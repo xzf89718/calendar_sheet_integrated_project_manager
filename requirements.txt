@@ -1,0 +1,16 @@
+# 销售项目跟进 - Python 依赖
+# 安装: pip install -r requirements.txt
+
+# 必需：Excel 导入/导出（.xlsx 读写）
+openpyxl>=3.1
+
+# 通知推送（Windows 原生通知，Win10/Win11）
+windows-toasts>=1.1
+
+# 备选通知库（windows-toasts 装不上时用它，二选一即可）
+# win10toast>=0.9
+
+# 注意：GUI 用的 tkinter 是 Python 标准库，无需安装。
+# Windows 官方版 Python 自带 tkinter；
+# 若用精简版 Python 报错 "No module named tkinter"，
+# 请改用 python.org 官方安装包。

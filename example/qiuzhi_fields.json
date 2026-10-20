@@ -1,0 +1,277 @@
+{
+  "product_name": "求职项目跟进",
+  "db_name": "qiuzhi.db",
+  "name_fields": [
+    "customer",
+    "product"
+  ],
+  "fields": [
+    {
+      "name": "start_date",
+      "label": "投递日期",
+      "type": "date",
+      "calendar": "start"
+    },
+    {
+      "name": "customer",
+      "label": "公司",
+      "type": "text"
+    },
+    {
+      "name": "city",
+      "label": "城市",
+      "type": "text"
+    },
+    {
+      "name": "product",
+      "label": "岗位",
+      "type": "text"
+    },
+    {
+      "name": "application",
+      "label": "投递渠道",
+      "type": "choice",
+      "choices": [
+        "官网",
+        "内推",
+        "BOSS直聘",
+        "实习僧",
+        "校招宣讲",
+        "猎头"
+      ]
+    },
+    {
+      "name": "brief",
+      "label": "岗位要点",
+      "type": "text",
+      "multiline": true,
+      "height": 4
+    },
+    {
+      "name": "milestone",
+      "label": "阶段",
+      "type": "choice",
+      "choices": [
+        "已投递",
+        "简历过筛",
+        "笔试",
+        "一面",
+        "二面",
+        "终面",
+        "Offer"
+      ],
+      "default": "已投递"
+    },
+    {
+      "name": "status",
+      "label": "状态",
+      "type": "status",
+      "choices": [
+        "投递中",
+        "已Offer",
+        "已拒",
+        "已放弃"
+      ],
+      "default": "投递中",
+      "_说明": "特殊字段，全程序只能有一个：取值为 status_closed 里列的值时归档（默认列表和日历消失，可在'显示已关闭'找回，历史保留）。已Offer也算归档——Offer 到手这单就'结案'了，随时翻回来。"
+    },
+    {
+      "name": "probability",
+      "label": "意向度(1-5)",
+      "type": "int",
+      "default": 3
+    },
+    {
+      "name": "amount",
+      "label": "薪资范围",
+      "type": "text"
+    },
+    {
+      "name": "followup_note",
+      "label": "跟进记录",
+      "type": "text",
+      "multiline": true,
+      "height": 10,
+      "max_lines": 6
+    },
+    {
+      "name": "next_followup",
+      "label": "下一次行动日期",
+      "type": "date",
+      "calendar": "followup"
+    },
+    {
+      "name": "close_date",
+      "label": "结束日期",
+      "type": "date",
+      "calendar": "close"
+    },
+    {
+      "name": "fail_reason",
+      "label": "复盘(被拒原因)",
+      "type": "text",
+      "multiline": true,
+      "height": 4
+    }
+  ],
+  "status_closed": [
+    "已Offer",
+    "已拒",
+    "已放弃"
+  ],
+  "_status_closed说明": "哪些状态算'结案'：已Offer/已拒/已放弃 都会归档。逻辑固定，取值可自由改。",
+  "backup": {
+    "_说明": "数据库备份。path=备份目录（相对路径相对程序目录，也支持绝对路径和~）；identifier=备份文件名里的识别符。文件名格式：时间(精确到秒)-识别符-数据库文件名。",
+    "path": "backups",
+    "identifier": "求职备份"
+  },
+  "search": {
+    "_说明": "搜索框匹配的字段范围（子串、不区分大小写、多关键词空格分隔取AND）。",
+    "fields": [
+      "customer",
+      "city",
+      "product",
+      "application",
+      "brief",
+      "milestone",
+      "status",
+      "followup_note",
+      "fail_reason"
+    ]
+  },
+  "import_default_status": "投递中",
+  "_import_default_status说明": "导入时如果状态为空，一律填这个值。",
+  "weekly_sheet": {
+    "_说明": "周报模式下方表格的列。内置列：snapshot_at=追加时间、project=项目、change_summary=改动说明；其余写字段名。",
+    "columns": [
+      "snapshot_at",
+      "project",
+      "milestone",
+      "status",
+      "next_followup",
+      "change_summary"
+    ]
+  },
+  "_templates说明": "导入/导出模板。field=数据库字段（表头用其 label）；label+const=不在库里的列，导出时填 const 字符串、导入时忽略；defaults=导入时给字段的固定赋值；kind=weekly 为周报导出专用模板（只读视图，不可导入）。加模板=往数组加一段。",
+  "templates": [
+    {
+      "name": "通用",
+      "columns": "all"
+    },
+    {
+      "name": "牛客投递表",
+      "columns": [
+        {
+          "field": "customer",
+          "label": "公司"
+        },
+        {
+          "field": "product",
+          "label": "岗位"
+        },
+        {
+          "field": "city",
+          "label": "工作地点"
+        },
+        {
+          "field": "start_date",
+          "label": "投递日期"
+        },
+        {
+          "field": "application",
+          "label": "投递渠道"
+        },
+        {
+          "field": "milestone",
+          "label": "当前进度"
+        },
+        {
+          "field": "status",
+          "label": "状态"
+        },
+        {
+          "field": "next_followup",
+          "label": "待办日期"
+        },
+        {
+          "field": "followup_note",
+          "label": "备注"
+        }
+      ]
+    },
+    {
+      "_周报说明": "kind=weekly 为周报导出专用模板（只读视图，不可导入）：date 列=追加时间；name 列=项目名(name_fields 组合，求职版=公司-岗位)；field 列=快照字段。",
+      "name": "周报",
+      "kind": "weekly",
+      "columns": [
+        {
+          "date": "snapshot_at",
+          "label": "日期"
+        },
+        {
+          "name": true,
+          "label": "求职项目"
+        },
+        {
+          "field": "milestone",
+          "label": "阶段"
+        },
+        {
+          "field": "status",
+          "label": "状态"
+        },
+        {
+          "field": "next_followup",
+          "label": "下一次行动"
+        },
+        {
+          "field": "followup_note",
+          "label": "跟进记录"
+        },
+        {
+          "field": "change_summary",
+          "label": "改动说明"
+        }
+      ]
+    }
+  ],
+  "ui": {
+    "window": {
+      "width": 1480,
+      "height": 860,
+      "margin_x": 80,
+      "margin_y": 120
+    },
+    "font": {
+      "default": 12,
+      "tree_rowheight": 38,
+      "heading_size": 13
+    },
+    "columns": {
+      "min_width": 70,
+      "max_width": 360
+    },
+    "calendar": {
+      "max_per_day": 1
+    },
+    "calendar_labels": {
+      "start": "投递",
+      "followup": "行动",
+      "close": "结束"
+    },
+    "editor": {
+      "width": 840,
+      "height": 940,
+      "entry_width": 52,
+      "text_width": 50
+    },
+    "render_limit": 600
+  },
+  "calendar_mode": "filtered",
+  "_calendar_mode说明": "日历渲染模式：all=当月全部(默认)；filtered=跟随表格筛选。",
+  "default_sort": {
+    "column": "start_date",
+    "desc": true
+  },
+  "_default_sort说明": "跟进表模式打开时的默认排序。求职版=start_date(投递日期)倒序。有误时退路 id 倒序。"
+}

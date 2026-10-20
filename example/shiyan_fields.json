@@ -1,0 +1,117 @@
+{
+  "product_name": "实验记录本",
+  "db_name": "shiyan.db",
+  "_说明": "实验记录本形态：替代纸质记录本/Excel，按日期记录实验、条件留痕可复现。用法：复制本文件为包根目录的 fields.json，重启即切换形态。",
+  "name_fields": ["experiment"],
+  "_name_fields说明": "项目名 = 实验名称（单字段直取）。",
+  "fields": [
+    {"name": "start_date",  "label": "实验日期",       "type": "date",   "calendar": "start"},
+    {"name": "experiment",  "label": "实验名称",       "type": "text"},
+    {"name": "operator",    "label": "记录人",         "type": "text"},
+    {"name": "stage",       "label": "实验阶段",       "type": "choice",
+     "choices": ["预实验", "正式实验", "复现验证", "补充实验"],
+     "default": "预实验"},
+    {"name": "brief",       "label": "实验目的",       "type": "text"},
+    {"name": "conditions",  "label": "条件参数",       "type": "text",
+     "multiline": true, "height": 5, "max_lines": 4},
+    {"name": "followup_note","label": "实验记录与现象","type": "text",
+     "multiline": true, "height": 10, "max_lines": 6},
+    {"name": "result",      "label": "结果与结论",     "type": "text",
+     "multiline": true, "height": 5, "max_lines": 4},
+    {"name": "deviation",   "label": "异常与偏差",     "type": "text",
+     "multiline": true, "height": 4, "max_lines": 4},
+    {"name": "status",      "label": "状态",           "type": "status",
+     "choices": ["进行中", "实验成功", "实验失败"],
+     "default": "进行中",
+     "_说明": "特殊字段：实验成功/实验失败 = 归档（列表和日历消失，可在'显示已关闭'找回，历史保留）。失败时填'失败原因'。"},
+    {"name": "priority",    "label": "优先级(1-5)",    "type": "int",
+     "default": 3},
+    {"name": "next_followup","label": "下次实验日期",  "type": "date",
+     "calendar": "followup"},
+    {"name": "close_date",  "label": "结束日期",       "type": "date",
+     "calendar": "close"},
+    {"name": "fail_reason", "label": "失败原因",       "type": "text",
+     "multiline": true, "height": 4}
+  ],
+  "status_closed": ["实验成功", "实验失败"],
+  "_status_closed说明": "实验成功/实验失败 归档。失败不是污点——记录本里最值钱的内容之一。",
+  "default_sort": {"column": "start_date", "desc": true},
+  "backup": {
+    "_说明": "数据库备份。path=备份目录（相对程序目录）；identifier=文件名识别符。",
+    "path": "backups",
+    "identifier": "实验备份"
+  },
+  "search": {
+    "_说明": "搜索范围。",
+    "fields": ["experiment", "operator", "brief", "conditions",
+               "followup_note", "result", "deviation", "stage",
+               "status", "fail_reason"]
+  },
+  "import_default_status": "进行中",
+  "weekly_sheet": {
+    "_说明": "周报模式下方表格的列。",
+    "columns": ["snapshot_at", "project", "stage", "operator",
+                "next_followup", "change_summary"]
+  },
+  "templates": [
+    {"name": "通用", "columns": "all"},
+    {
+      "_周报说明": "kind=weekly 导出专用（只读视图）。",
+      "name": "实验周报",
+      "kind": "weekly",
+      "columns": [
+        {"date": "snapshot_at", "label": "日期"},
+        {"name": true, "label": "实验名称"},
+        {"field": "stage", "label": "实验阶段"},
+        {"field": "status", "label": "状态"},
+        {"field": "operator", "label": "记录人"},
+        {"field": "next_followup", "label": "下次实验日期"},
+        {"field": "followup_note", "label": "实验记录与现象"},
+        {"field": "change_summary", "label": "改动说明"}
+      ]
+    },
+    {
+      "name": "实验条件表",
+      "_说明": "只导出条件参数，横向对比两次实验用。",
+      "columns": [
+        {"field": "start_date", "label": "实验日期"},
+        {"field": "experiment", "label": "实验名称"},
+        {"field": "conditions", "label": "条件参数"},
+        {"field": "result", "label": "结果与结论"}
+      ]
+    }
+  ],
+  "display_mainsheet": [
+    {"name": "id", "alias": "", "on": true},
+    {"name": "start_date", "alias": "", "on": true, "filter": "range"},
+    {"name": "experiment", "alias": "", "on": true},
+    {"name": "operator", "alias": "", "on": true},
+    {"name": "stage", "alias": "", "on": true},
+    {"name": "brief", "alias": "", "on": true},
+    {"name": "conditions", "alias": "", "on": true},
+    {"name": "followup_note", "alias": "", "on": true},
+    {"name": "result", "alias": "", "on": true},
+    {"name": "deviation", "alias": "", "on": true},
+    {"name": "status", "alias": "", "on": true},
+    {"name": "priority", "alias": "", "on": true},
+    {"name": "next_followup", "alias": "", "on": true, "filter": "range"},
+    {"name": "close_date", "alias": "", "on": true, "filter": "range"},
+    {"name": "fail_reason", "alias": "", "on": true}
+  ],
+  "calendar_mode": "filtered",
+  "split": {
+    "_说明": "db_split 输出文件名配方。",
+    "components": ["field", "key", "time"],
+    "prefix": ""
+  },
+  "ui": {
+    "window": {"width": 1480, "height": 860, "margin_x": 80, "margin_y": 120},
+    "font": {"default": 12, "tree_rowheight": 38, "heading_size": 13},
+    "columns": {"min_width": 70, "max_width": 360},
+    "calendar": {"max_per_day": 1},
+    "calendar_labels": {"start": "实验", "followup": "待做", "close": "结束"},
+    "editor": {"width": 840, "height": 940, "entry_width": 52,
+               "text_width": 50},
+    "render_limit": 600
+  }
+}
