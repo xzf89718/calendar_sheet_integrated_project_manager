@@ -187,7 +187,9 @@ class MainApp(tk.Tk):
         self.reload()          # 启动即加载数据
 
         # Windows 通知：启动后推一次当天事项，之后每 30 分钟检查跨天
+        # _last_seen_date：日历跨天自动翻页的日期标记（与通知互相独立）
         self._last_notify_date = None
+        self._last_seen_date = None
         self.after(1500, self._notify_today)
         self.after(30 * 60 * 1000, self._notify_loop)
 
@@ -211,9 +213,17 @@ class MainApp(tk.Tk):
         self._last_notify_date = date.today()
 
     def _notify_loop(self):
-        """每 30 分钟：跨天时重新推送。"""
+        """每 30 分钟巡检：跨天时日历自动翻到新日期 + 重新推送。
+        日历刷新只在日期变化时发生一次，不弹通知、不刷屏。"""
         from datetime import date
-        if date.today() != self._last_notify_date:
+        today = date.today()
+        if today != getattr(self, "_last_seen_date", None):
+            self._last_seen_date = today
+            # 翻到新日期：跨月时连月份一起翻过去（否则停留在旧月）
+            if (self.cal.year, self.cal.month) != (today.year, today.month):
+                self.cal.year, self.cal.month = today.year, today.month
+            self.cal.refresh()          # 今天高亮移动、月视图跟随
+        if today != self._last_notify_date:
             self._notify_today()
         self.after(30 * 60 * 1000, self._notify_loop)
 
