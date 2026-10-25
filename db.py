@@ -340,12 +340,13 @@ class Database:
         """只给指定项目集合供给日历条目（filtered 模式用）。"""
         if not project_ids:
             return []
-        cal_names = list(CFG.calendar.values())
+        date_items = [(k, f) for k, f, _l, _c in CFG.calendar_dates if f]
+        cal_names = [f for _k, f in date_items]
         name_cols = [c for c in CFG.name_fields if c in SNAPSHOT_FIELDS]
         select_cols = ", ".join(f"s.{c}" for c in cal_names + name_cols)
         ph = ",".join("?" * len(project_ids))
         prefix = f"{year:04d}-{month:02d}"
-        kind_tag = CFG.cal_labels
+        kind_tag = {k: l for k, _f, l, _c in CFG.calendar_dates}
         rows = self.conn.execute(
             f"""SELECT p.id AS pid, p.title, {select_cols}
                 FROM projects p
@@ -356,7 +357,7 @@ class Database:
         for r in rows:
             name = "-".join(x for x in (r[c] for c in name_cols) if x) \
                 or r["title"]
-            for kind, col in CFG.calendar.items():
+            for kind, col in date_items:
                 d = r[col]
                 if d and d.startswith(prefix):
                     entries.append({
@@ -443,8 +444,9 @@ class Database:
         日历组件不认识项目，只认这三个字段 + payload。
         """
         prefix = f"{year:04d}-{month:02d}"
-        # 日历时间节点由配置驱动：fields.json 里带 "calendar" 标记的日期字段
-        cal_names = list(CFG.calendar.values())          # 如 start_date 等
+        # 日历类别全配置化（v2.5.0 calendar_dates）：字段/显示名/颜色
+        date_items = [(k, f) for k, f, _l, _c in CFG.calendar_dates if f]
+        cal_names = [f for _k, f in date_items]
         # 项目名组合字段由 JSON 的 name_fields 配置（空值跳过）
         name_cols = [c for c in CFG.name_fields if c in SNAPSHOT_FIELDS]
         select_cols = ", ".join(f"s.{c}" for c in cal_names + name_cols)
@@ -453,17 +455,17 @@ class Database:
                 FROM projects p
                 JOIN snapshots s ON s.id = p.current_id
                 WHERE p.status='open'""").fetchall()
-        kind_tag = CFG.cal_labels
+        label_of = {k: l for k, _f, l, _c in CFG.calendar_dates}
         entries = []
         for r in rows:
             name = "-".join(x for x in (r[c] for c in name_cols) if x) \
                 or r["title"]
-            for kind, col in CFG.calendar.items():
+            for kind, col in date_items:
                 d = r[col]
                 if d and d.startswith(prefix):
                     entries.append({
                         "date": d, "kind": kind,
-                        "text": f"[{kind_tag.get(kind, kind)}] {name}",
+                        "text": f"[{label_of.get(kind, kind)}] {name}",
                         "project_id": r["pid"],
                     })
         return entries

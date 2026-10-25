@@ -9,8 +9,7 @@
     {
       "name": "start_date",
       "label": "投递日期",
-      "type": "date",
-      "calendar": "start"
+      "type": "date"
     },
     {
       "name": "customer",
@@ -97,14 +96,12 @@
     {
       "name": "next_followup",
       "label": "下一次行动日期",
-      "type": "date",
-      "calendar": "followup"
+      "type": "date"
     },
     {
       "name": "close_date",
       "label": "结束日期",
-      "type": "date",
-      "calendar": "close"
+      "type": "date"
     },
     {
       "name": "fail_reason",
@@ -273,5 +270,31 @@
     "column": "start_date",
     "desc": true
   },
-  "_default_sort说明": "跟进表模式打开时的默认排序。求职版=start_date(投递日期)倒序。有误时退路 id 倒序。"
+  "_default_sort说明": "跟进表模式打开时的默认排序。求职版=start_date(投递日期)倒序。有误时退路 id 倒序。",
+  "calendar_dates": [
+    {
+      "key": "start",
+      "field": "start_date",
+      "label": "投递",
+      "color": "#2e7d32"
+    },
+    {
+      "key": "followup",
+      "field": "next_followup",
+      "label": "待办",
+      "color": "#1565c0"
+    },
+    {
+      "key": "close",
+      "field": "close_date",
+      "label": "结项",
+      "color": "#c62828"
+    },
+    {
+      "key": "append",
+      "label": "追加",
+      "color": "#6a1b9a"
+    }
+  ],
+  "_calendar_dates说明": "日历日期类别（全配置化）：法定 start/followup/close（各绑定一个日期字段，显示名和颜色可改）+ append（追加记录，无字段）；可继续追加任意日期字段（每项 key/field/label/color）。本软件特色：一个项目多个日期，每个日期都能在日历上点击找到项目。"
 }

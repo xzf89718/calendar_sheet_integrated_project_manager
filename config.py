@@ -98,6 +98,43 @@ class Config:
                                 if e.get("filter")}
         # 日历渲染模式："all"(当月全部，默认) / "filtered"(跟随表格筛选)
         self.calendar_mode = data.get("calendar_mode", "all")
+        # 日历日期类别（v2.5.0 全配置化，本软件特色：一个项目多个日期）：
+        # 法定四个：start/followup/close（各绑定一个日期字段）+ append
+        # （追加记录，无字段，用快照时间）；此后可继续加任意日期字段。
+        # 每项：key=类别标识，field=日期字段名（append 不写），
+        #      label=显示名，color=#RRGGBB。
+        cd = data.get("calendar_dates")
+        if cd is None:
+            # 旧式配置自动转换：fields 的 calendar 标记 + calendar_labels
+            labels = self.ui.get("calendar_labels", {})
+            base = {"start": "#2e7d32", "followup": "#1565c0",
+                    "close": "#c62828", "append": "#6a1b9a"}
+            cd = [{"key": f["calendar"], "field": f["name"],
+                   "label": labels.get(f["calendar"], f["calendar"]),
+                   "color": base[f["calendar"]]}
+                  for f in self.fields
+                  if f.get("calendar") in ("start", "followup", "close")]
+            cd.append({"key": "append",
+                       "label": labels.get("append", "追加"),
+                       "color": base["append"]})
+        keys = [e.get("key") for e in cd]
+        for req in ("start", "followup", "close"):
+            if req not in keys:
+                raise ValueError(
+                    f"calendar_dates 缺少法定类别：{req}"
+                    f"（start/followup/close/append 必须有）")
+        for e in cd:
+            if e["key"] == "append":
+                continue
+            f = e.get("field")
+            fd = next((x for x in self.fields if x["name"] == f), None)
+            if fd is None or fd["type"] != "date":
+                raise ValueError(
+                    f"calendar_dates 的 {e['key']} 指向无效日期字段：{f}")
+        # [(key, field 或 None, label, color)]
+        self.calendar_dates = [
+            (e["key"], e.get("field"), e.get("label", e["key"]),
+             e.get("color", "#333333")) for e in cd]
         # 表格渲染上限（v2.0 懒渲染）：筛选+排序全量进行，仅显示前 N 条，
         # 数据层（导出/日历/周报/备份/写入）不受影响
         self.render_limit = int(self.ui.get("render_limit", 600))

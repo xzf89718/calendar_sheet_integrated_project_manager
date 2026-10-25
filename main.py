@@ -58,6 +58,7 @@ class MainApp(tk.Tk):
             on_entry_click=self._open_project,   # 点条目 -> 看项目
             on_day_click=self._open_day,         # 点日期/还有N条 -> 当天明细
             max_per_day=CFG.cal_ui.get("max_per_day", 1),
+            colors=_kind_colors(),               # 类别颜色：calendar_dates 配置
         )
         self.cal.pack(fill="x", padx=8, pady=8)
 
@@ -400,8 +401,9 @@ class MainApp(tk.Tk):
             # 日历组件一次只查询当前查看页的年月，窗口检查是恒真的
             # 赘余——直接供给所查月份即可：看 12 月时翻 11/12/1 月，
             # 各自显示当月追加记录（跨年天然正确），无白屏。
+            append_label = _kind_labels().get("append", "追加")
             return [{"date": e["date"], "kind": "append",
-                     "text": "[追加] " + e["text"],
+                     "text": f"[{append_label}] " + e["text"],
                      "project_id": e["project_id"]}
                     for e in self.db.calendar_snapshots(year, month)]
         if CFG.calendar_mode == "filtered":
@@ -431,10 +433,12 @@ class MainApp(tk.Tk):
         tpl = next((t for t in CFG.templates
                     if t.get("kind") == "weekly"), None)
         if tpl is None:
-            messagebox.showerror(
-                "缺少模板", "fields.json 中没有 kind=weekly 的周报模板",
-                parent=self)
-            return
+            # 内置默认周报列：JSON 不配 kind=weekly 也能导出
+            tpl = {"kind": "weekly", "columns": [
+                ("日期", "__date__", None),
+                ("项目", "__name__", None),
+                ("跟进记录", "followup_note", None),
+                ("改动说明", "change_summary", None)]}
         path = filedialog.asksaveasfilename(
             parent=self, defaultextension=".xlsx",
             initialfile=f"周报_{d1}~{d2}.xlsx",
@@ -1005,7 +1009,14 @@ class FilterPopup(tk.Toplevel):
         self.destroy()
 
 
-KIND_LABELS = CFG.cal_labels          # 日历类别显示名，fields.json 可配
+def _kind_labels():
+    """日历类别显示名：calendar_dates 配置驱动（v2.5.0）。"""
+    return {k: l for k, _f, l, _c in CFG.calendar_dates}
+
+
+def _kind_colors():
+    """日历类别颜色：calendar_dates 配置驱动。"""
+    return {k: c for k, _f, _l, c in CFG.calendar_dates}
 
 
 class DayWindow(tk.Toplevel):
