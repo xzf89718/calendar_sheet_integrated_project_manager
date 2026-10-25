@@ -1,36 +1,109 @@
 {
-  "product_name": "日期表格聚合项目管理框架",
+  "product_name": "日历表格聚合项目跟进工作台",
   "db_name": "sales_pm.db",
-  "name_fields": ["customer", "product"],
+  "name_fields": [
+    "customer",
+    "product"
+  ],
   "_name_fields说明": "项目名由哪几列按序拼接（空值跳过）。当前 = 客户-产品。",
   "fields": [
-    {"name": "start_date",  "label": "开始日期",       "type": "date",   "calendar": "start"},
-    {"name": "customer",    "label": "终端客户",       "type": "text"},
-    {"name": "city",        "label": "城市",           "type": "text"},
-    {"name": "product",     "label": "产品名",         "type": "text"},
-    {"name": "brief",       "label": "简述",           "type": "text",   "multiline": true, "height": 5, "max_lines": 4},
-    {"name": "status",      "label": "状态",           "type": "status",
-     "choices": ["跟进中", "成单", "关闭"],
-     "default": "跟进中",
-     "_说明": "特殊字段，全程序只能有一个：取值为 status_closed 里列的值时归档（默认列表和日历消失，可在'显示已关闭'找回，历史保留）。"},
-    {"name": "probability", "label": "成单概率(%)",    "type": "int",
-     "default": 30},
-    {"name": "amount",      "label": "金额（USD）",    "type": "float"},
-    {"name": "followup_note","label": "跟进记录",      "type": "text",   "multiline": true, "height": 10, "max_lines": 6},
-    {"name": "next_followup","label": "下一个跟进日期","type": "date",   "calendar": "followup"},
-    {"name": "close_date",  "label": "项目关闭日期",   "type": "date",   "calendar": "close"},
-    {"name": "fail_reason", "label": "失败原因",       "type": "text",   "multiline": true, "height": 4}
+    {
+      "name": "start_date",
+      "label": "开始日期",
+      "type": "date"
+    },
+    {
+      "name": "customer",
+      "label": "终端客户",
+      "type": "text"
+    },
+    {
+      "name": "city",
+      "label": "城市",
+      "type": "text"
+    },
+    {
+      "name": "product",
+      "label": "产品名",
+      "type": "text"
+    },
+    {
+      "name": "brief",
+      "label": "简述",
+      "type": "text",
+      "multiline": true,
+      "height": 5,
+      "max_lines": 4
+    },
+    {
+      "name": "status",
+      "label": "状态",
+      "type": "status",
+      "choices": [
+        "跟进中",
+        "成单",
+        "关闭"
+      ],
+      "default": "跟进中",
+      "_说明": "特殊字段，全程序只能有一个：取值为 status_closed 里列的值时归档（默认列表和日历消失，可在'显示已关闭'找回，历史保留）。"
+    },
+    {
+      "name": "probability",
+      "label": "成单概率(%)",
+      "type": "int",
+      "default": 30
+    },
+    {
+      "name": "amount",
+      "label": "金额（USD）",
+      "type": "float"
+    },
+    {
+      "name": "followup_note",
+      "label": "跟进记录",
+      "type": "text",
+      "multiline": true,
+      "height": 10,
+      "max_lines": 6
+    },
+    {
+      "name": "next_followup",
+      "label": "下一个跟进日期",
+      "type": "date"
+    },
+    {
+      "name": "close_date",
+      "label": "项目关闭日期",
+      "type": "date"
+    },
+    {
+      "name": "fail_reason",
+      "label": "失败原因",
+      "type": "text",
+      "multiline": true,
+      "height": 4
+    }
   ],
-  "status_closed": ["成单", "关闭"],
+  "status_closed": [
+    "成单",
+    "关闭"
+  ],
   "_status_closed说明": "哪些状态值算'归档'：归档的项目不进默认列表、不上日历，仅在'显示已关闭'里可见。逻辑固定，取值可自由改。",
   "calendar_mode": "filtered",
   "_calendar_mode说明": "日历渲染模式：all=当月全部；filtered=跟随表格筛选（默认，日历与表格聚合联动的核心体验）。",
   "split": {
     "_说明": "db_split 分拆器的输出文件名配方。components=组成部分及顺序（field=键列名/key=键值/time=时间/prefix=前缀文本，空段自动跳过）；prefix=前缀文本。",
-    "components": ["field", "key", "time"],
+    "components": [
+      "field",
+      "key",
+      "time"
+    ],
     "prefix": ""
   },
-  "default_sort": {"column": "start_date", "desc": true},
+  "default_sort": {
+    "column": "start_date",
+    "desc": true
+  },
   "_default_sort说明": "跟进表打开时的默认排序。column=字段名（或id），desc=true倒序。读取不到或列名有误时自动退路为 id 倒序，不报错。",
   "backup": {
     "_说明": "数据库备份。path=备份目录（相对路径相对程序目录，也支持绝对路径和~）；identifier=备份文件名里的识别符。",
@@ -39,55 +112,189 @@
   },
   "search": {
     "_说明": "搜索框匹配的字段范围（子串、不区分大小写、多关键词空格分隔取AND）。",
-    "fields": ["customer", "city", "product", "brief", "status",
-               "followup_note", "fail_reason"]
+    "fields": [
+      "customer",
+      "city",
+      "product",
+      "brief",
+      "status",
+      "followup_note",
+      "fail_reason"
+    ]
   },
   "import_default_status": "跟进中",
   "_import_default_status说明": "导入时如果状态为空，一律填这个值。",
   "templates": [
-    {"name": "全选", "columns": "all"},
+    {
+      "name": "全选",
+      "columns": "all"
+    },
     {
       "_周报说明": "kind=weekly 为周报导出专用模板（只读视图，不可导入）：date 列=追加时间；name 列=项目名(按 name_fields 组合)；field 列=快照字段。不提供对应 xlsx 文件。",
       "name": "周报",
       "kind": "weekly",
       "columns": [
-        {"date": "snapshot_at", "label": "日期"},
-        {"name": true, "label": "项目"},
-        {"field": "status",       "label": "状态"},
-        {"field": "followup_note","label": "跟进记录"},
-        {"field": "change_summary","label": "改动说明"}
+        {
+          "date": "snapshot_at",
+          "label": "日期"
+        },
+        {
+          "name": true,
+          "label": "项目"
+        },
+        {
+          "field": "status",
+          "label": "状态"
+        },
+        {
+          "field": "followup_note",
+          "label": "跟进记录"
+        },
+        {
+          "field": "change_summary",
+          "label": "改动说明"
+        }
       ]
     }
   ],
   "_templates说明": "导入/导出模板。field=数据库字段（表头用其 label）；label+const=不在库里的列，导出填 const 字符串、导入时忽略；defaults=导入时给字段的固定赋值；columns=all 表示全量字段；kind=weekly 为周报导出专用。加模板=往数组加一段。",
   "display_mainsheet": [
-    {"name": "id",        "alias": "", "on": true},
-    {"name": "start_date","alias": "", "on": true, "filter": "range"},
-    {"name": "customer",  "alias": "", "on": true},
-    {"name": "city",      "alias": "", "on": true},
-    {"name": "product",   "alias": "", "on": true},
-    {"name": "brief",     "alias": "", "on": true},
-    {"name": "status",    "alias": "", "on": true},
-    {"name": "probability","alias": "", "on": true},
-    {"name": "amount",    "alias": "", "on": true},
-    {"name": "followup_note","alias": "", "on": true},
-    {"name": "next_followup","alias": "", "on": true, "filter": "range"},
-    {"name": "close_date","alias": "", "on": true, "filter": "range"},
-    {"name": "fail_reason","alias": "", "on": true}
+    {
+      "name": "id",
+      "alias": "",
+      "on": true
+    },
+    {
+      "name": "start_date",
+      "alias": "",
+      "on": true,
+      "filter": "range"
+    },
+    {
+      "name": "customer",
+      "alias": "",
+      "on": true
+    },
+    {
+      "name": "city",
+      "alias": "",
+      "on": true
+    },
+    {
+      "name": "product",
+      "alias": "",
+      "on": true
+    },
+    {
+      "name": "brief",
+      "alias": "",
+      "on": true
+    },
+    {
+      "name": "status",
+      "alias": "",
+      "on": true
+    },
+    {
+      "name": "probability",
+      "alias": "",
+      "on": true
+    },
+    {
+      "name": "amount",
+      "alias": "",
+      "on": true
+    },
+    {
+      "name": "followup_note",
+      "alias": "",
+      "on": true
+    },
+    {
+      "name": "next_followup",
+      "alias": "",
+      "on": true,
+      "filter": "range"
+    },
+    {
+      "name": "close_date",
+      "alias": "",
+      "on": true,
+      "filter": "range"
+    },
+    {
+      "name": "fail_reason",
+      "alias": "",
+      "on": true
+    }
   ],
   "_display_mainsheet说明": "主界面显示配置。每项：name=字段原名（id 也可配，可关可改名），alias=列表表头别名（空=用字段默认显示名），on=true/false=是否显示，filter=该列筛选类型 list(勾选清单,默认)/range(从~到区间,适合日期)。数组顺序即列顺序。没写进这里的新字段自动补到末尾。数据/导出永远全量，这里只管看什么。",
   "weekly_sheet": {
     "_说明": "周报模式下方表格的列。内置列：snapshot_at=追加时间、project=项目、change_summary=改动说明；其余写字段名。",
-    "columns": ["snapshot_at", "project", "status", "next_followup", "change_summary"]
+    "columns": [
+      "snapshot_at",
+      "project",
+      "status",
+      "next_followup",
+      "change_summary"
+    ]
   },
   "ui": {
-    "window": {"width": 1480, "height": 860, "margin_x": 80, "margin_y": 120},
-    "font": {"default": 12, "tree_rowheight": 38, "heading_size": 13},
-    "columns": {"min_width": 70, "max_width": 360},
-    "calendar": {"max_per_day": 1},
-    "calendar_labels": {"start": "开始", "followup": "跟进", "close": "关闭"},
-    "editor": {"width": 840, "height": 940, "entry_width": 52,
-               "text_width": 50},
+    "window": {
+      "width": 1480,
+      "height": 860,
+      "margin_x": 80,
+      "margin_y": 120
+    },
+    "font": {
+      "default": 12,
+      "tree_rowheight": 38,
+      "heading_size": 13
+    },
+    "columns": {
+      "min_width": 70,
+      "max_width": 360
+    },
+    "calendar": {
+      "max_per_day": 1
+    },
+    "calendar_labels": {
+      "start": "开始",
+      "followup": "跟进",
+      "close": "关闭"
+    },
+    "editor": {
+      "width": 840,
+      "height": 940,
+      "entry_width": 52,
+      "text_width": 50
+    },
     "render_limit": 600
-  }
+  },
+  "calendar_dates": [
+    {
+      "key": "start",
+      "field": "start_date",
+      "label": "开始",
+      "color": "#2e7d32"
+    },
+    {
+      "key": "followup",
+      "field": "next_followup",
+      "label": "跟进",
+      "color": "#1565c0"
+    },
+    {
+      "key": "close",
+      "field": "close_date",
+      "label": "关闭",
+      "color": "#c62828"
+    },
+    {
+      "key": "append",
+      "label": "追加",
+      "color": "#6a1b9a"
+    }
+  ],
+  "_calendar_dates说明": "日历日期类别（全配置化）：法定 start/followup/close（各绑定一个日期字段，显示名和颜色可改）+ append（追加记录，无字段）；可继续追加任意日期字段（每项 key/field/label/color）。本软件特色：一个项目多个日期，每个日期都能在日历上点击找到项目。"
 }
