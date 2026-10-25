@@ -340,7 +340,9 @@ class Database:
         """只给指定项目集合供给日历条目（filtered 模式用）。"""
         if not project_ids:
             return []
-        date_items = [(k, f) for k, f, _l, _c in CFG.calendar_dates if f]
+        # show_calendar=false 的类别不上日历（v2.6.0 显示开关）
+        date_items = [(k, f) for k, f, _l, _c in CFG.calendar_dates
+                      if f and CFG.calendar_show.get(k, True)]
         cal_names = [f for _k, f in date_items]
         name_cols = [c for c in CFG.name_fields if c in SNAPSHOT_FIELDS]
         select_cols = ", ".join(f"s.{c}" for c in cal_names + name_cols)
@@ -445,7 +447,9 @@ class Database:
         """
         prefix = f"{year:04d}-{month:02d}"
         # 日历类别全配置化（v2.5.0 calendar_dates）：字段/显示名/颜色
-        date_items = [(k, f) for k, f, _l, _c in CFG.calendar_dates if f]
+        # show_calendar=false 的类别不上日历（v2.6.0 显示开关）
+        date_items = [(k, f) for k, f, _l, _c in CFG.calendar_dates
+                      if f and CFG.calendar_show.get(k, True)]
         cal_names = [f for _k, f in date_items]
         # 项目名组合字段由 JSON 的 name_fields 配置（空值跳过）
         name_cols = [c for c in CFG.name_fields if c in SNAPSHOT_FIELDS]

@@ -6,6 +6,7 @@
 """
 import re
 import tkinter as tk
+from datetime import date as _date
 from tkinter import ttk, messagebox
 
 from db import SNAPSHOT_FIELDS, normalize_date as _norm_date
@@ -19,6 +20,87 @@ COMBO_FIELDS[CFG.status_field] = CFG.status_options
 DATE_FIELDS = tuple(CFG.date_fields)
 INT_FIELDS = set(CFG.int_fields)
 FLOAT_FIELDS = set(CFG.float_fields)
+
+
+def validate_field_input(name, raw):
+    """单字段输入校验（v2.6.0，纯函数，GUI 无关）。
+
+    按字段类型（fields.json 的 type）分别检查：
+      date   须能被识别为真实日期（兼容全角/中文写法），统一成 YYYY-MM-DD；
+      int    必须是整数（兼容 "30%" 写法），拒绝小数与字母；
+      float  必须是实数；
+      其余   字符串/choice/status：任意文本合法，仅去首尾空白。
+    返回 (清洗后的值, 错误消息或 None)。
+    """
+    raw = "" if raw is None else str(raw).strip()
+    if not raw:
+        return "", None
+    if name in DATE_FIELDS:
+        v = _norm_date(raw)
+        if v is None:
+            return raw, "必须是有效日期（如 2026-10-25、2026/10/25、2026年10月25日）"
+        try:
+            _date.fromisoformat(v)     # 格式对了还要是真实日历日
+        except ValueError:
+            return raw, f"日期不存在：{v}（请检查年/月/日）"
+        return v, None
+    if name in INT_FIELDS:
+        s = raw.rstrip("%").strip()
+        try:
+            fv = float(s)
+        except ValueError:
+            return raw, "必须是整数（如 30）"
+        if not fv.is_integer():
+            return raw, "必须是整数，不能带小数"
+        return int(fv), None
+    if name in FLOAT_FIELDS:
+        try:
+            return float(raw), None
+        except ValueError:
+            return raw, "必须是数字（如 3.5）"
+    return raw, None          # 字符串/choice/status：始终合法
+
+
+def validate_snapshot_fields(fields):
+    """整表校验：对 SNAPSHOT_FIELDS 逐个过 validate_field_input。
+
+    返回 (清洗后的 dict, 错误消息列表)。错误带字段显示名，逐条列出。
+    """
+    cleaned, errors = {}, []
+    for f in SNAPSHOT_FIELDS:
+        v, err = validate_field_input(f, fields.get(f, ""))
+        if err:
+            errors.append(f"「{LABELS.get(f, f)}」{err}")
+        cleaned[f] = v
+    return cleaned, errors
+
+
+def check_date_bounds(fields):
+    """日期范围检查器（v2.6.0，fields.json 的 date_check 段驱动）。
+
+    被检查的日期字段（date_check.fields）若有值，必须落在
+    [开始日期, 关闭日期] 内；某侧边界为空则该侧不检。enabled=false
+    或段缺省时直接放行。返回错误消息列表（空 = 通过）。
+    """
+    if not CFG.date_check_enabled:
+        return []
+    start_f, close_f = CFG.date_check_bounds
+    start_v = (fields.get(start_f) or "").strip() if start_f else ""
+    close_v = (fields.get(close_f) or "").strip() if close_f else ""
+    errors = []
+    if start_v and close_v and start_v > close_v:
+        errors.append(f"「{LABELS.get(start_f, start_f)}」{start_v} "
+                      f"晚于「{LABELS.get(close_f, close_f)}」{close_v}")
+    for f in CFG.date_check_fields:
+        v = (fields.get(f) or "").strip()
+        if not v:
+            continue
+        label = LABELS.get(f, f)
+        if start_v and v < start_v:
+            errors.append(f"「{label}」{v} 早于开始日期 {start_v}")
+        if close_v and v > close_v:
+            errors.append(f"「{label}」{v} 晚于关闭日期 {close_v}")
+    return errors
 
 
 class SnapshotEditor(tk.Toplevel):
@@ -121,20 +203,22 @@ class SnapshotEditor(tk.Toplevel):
         return self.vars[f].get().strip()
 
     def _save(self):
-        fields = {f: self._field(f) for f in SNAPSHOT_FIELDS}
-        for f in DATE_FIELDS:
-            if fields[f]:
-                fields[f] = _norm_date(fields[f])
-        try:
-            for f in INT_FIELDS:
-                if fields[f]:
-                    fields[f] = int(float(str(fields[f]).rstrip("%")))
-            for f in FLOAT_FIELDS:
-                if fields[f]:
-                    fields[f] = float(fields[f])
-        except ValueError:
-            bad = "、".join(INT_FIELDS | FLOAT_FIELDS)
-            messagebox.showwarning("提示", f"{bad} 必须是数字", parent=self)
+        # ① 字段类型校验（日期/整数/实数逐字段报错，字符串不拦）
+        fields, errors = validate_snapshot_fields(
+            {f: self._field(f) for f in SNAPSHOT_FIELDS})
+        if errors:
+            more = "\n……" if len(errors) > 8 else ""
+            messagebox.showwarning(
+                "请修正以下输入", "\n".join(errors[:8]) + more, parent=self)
+            return
+        # ② 日期范围检查器（date_check 配置驱动，不通过则阻止保存）
+        errors = check_date_bounds(fields)
+        if errors:
+            messagebox.showwarning(
+                "日期不在有效范围内",
+                "\n".join(errors)
+                + "\n\n（检查器可在 fields.json 的 date_check 段关闭）",
+                parent=self)
             return
         if self.project_id is None:
             pid = self.db.create_project(**fields)

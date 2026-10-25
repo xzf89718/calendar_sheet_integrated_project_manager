@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v2.5.1
+# 日历表格聚合项目跟进工作台 v2.6.0
 
 **面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
 做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
@@ -593,6 +593,14 @@ EXPLAIN QUERY PLAN SELECT * FROM snapshots WHERE project_id = 5;
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v2.6.0** 配置校验器（启动即全量核对 fields.json，错误逐条列出：
+  法定三日期字段、status、status_closed 必须在；周报法定四类
+  start/followup/close/append 锁定，仅 label/颜色/日历显隐可配）；
+  calendar_dates 每项新增 show_calendar（该类日期在日历显示与否；表格
+  显隐与顺序仍由 display_mainsheet 管）；
+  编辑器字段类型校验（日期/整数/实数逐字段弹错）；
+  保存跟进时日期范围检查器（date_check 段：被检日期须在
+  开始~关闭之间，开关与检查字段 JSON 可配）
 - **v2.5.1** 更新README，作者联系方式，维护承诺等
 - **v2.5.0** 更名"日历表格聚合项目跟进工作台"；日历日期类别全
   配置化（calendar_dates：开始/跟进/关闭/追加的显示名与颜色可配，
