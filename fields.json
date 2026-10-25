@@ -271,9 +271,11 @@
     },
     "render_limit": 600
   },
+  "_法定四类说明": "法定四类（start / followup / close / append）必须有、不可增删、key 不可改，只能配置 label、color、show_calendar（在日历显示与否）。前三类各绑定一个 date 类型字段；append 无字段。",
+  "_周报模式说明": "append 这一条 = 周报模式在日历上的标记（追加记录，无字段）。仅 label 与 color 可改，不能删除。",
+  "_calendar_dates说明": "日历日期类别（全配置化）：法定四类见上两条说明；自定义日期类别在数组末尾往后加，格式 {\"key\": \"唯一名\", \"field\": \"fields 里的 date 字段\", \"label\": \"显示名\", \"color\": \"#RRGGBB\", \"show_calendar\": true/false}。show_calendar=false 则该类日期不上日历；表格显隐与列顺序由 display_mainsheet 段管。",
   "calendar_dates": [
     {
-      "_法定说明": "法定四类（start/followup/close/append）不可增删、key 不可改，只能配置 label、color 和 show_calendar（在日历显示与否）。",
       "key": "start",
       "field": "start_date",
       "label": "开始",
@@ -295,14 +297,12 @@
       "show_calendar": true
     },
     {
-      "_周报模式": "本条 = 周报模式在日历上的标记（追加记录，无字段）。仅 label 与 color 可改，不能删除。",
       "key": "append",
       "label": "追加",
       "color": "#6a1b9a",
       "show_calendar": true
     }
   ],
-  "_calendar_dates说明": "日历日期类别（全配置化）：法定 start/followup/close（各绑定一个日期字段）+ append（周报追加记录，无字段），四类必须有、不可增删，只能配 label/color/show_calendar；自定义日期类别在数组末尾往后加（每项 key/field/label/color，可带显示开关）。show_calendar=false 则该类日期不上日历；表格显隐与列顺序由 display_mainsheet 段管。本软件特色：一个项目多个日期，每个日期都能在日历上点击找到项目。",
   "date_check": {
     "_说明": "保存跟进时的日期范围检查器（v2.6.0）。enabled=true 开启；fields=要检查的日期字段清单（必须是 fields 里的 date 类型字段，建议用法定三日期之外的其他日期）。被检日期落在 开始日期~关闭日期 之外时弹框阻止保存；开始或关闭为空则该侧不检。要检查别的日期，在 fields 数组里加字段名。",
     "enabled": true,
