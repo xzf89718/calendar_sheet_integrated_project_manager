@@ -26,10 +26,158 @@ if getattr(sys, "frozen", False) and not os.path.exists(_CFG_PATH):
         _CFG_PATH = _up
 
 
+# 字段类型全集（fields.json 的 type 只允许这些）
+KNOWN_TYPES = ("date", "int", "float", "text", "choice", "status")
+
+# 日历法定四类：start/followup/close 绑定日期字段，append 是周报模式的
+# 追加记录（无字段）。这四个不可增删、key 不可改，只能配置 label、
+# color 与 show_calendar/show_table 显示开关；自定义日期类别往后追加。
+CORE_DATE_KEYS = ("start", "followup", "close")
+CORE_APPEND_KEY = "append"
+CORE_CALENDAR_KEYS = CORE_DATE_KEYS + (CORE_APPEND_KEY,)
+
+
+def validate_config_data(data):
+    """fields.json 配置校验（v2.6.0 配置校验器）。
+
+    纯函数：不读文件、不抛异常，返回错误消息列表（空 = 通过）。
+    校验项：
+      1. fields 段：非空、name 不重复、type 合法；
+      2. 必须有一个 type=status 的字段（归档联动依赖它），且只能有一个；
+      3. status_closed 段必须在（允许是空数组 []）；
+      4. calendar_dates：start/followup/close/append 法定四类必须在
+         （旧式 fields.calendar 标记的配置除外，会自动转换），key 不重复，
+         三类日期字段必须绑定 date 类型字段，append 不应绑定字段，
+         自定义类别必须绑定未被占用的 date 字段；
+      5. date_check 段（可缺省）：fields 里必须是已配置的 date 字段；
+      6. 周报模板（kind=weekly）的 columns 不能为空。
+    """
+    errs = []
+    if not isinstance(data, dict):
+        return ["fields.json 的根节点必须是 JSON 对象"]
+
+    fields = data.get("fields")
+    if not isinstance(fields, list) or not fields:
+        errs.append("fields 段缺失或为空（至少需要一个字段）")
+        fields = []
+    names, ftypes = set(), {}
+    for i, f in enumerate(fields):
+        if not isinstance(f, dict) or not f.get("name"):
+            errs.append(f"fields 第 {i + 1} 项缺少 name")
+            continue
+        n = f["name"]
+        if n in names:
+            errs.append(f"fields 里字段名重复：{n}")
+        names.add(n)
+        ftypes[n] = f.get("type")
+        if f.get("type") not in KNOWN_TYPES:
+            errs.append(
+                f"字段 {n} 的 type 无效：{f.get('type')!r}"
+                f"（可选：{'/'.join(KNOWN_TYPES)}）")
+
+    # status：必须有（归档联动依赖它），且全程序只能有一个
+    st = [f["name"] for f in fields
+          if isinstance(f, dict) and f.get("type") == "status"]
+    if not st:
+        errs.append("fields 里必须有一个 type=status 的字段"
+                    "（「显示已关闭」归档联动依赖它）")
+    elif len(st) > 1:
+        errs.append(f"type=status 的字段只能有一个，现在有 {len(st)} 个：{st}")
+
+    # status_closed：段必须在，允许为空数组
+    if "status_closed" not in data:
+        errs.append("缺少 status_closed 段（允许空数组 []，但段必须在）")
+    elif not isinstance(data["status_closed"], list):
+        errs.append("status_closed 必须是数组")
+
+    # calendar_dates：新格式严格校验；旧格式（fields 的 calendar 标记）
+    # 由 Config 自动转换，这里不拦
+    cd = data.get("calendar_dates")
+    legacy = cd is None and any(
+        isinstance(f, dict) and f.get("calendar")
+        for f in fields)
+    if cd is None:
+        if not legacy:
+            errs.append("calendar_dates 段缺失（法定四类 "
+                        "start/followup/close/append 必须配置）")
+    else:
+        if not isinstance(cd, list) or not cd:
+            errs.append("calendar_dates 段为空")
+            cd = []
+        keys = []
+        for e in cd:
+            if not isinstance(e, dict) or not e.get("key"):
+                errs.append("calendar_dates 里每项都必须有 key")
+                continue
+            keys.append(e["key"])
+        for k in sorted({k for k in keys if keys.count(k) > 1}):
+            errs.append(f"calendar_dates 的 key 重复：{k}")
+        for req in CORE_CALENDAR_KEYS:
+            if req not in keys:
+                errs.append(
+                    f"calendar_dates 缺少法定类别：{req}"
+                    f"（start/followup/close/append 四类必须有，不可增删）")
+        core_fields = {e.get("field")
+                       for e in cd
+                       if isinstance(e, dict)
+                       and e.get("key") in CORE_DATE_KEYS}
+        for e in cd:
+            if not isinstance(e, dict):
+                continue
+            k, fld = e.get("key"), e.get("field")
+            if k in CORE_DATE_KEYS:
+                # 法定三类：必须绑定 date 字段（绑定本身属于结构，模板已给定）
+                if not fld:
+                    errs.append(f"calendar_dates 的 {k} 必须绑定日期字段")
+                elif fld not in ftypes:
+                    errs.append(f"calendar_dates 的 {k} 指向不存在的字段：{fld}")
+                elif ftypes[fld] != "date":
+                    errs.append(
+                        f"calendar_dates 的 {k} 绑定的字段必须是 date 类型：{fld}")
+            elif k == CORE_APPEND_KEY:
+                if fld:
+                    errs.append("calendar_dates 的 append 是周报追加记录"
+                                "（无字段），不应写 field")
+            else:  # 自定义日期类别
+                if not fld:
+                    errs.append(f"自定义日历类别 {k} 必须绑定日期字段（field）")
+                elif fld not in ftypes or ftypes[fld] != "date":
+                    errs.append(
+                        f"自定义日历类别 {k} 必须绑定 date 类型字段：{fld}")
+                elif fld in core_fields:
+                    errs.append(
+                        f"自定义日历类别 {k} 绑定的字段已被法定类别占用：{fld}")
+
+    # date_check：保存跟进时的日期范围检查器（可缺省）
+    dc = data.get("date_check")
+    if dc is not None:
+        if not isinstance(dc, dict):
+            errs.append("date_check 必须是对象（{enabled, fields}）")
+        else:
+            for fn in dc.get("fields", []):
+                if fn not in ftypes:
+                    errs.append(f"date_check.fields 里有不存在的字段：{fn}")
+                elif ftypes[fn] != "date":
+                    errs.append(f"date_check.fields 里必须是 date 类型：{fn}")
+
+    # 周报模板：columns 不能为空（周报模式只读，列集合即模板本体）
+    for t in data.get("templates", []) or []:
+        if isinstance(t, dict) and t.get("kind") == "weekly":
+            if not t.get("columns"):
+                errs.append(f"周报模板「{t.get('name', '?')}」的 columns 不能为空"
+                            f"（周报模式：列的 label 可改，列不可增删）")
+    return errs
+
+
 class Config:
     def __init__(self, path=None):
         with open(path or _CFG_PATH, encoding="utf-8") as f:
             data = json.load(f)
+        # 配置校验器（v2.6.0）：启动即全量核对 fields.json，错误逐条列出
+        errors = validate_config_data(data)
+        if errors:
+            raise ValueError("fields.json 配置错误：\n- "
+                             + "\n- ".join(errors))
         # 加载即剔除所有 "_" 开头的键（JSON 里的注释约定），保证它们
         # 只存在于文件里，程序内任何路径都接触不到
         self.fields = [{k: v for k, v in f.items() if not k.startswith("_")}
@@ -88,8 +236,8 @@ class Config:
                     f"display_mainsheet 段里有不存在的字段名：{name}"
                     f"（fields.json 的 fields 里没有这个名字）")
             default_head = "ID" if name == "id" else self.labels[name]
-            self.display.append((name, e.get("alias") or default_head,
-                                 bool(e.get("on", True))))
+            on = bool(e.get("on", True))
+            self.display.append((name, e.get("alias") or default_head, on))
         # 主界面列（含开关过滤）：[(name, 表头)]
         self.display_cols = [(n, h) for n, h, on in self.display if on]
         # 每列筛选类型："range"(区间)/"list"(勾选清单，默认)
@@ -135,6 +283,20 @@ class Config:
         self.calendar_dates = [
             (e["key"], e.get("field"), e.get("label", e["key"]),
              e.get("color", "#333333")) for e in cd]
+        # 每个类别"在日历里显示与否"的开关（v2.6.0）：
+        # show_calendar=false 则该日期不上日历；表格显隐与列顺序由
+        # display_mainsheet 段负责，这里不重复管。缺省显示。
+        self.calendar_show = {e["key"]: bool(e.get("show_calendar", True))
+                              for e in cd}
+        # 保存跟进时的日期范围检查器（v2.6.0，date_check 段，可缺省）：
+        # 被检日期必须落在 [开始日期, 关闭日期] 内；边界字段取自
+        # calendar_dates 的 start/close 绑定，某侧为空则该侧不检。
+        dc = data.get("date_check") or {}
+        self.date_check_enabled = bool(dc.get("enabled", False))
+        self.date_check_fields = [f for f in dc.get("fields", [])
+                                  if f in self.labels]
+        bound = {k: f for k, f, _l, _c in self.calendar_dates}
+        self.date_check_bounds = (bound.get("start"), bound.get("close"))
         # 表格渲染上限（v2.0 懒渲染）：筛选+排序全量进行，仅显示前 N 条，
         # 数据层（导出/日历/周报/备份/写入）不受影响
         self.render_limit = int(self.ui.get("render_limit", 600))
