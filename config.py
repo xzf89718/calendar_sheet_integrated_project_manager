@@ -50,7 +50,8 @@ def validate_config_data(data):
          三类日期字段必须绑定 date 类型字段，append 不应绑定字段，
          自定义类别必须绑定未被占用的 date 字段；
       5. date_check 段（可缺省）：fields 里必须是已配置的 date 字段；
-      6. 周报模板（kind=weekly）的 columns 不能为空。
+      6. 周报模板（kind=weekly）的 columns 不能为空；
+      7. favorites 段（可缺省）：enabled 必须是布尔，label 必须非空。
     """
     errs = []
     if not isinstance(data, dict):
@@ -159,6 +160,19 @@ def validate_config_data(data):
                     errs.append(f"date_check.fields 里有不存在的字段：{fn}")
                 elif ftypes[fn] != "date":
                     errs.append(f"date_check.fields 里必须是 date 类型：{fn}")
+
+    # favorites：收藏夹功能开关（可缺省，缺省 = 关闭）
+    fav = data.get("favorites")
+    if fav is not None:
+        if not isinstance(fav, dict):
+            errs.append("favorites 必须是对象（{enabled, label}）")
+        else:
+            if not isinstance(fav.get("enabled"), bool):
+                errs.append("favorites.enabled 必须是 true/false")
+            if not isinstance(fav.get("label"), str) \
+                    or not fav.get("label", "").strip():
+                errs.append("favorites.label 必须是非空字符串"
+                            "（按钮/面板显示名）")
 
     # 周报模板：columns 不能为空（周报模式只读，列集合即模板本体）
     for t in data.get("templates", []) or []:
@@ -295,6 +309,13 @@ class Config:
         self.date_check_enabled = bool(dc.get("enabled", False))
         self.date_check_fields = [f for f in dc.get("fields", [])
                                   if f in self.labels]
+
+        # 收藏夹功能开关（v2.7.0，favorites 段，可缺省 = 关闭）。
+        # 只控制 GUI 是否出现收藏夹按钮与是否建表；数据仍是 db 里的
+        # 纯索引（collections/collection_items）。
+        fav = data.get("favorites") or {}
+        self.favorites_enabled = bool(fav.get("enabled", False))
+        self.favorites_label = str(fav.get("label") or "收藏夹")
         bound = {k: f for k, f, _l, _c in self.calendar_dates}
         self.date_check_bounds = (bound.get("start"), bound.get("close"))
         # 表格渲染上限（v2.0 懒渲染）：筛选+排序全量进行，仅显示前 N 条，

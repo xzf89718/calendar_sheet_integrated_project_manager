@@ -95,6 +95,7 @@ class Database:
         self.conn.execute("PRAGMA foreign_keys=ON")
         self.conn.executescript(_SCHEMA)
         self._reconcile_columns()
+        self._ensure_fav_tables()
         # _migrate 已于 v1.5.5 停用（见下方注释），保留调用点仅作记录。
         # self._migrate()
 
@@ -239,7 +240,18 @@ class Database:
         """把筛选/搜索状态翻译成 WHERE 片段。返回 (where_sql, args)。"""
         where, args = [], []
         for c, spec in (filters or {}).items():
-            if spec is None or c == "id":
+            if spec is None:
+                continue
+            if c == "id":
+                # v2.7.0：收藏夹模式注入的项目 id 集合（沿用本接口传参，
+                # 不新增查询入口）。空集 = 全不显示。
+                vals = [int(v) for v in spec]
+                if not vals:
+                    where.append("1=0")
+                else:
+                    where.append(
+                        f"p.id IN ({','.join('?' * len(vals))})")
+                    args += vals
                 continue
             if isinstance(spec, tuple):            # 日期区间 (d1, d2)
                 d1, d2 = spec
@@ -326,6 +338,75 @@ class Database:
             f"SELECT p.id FROM projects p "
             f"JOIN snapshots cur ON cur.id = p.current_id {wh}",
             args)]
+
+    # ---------- 收藏夹（v2.7.0：纯索引，指向 projects.id） ----------
+    # 收藏夹不是新实体：表里只存项目 id 引用，项目数据始终只有一份。
+    # 收藏夹模式只是给现有筛选接口传一组 id（见 _build_where 的 id 分支）。
+    def _ensure_fav_tables(self):
+        """按配置开关建表：enabled=false 的库不建，保持干净。
+        旧库打开时自动补建（CREATE IF NOT EXISTS），无需迁移。"""
+        if not CFG.favorites_enabled:
+            return
+        self.conn.executescript("""
+            CREATE TABLE IF NOT EXISTS collections(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL
+                              DEFAULT (datetime('now', 'localtime')));
+            CREATE TABLE IF NOT EXISTS collection_items(
+                collection_id INTEGER NOT NULL
+                    REFERENCES collections(id) ON DELETE CASCADE,
+                project_id INTEGER NOT NULL
+                    REFERENCES projects(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(collection_id, project_id));
+        """)
+
+    def list_collections(self):
+        """[(id, name, 项目数)]，按创建顺序。"""
+        if not CFG.favorites_enabled:
+            return []
+        return self.conn.execute(
+            "SELECT c.id, c.name, COUNT(i.project_id) FROM collections c "
+            "LEFT JOIN collection_items i ON i.collection_id = c.id "
+            "GROUP BY c.id ORDER BY c.id").fetchall()
+
+    def create_collection(self, name):
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT INTO collections(name) VALUES(?)", (name,))
+        return cur.lastrowid
+
+    def delete_collection(self, cid):
+        with self.conn:
+            self.conn.execute(
+                "DELETE FROM collection_items WHERE collection_id=?", (cid,))
+            self.conn.execute("DELETE FROM collections WHERE id=?", (cid,))
+
+    def collection_name(self, cid):
+        r = self.conn.execute(
+            "SELECT name FROM collections WHERE id=?", (cid,)).fetchone()
+        return r[0] if r else None
+
+    def collection_projects(self, cid):
+        """收藏夹内仍存在的项目 id（join projects，自动剔除已删项目）。"""
+        return [r[0] for r in self.conn.execute(
+            "SELECT i.project_id FROM collection_items i "
+            "JOIN projects p ON p.id = i.project_id "
+            "WHERE i.collection_id=? ORDER BY i.position, i.rowid", (cid,))]
+
+    def collection_add(self, cid, project_ids):
+        with self.conn:
+            for pid in project_ids:
+                self.conn.execute(
+                    "INSERT OR IGNORE INTO collection_items"
+                    "(collection_id, project_id) VALUES(?, ?)", (cid, pid))
+
+    def collection_remove(self, cid, project_id):
+        with self.conn:
+            self.conn.execute(
+                "DELETE FROM collection_items WHERE collection_id=? "
+                "AND project_id=?", (cid, project_id))
 
     # ---------- 周报模式（只读视图：数据唯一入口是跟进表） ----------
     def snapshots_between(self, d1, d2):

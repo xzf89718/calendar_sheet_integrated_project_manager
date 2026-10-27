@@ -8,7 +8,7 @@
 """
 import os
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog, simpledialog
 
 from db import Database, SNAPSHOT_FIELDS
 from editor import LABELS
@@ -51,6 +51,11 @@ class MainApp(tk.Tk):
         self._setup_fonts()
 
         self.mode = "followup"        # followup=跟进表(默认) / weekly=周报
+        # 收藏夹模式（v2.7.0）：fav_ids=None 未开启；否则为当前收藏夹的
+        # 项目 id 集合。纯视图筛选 —— 数据模型不知道它的存在，
+        # 只是 _query_kwargs 给现有筛选接口多传一组 id。
+        self.fav_ids = None
+        self.fav_coll = None          # (collection_id, name)
         # ---- 上半：通用日历 ----
         self.cal = CalendarWidget(
             self,
@@ -81,6 +86,22 @@ class MainApp(tk.Tk):
         self.closed_btn.pack(side="left", padx=4)
         tk.Button(btns, text="清除筛选",
                   command=self._clear_filters).pack(side="left", padx=4)
+        # 收藏夹（v2.7.0，仅 fields.json 的 favorites.enabled=true 显示）
+        if CFG.favorites_enabled:
+            self.fav_var = tk.StringVar()
+            self.fav_btn = tk.Button(btns, text=CFG.favorites_label,
+                                     command=self._open_favorites)
+            self.fav_btn.pack(side="left", padx=4)
+            # 模式指示与退出按钮：平时隐藏，进入收藏夹模式后出现
+            self.fav_state_lbl = tk.Label(btns, textvariable=self.fav_var,
+                                          fg="#8d6e00")
+            self.fav_state_lbl.pack(side="left", padx=4)
+            self.fav_state_lbl.pack_forget()
+            self.fav_exit_btn = tk.Button(
+                btns, text=f"退出{CFG.favorites_label}",
+                command=self._exit_favorites)
+            self.fav_exit_btn.pack(side="left", padx=4)
+            self.fav_exit_btn.pack_forget()
         tk.Button(btns, text="今日推送",
                   command=self._notify_now).pack(side="left", padx=4)
         tk.Button(btns, text="刷新",
@@ -407,6 +428,10 @@ class MainApp(tk.Tk):
         weekly = self.mode == "weekly"
         for b in (self.new_btn, self.import_btn, self.export_btn):
             b.config(state="disabled" if weekly else "normal")
+        # 收藏夹模式只作用于跟进表：周报模式下入口禁用
+        if CFG.favorites_enabled:
+            self.fav_btn.config(
+                state="disabled" if weekly else "normal")
         self.wk_export_btn.config(
             state="normal" if weekly else "disabled")
         self.mode_btn.config(text="跟进表模式" if weekly else "周报模式")
@@ -423,8 +448,10 @@ class MainApp(tk.Tk):
                      "text": f"[{append_label}] " + e["text"],
                      "project_id": e["project_id"]}
                     for e in self.db.calendar_snapshots(year, month)]
-        if CFG.calendar_mode == "filtered":
+        if CFG.calendar_mode == "filtered" or self.fav_ids is not None:
             # 跟随表格筛选：只渲染当前筛选/搜索后项目的时间节点。
+            # 收藏夹模式强制走本分支（无论 calendar_mode 配置），
+            # 保证"表格和日历同步只显示收藏夹内容"。
             # 启动初期 cols 尚未建好（日历先于列表创建），此时返回空，
             # 等列表就绪后的首次 reload 会重新填充。
             if not getattr(self, "cols", None):
@@ -558,6 +585,71 @@ class MainApp(tk.Tk):
         self._refresh_headings()
         self.reload()
 
+    def _selected_ids(self):
+        """当前表格选中行的项目 id 列表（跟进表模式）。"""
+        if self.mode != "followup" or not getattr(self, "_row_ids", None):
+            return []
+        out = []
+        for item in self.tree.selection():
+            i = self.tree.index(item)
+            if 0 <= i < len(self._row_ids):
+                out.append(self._row_ids[i])
+        return out
+
+    # ---------- 收藏夹模式（v2.7.0） ----------
+    def _open_favorites(self):
+        FavoritesDialog(self, self.db, on_enter=self._enter_favorites,
+                        on_changed=self._fav_changed)
+
+    def _enter_favorites(self, coll_id, name):
+        ids = self.db.collection_projects(coll_id)
+        if not ids:
+            messagebox.showinfo(
+                CFG.favorites_label,
+                f"收藏夹「{name}」是空的。\n请先在弹窗里加入项目。",
+                parent=self)
+            return
+        if self.mode == "weekly":
+            self._toggle_mode()      # 收藏夹只作用于跟进表模式
+        self.fav_ids = set(ids)
+        self.fav_coll = (coll_id, name)
+        self.fav_var.set(f"★ {CFG.favorites_label}模式：{name}"
+                         f"（{len(ids)} 个项目）")
+        self.fav_state_lbl.pack(side="left", padx=4)
+        self.fav_exit_btn.pack(side="left", padx=4)
+        self.mode_btn.config(state="disabled")   # 模式内不允许切周报
+        self.reload()
+
+    def _exit_favorites(self):
+        self.fav_ids = None
+        self.fav_coll = None
+        self.fav_state_lbl.pack_forget()
+        self.fav_exit_btn.pack_forget()
+        self.mode_btn.config(state="normal")
+        self.reload()
+
+    def _fav_changed(self):
+        """收藏夹内容/清单被弹窗改动后的回调：模式内同步刷新，
+        当前夹被删/清空则自动退出模式。"""
+        if self.fav_coll is None:
+            return
+        cid, name = self.fav_coll
+        if self.db.collection_name(cid) is None:
+            self._exit_favorites()
+            return
+        ids = self.db.collection_projects(cid)
+        if not ids:
+            messagebox.showinfo(
+                CFG.favorites_label,
+                f"收藏夹「{name}」已没有项目，退出收藏夹模式。",
+                parent=self)
+            self._exit_favorites()
+            return
+        self.fav_ids = set(ids)
+        self.fav_var.set(f"★ {CFG.favorites_label}模式：{name}"
+                         f"（{len(ids)} 个项目）")
+        self.reload()
+
     # ---------- 数据 ----------
     def _filtered_rows(self):
         """周报模式的行（SQL 窗口查询）。跟进表模式已全面走
@@ -660,10 +752,17 @@ class MainApp(tk.Tk):
         self._render_rows()
         self.cal.refresh()
 
-    def _query_kwargs(self):
-        """当前筛选/搜索状态 -> SQL 查询参数（followup 模式）。"""
+    def _query_kwargs(self, favorites=True):
+        """当前筛选/搜索状态 -> SQL 查询参数（followup 模式）。
+
+        favorites=True 时并入收藏夹模式的项目 id 集合（key="id" 走
+        _build_where 的 id 分支）；导出等场景传 favorites=False 绕过，
+        保证收藏夹只是视图筛选、不影响产出内容。
+        """
         filters = {c: s for c, s in self.col_filters.items()
                    if s is not None}
+        if favorites and self.fav_ids is not None:
+            filters["id"] = set(self.fav_ids)
         kws = self.search_var.get().split()
         sf = []
         if kws:
@@ -692,7 +791,7 @@ class MainApp(tk.Tk):
         if self.mode == "weekly":
             return self._filtered_rows()
         rows, _ = self.db.query_projects(
-            **self._query_kwargs(),
+            **self._query_kwargs(favorites=False),   # 导出不受收藏夹影响
             sort=self.sort_col, sort_desc=self.sort_reverse,
             include_closed=self.show_closed)
         return rows
@@ -702,6 +801,9 @@ class MainApp(tk.Tk):
         rows, total = self._page_rows()
         self._fit_columns(rows)
         self.tree.delete(*self.tree.get_children())
+        # 行号 -> 项目 id 映射（收藏夹"加入选中项目"用；iid 在跟进表
+        # 模式下为 None，不能反查 id）
+        self._row_ids = [r["id"] for r in rows]
         for idx, r in enumerate(rows):
             if self.mode == "weekly":
                 iid = f'{r["project_id"]}-{idx}'   # 一项目多条追加需唯一
@@ -1024,6 +1126,104 @@ class FilterPopup(tk.Toplevel):
         checked = {v for v, var in self.vars.items() if var.get()}
         self.on_apply(checked)
         self.destroy()
+
+
+class FavoritesDialog(tk.Toplevel):
+    """收藏夹管理 + 进入筛选（v2.7.0）。
+
+    收藏夹 = 项目 id 的命名集合（纯索引，存在 db 的
+    collections / collection_items 两张表里）。本弹窗负责建夹、
+    删夹、把主表格选中项目加入夹、进入筛选；进入后由主窗口接管
+    模式状态（见 MainApp._enter_favorites）。
+    """
+
+    def __init__(self, app, db, on_enter, on_changed):
+        super().__init__(app)
+        self.app = app
+        self.db = db
+        self.on_enter = on_enter
+        self.on_changed = on_changed
+        self.title(CFG.favorites_label)
+        self.resizable(False, False)
+        self.transient(app)
+
+        self.listbox = tk.Listbox(self, width=42, height=10,
+                                  activestyle="dotbox")
+        self.listbox.grid(row=0, column=0, rowspan=6, padx=8, pady=8)
+        self.listbox.bind("<Double-1>", lambda e: self._enter())
+
+        btns = [
+            ("进入筛选（表格+日历只看夹内）", self._enter),
+            ("新建收藏夹", self._new),
+            ("删除收藏夹", self._delete),
+            ("把主表格选中项目加入此夹", self._add_selected),
+            ("关闭", self.destroy),
+        ]
+        for i, (text, cmd) in enumerate(btns):
+            tk.Button(self, text=text, command=cmd).grid(
+                row=i, column=1, padx=8, pady=4, sticky="ew")
+        self._reload()
+
+    def _reload(self):
+        self._rows = self.db.list_collections()
+        self.listbox.delete(0, "end")
+        for _cid, name, n in self._rows:
+            self.listbox.insert("end", f"{name}（{n} 个项目）")
+
+    def _pick(self):
+        sel = self.listbox.curselection()
+        if not sel:
+            messagebox.showinfo(CFG.favorites_label, "请先选一个收藏夹",
+                                parent=self)
+            return None
+        return self._rows[sel[0]]
+
+    def _enter(self):
+        row = self._pick()
+        if row is None:
+            return
+        cid, name, _n = row
+        self.on_enter(cid, name)   # 空夹会被弹框拒绝，模式状态不变
+        if self.app.fav_coll is not None and self.app.fav_coll[0] == cid:
+            self.destroy()
+
+    def _new(self):
+        name = simpledialog.askstring(
+            CFG.favorites_label, "新收藏夹名称：", parent=self)
+        if name and name.strip():
+            self.db.create_collection(name.strip())
+            self._reload()
+            self.on_changed()
+
+    def _delete(self):
+        row = self._pick()
+        if row is None:
+            return
+        cid, name, _n = row
+        if not messagebox.askyesno(
+                CFG.favorites_label,
+                f"删除收藏夹「{name}」？（只删索引，项目数据不动）",
+                parent=self):
+            return
+        self.db.delete_collection(cid)
+        self._reload()
+        self.on_changed()      # 删的若是当前模式夹，主窗口会退出模式
+
+    def _add_selected(self):
+        row = self._pick()
+        if row is None:
+            return
+        cid, name, _n = row
+        ids = self.app._selected_ids()
+        if not ids:
+            messagebox.showinfo(
+                CFG.favorites_label,
+                "先在主表格里选中项目（Ctrl/Shift 可多选）再点这个按钮。",
+                parent=self)
+            return
+        self.db.collection_add(cid, ids)
+        self._reload()
+        self.on_changed()
 
 
 def _kind_labels():
