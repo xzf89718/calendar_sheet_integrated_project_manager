@@ -388,10 +388,22 @@ class Database:
             "SELECT name FROM collections WHERE id=?", (cid,)).fetchone()
         return r[0] if r else None
 
+    def collection_rename(self, cid, name):
+        with self.conn:
+            self.conn.execute("UPDATE collections SET name=? WHERE id=?",
+                              (name, cid))
+
     def collection_projects(self, cid):
         """收藏夹内仍存在的项目 id（join projects，自动剔除已删项目）。"""
         return [r[0] for r in self.conn.execute(
             "SELECT i.project_id FROM collection_items i "
+            "JOIN projects p ON p.id = i.project_id "
+            "WHERE i.collection_id=? ORDER BY i.position, i.rowid", (cid,))]
+
+    def collection_items_detail(self, cid):
+        """收藏夹内项目明细 [(project_id, 项目名)]，按加入顺序。"""
+        return [(r[0], r[1]) for r in self.conn.execute(
+            "SELECT i.project_id, p.title FROM collection_items i "
             "JOIN projects p ON p.id = i.project_id "
             "WHERE i.collection_id=? ORDER BY i.position, i.rowid", (cid,))]
 
