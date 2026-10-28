@@ -93,26 +93,9 @@ class MainApp(tk.Tk):
             self.fav_btn = tk.Button(btns, text=CFG.favorites_label,
                                      command=self._open_favorites)
             self.fav_btn.pack(side="left", padx=4)
-            # 模式指示与退出按钮：平时隐藏，进入收藏夹模式后出现
-            # 模式指示 + 退出单独占一行（按钮行位置紧张），默认隐藏
-            self.fav_banner = tk.Frame(self)
-            self.fav_state_lbl = tk.Label(self.fav_banner,
-                                          textvariable=self.fav_var,
-                                          fg="#8d6e00", anchor="w")
-            self.fav_state_lbl.pack(side="left", padx=8)
-            # 移出：把主表格选中项目从当前夹剔除（只删索引，v2.7.2）；
-            # 周报模式下禁用（与面板"加入"一致）
-            self.fav_remove_btn = tk.Button(
-                self.fav_banner, text="移出",
-                command=self._fav_remove_selected)
-            self.fav_remove_btn.pack(side="left", padx=4)
-            self.fav_exit_btn = tk.Button(
-                self.fav_banner, text=f"退出{CFG.favorites_label}",
-                command=self._exit_favorites)
-            self.fav_exit_btn.pack(side="left", padx=4)
-            self.fav_banner.pack(fill="x", padx=8)
-            self.fav_banner.pack_forget()
-            # 快捷键：Ctrl+1~9 直达前 9 个收藏夹，Ctrl+0 退出模式
+            # 模式横幅（状态 + 移出 + 退出）建在分页行里，与
+            # "共 N 条"同一行（v2.7.2）：小窗口下不会像独立一行那样
+            # 被挤出可视区。默认不打包，进入模式时显示
             self.bind("<Control-KeyPress>", self._fav_hotkey)
         tk.Button(btns, text="今日推送",
                   command=self._notify_now).pack(side="left", padx=4)
@@ -138,10 +121,13 @@ class MainApp(tk.Tk):
         self._search_after = None
         self._search_popup = None
         self.search_var.trace_add("write", self._search_changed)
-        # 提示单独一行，放在按钮行下方
-        tk.Label(self, text="提示: 左键表头=排序  右键表头=筛选  "
-                            "搜索=多关键词空格分隔(AND)",
-                 fg="#888888", anchor="w").pack(fill="x", padx=12)
+        # 提示单独一行，放在按钮行下方（保留引用：收藏夹横幅要插在
+        # 它前面，保证小窗口下横幅不被挤出可视区——v2.7.2 修复）
+        self.hint_lbl = tk.Label(
+            self, text="提示: 左键表头=排序  右键表头=筛选  "
+                       "搜索=多关键词空格分隔(AND)",
+            fg="#888888", anchor="w")
+        self.hint_lbl.pack(fill="x", padx=12)
         self._build_list()      # 列表区（cols/tree/滚动条/启动加载/通知）
 
     def _search_changed(self, *_a):
@@ -195,6 +181,31 @@ class MainApp(tk.Tk):
                             command=self.tree.xview)
         self.tree.configure(yscrollcommand=ysb.set,
                             xscrollcommand=xsb.set)
+        # v2.1 翻页式：第 X~Y/共 N 提示 + 上/下一页（恒定每页渲染量）。
+        # v2.7.3：翻页行（共N条/上下页/收藏夹横幅）第一个打包且锚定
+        # 底部（side="bottom"）——高度先于表格被保证，窗口纵向紧张时
+        # 表格少显示几行（可滚动），最底行永不被吞；位置仍在表格下方
+        lrow = tk.Frame(bottom)
+        lrow.pack(side="bottom", fill="x", pady=(2, 0))
+        self.limit_lbl = tk.Label(lrow, text="", fg="#8d6e00", anchor="w")
+        self.limit_lbl.pack(side="left")
+        # 收藏夹模式横幅：分页行的子部件，排在"共 N 条"左边
+        if CFG.favorites_enabled:
+            self.fav_banner = tk.Frame(lrow)
+            self.fav_state_lbl = tk.Label(self.fav_banner,
+                                          textvariable=self.fav_var,
+                                          fg="#8d6e00", anchor="w")
+            self.fav_state_lbl.pack(side="left", padx=(0, 8))
+            # 移出：把主表格选中项目从当前夹剔除（只删索引，v2.7.2）；
+            # 周报模式下禁用（与面板"加入"一致）
+            self.fav_remove_btn = tk.Button(
+                self.fav_banner, text="移出",
+                command=self._fav_remove_selected)
+            self.fav_remove_btn.pack(side="left", padx=4)
+            self.fav_exit_btn = tk.Button(
+                self.fav_banner, text=f"退出{CFG.favorites_label}",
+                command=self._exit_favorites)
+            self.fav_exit_btn.pack(side="left", padx=4)
         # 滚动条先占位，否则被可伸展的表格挤成零宽/零高
         xsb.pack(fill="x")
         area.pack(fill="both", expand=True)
@@ -202,11 +213,6 @@ class MainApp(tk.Tk):
         self.tree.pack(side="left", fill="both", expand=True)
         self.tree.bind("<Double-1>", lambda e: self._open_selected())
         self.tree.bind("<Button-3>", self._header_menu)  # 右键表头=筛选
-        # v2.1 翻页式：第 X~Y/共 N 提示 + 上/下一页（恒定每页渲染量）
-        lrow = tk.Frame(bottom)
-        lrow.pack(fill="x", pady=(2, 0))
-        self.limit_lbl = tk.Label(lrow, text="", fg="#8d6e00", anchor="w")
-        self.limit_lbl.pack(side="left")
         self.next_btn = tk.Button(lrow, text="下一页 ▼", state="disabled",
                                   command=self._load_more)
         self.next_btn.pack(side="right")
@@ -691,7 +697,10 @@ class MainApp(tk.Tk):
         self._refresh_headings()
         self.fav_ids = set(ids)
         self.fav_coll = (coll_id, name)
-        self.fav_banner.pack(fill="x", padx=8)
+        # 横幅与"共 N 条"同一行：钉在分页行"共 N 条"标签的左边，
+        # 任何窗口高度下都随分页行可见（v2.7.2 修复）
+        self.fav_banner.pack(side="left", padx=(8, 4),
+                             before=self.limit_lbl)
         self._fav_chrome()
         self.reload()
 
