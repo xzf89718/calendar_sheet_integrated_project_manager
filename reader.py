@@ -31,18 +31,20 @@ class ProjectReader(tk.Toplevel):
         self.geometry("1300x760")      # 默认窗口更宽，富余宽度全给当前状态
         root = tk.Frame(self, padx=8, pady=8)
         root.pack(fill="both", expand=True)
-        # 左：当前状态（可滚动：文本再多也能滚到底部按钮）
-        left_wrap = tk.LabelFrame(root, text="当前状态", padx=6, pady=6)
-        left_wrap.pack(side="left", fill="both", expand=True)
-        # 查看历史版本时的横幅（默认隐藏）
-        self.banner = tk.Frame(left_wrap, bg="#fff8e1")
+        # 查看历史版本时的横幅（默认隐藏）：停靠在整个内容区最上方、
+        # 独占一行。不放左侧面板里——pack_forget 后再 pack 会排到
+        # 滚动画布之后，被 expand 画布挤得占位半页（v2.7.3 修复）。
+        # 每次显示都用 before= 钉回最顶，与左右分栏互不挤压。
+        self.banner = tk.Frame(root, bg="#fff8e1")
         self.banner_lbl = tk.Label(self.banner, bg="#fff8e1", fg="#8d6e00")
         self.banner_lbl.pack(side="left", padx=6)
         tk.Button(self.banner, text="回到最新", command=self._show_latest
                   ).pack(side="right", padx=6, pady=2)
-        self.banner.pack(fill="x", pady=(0, 6))   # 占位顶部位置
-        self.banner.pack_forget()                 # 默认隐藏
         self.viewing_hist = False
+        # 左：当前状态（可滚动：文本再多也能滚到底部按钮）
+        left_wrap = tk.LabelFrame(root, text="当前状态", padx=6, pady=6)
+        self.left_wrap = left_wrap
+        left_wrap.pack(side="left", fill="both", expand=True)
         canvas = tk.Canvas(left_wrap, highlightthickness=0)
         vsb = tk.Scrollbar(left_wrap, orient="vertical",
                            command=canvas.yview)
@@ -155,7 +157,8 @@ class ProjectReader(tk.Toplevel):
         self.banner_lbl.config(
             text=f"⏳ 正在查看历史版本（{idx}/{len(self.snap_rows)}）"
                  f"  {snap['snapshot_at']}  —  编辑按钮基于最新状态")
-        self.banner.pack(fill="x", pady=(0, 6))
+        # before= 钉在内容区最上方（与 left_wrap 同父，排它前面）
+        self.banner.pack(fill="x", pady=(0, 6), before=self.left_wrap)
 
     def _show_snapshot(self, cur):
         """把某条快照（或当前状态）填进左侧面板。"""
