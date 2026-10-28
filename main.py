@@ -181,13 +181,12 @@ class MainApp(tk.Tk):
                             command=self.tree.xview)
         self.tree.configure(yscrollcommand=ysb.set,
                             xscrollcommand=xsb.set)
-        # 滚动条先占位，否则被可伸展的表格挤成零宽/零高。
-        # v2.7.2：翻页行（共N条/上下页/收藏夹横幅）先于表格打包——
-        # 窗口纵向紧张时表格少显示几行（可滚动），翻页行永不缺席
-        xsb.pack(fill="x")
-        # v2.1 翻页式：第 X~Y/共 N 提示 + 上/下一页（恒定每页渲染量）
+        # v2.1 翻页式：第 X~Y/共 N 提示 + 上/下一页（恒定每页渲染量）。
+        # v2.7.3：翻页行（共N条/上下页/收藏夹横幅）第一个打包且锚定
+        # 底部（side="bottom"）——高度先于表格被保证，窗口纵向紧张时
+        # 表格少显示几行（可滚动），最底行永不被吞；位置仍在表格下方
         lrow = tk.Frame(bottom)
-        lrow.pack(fill="x", pady=(2, 0))
+        lrow.pack(side="bottom", fill="x", pady=(2, 0))
         self.limit_lbl = tk.Label(lrow, text="", fg="#8d6e00", anchor="w")
         self.limit_lbl.pack(side="left")
         # 收藏夹模式横幅：分页行的子部件，排在"共 N 条"左边
@@ -207,6 +206,8 @@ class MainApp(tk.Tk):
                 self.fav_banner, text=f"退出{CFG.favorites_label}",
                 command=self._exit_favorites)
             self.fav_exit_btn.pack(side="left", padx=4)
+        # 滚动条先占位，否则被可伸展的表格挤成零宽/零高
+        xsb.pack(fill="x")
         area.pack(fill="both", expand=True)
         ysb.pack(side="right", fill="y")
         self.tree.pack(side="left", fill="both", expand=True)
