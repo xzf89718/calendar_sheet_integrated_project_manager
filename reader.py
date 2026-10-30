@@ -190,10 +190,19 @@ class ProjectReader(tk.Toplevel):
 
     def _delete(self):
         p = self.db.get_project(self.project_id)
-        ok = ConfirmDialog(self, "删除项目",
-                           f"确定要删除项目「{p['title']}」吗？\n\n"
-                           f"该项目的全部跟进历史和快照将一并删除，"
-                           f"此操作不可恢复。").result
+        if CFG.recycle_bin_enabled:
+            # 回收站开启（v3.1.0）：删除 = 移入回收站，可恢复；
+            # 彻底删除只在 db_recycled 里，带红色二次确认
+            ok = ConfirmDialog(self, "删除项目",
+                               f"确定要删除项目「{p['title']}」吗？\n\n"
+                               f"项目及其全部跟进历史将移入回收站，"
+                               f"可在 db_recycled（命令行或GUI）中"
+                               f"恢复或彻底删除。").result
+        else:
+            ok = ConfirmDialog(self, "删除项目",
+                               f"确定要删除项目「{p['title']}」吗？\n\n"
+                               f"该项目的全部跟进历史和快照将一并删除，"
+                               f"此操作不可恢复。").result
         if not ok:
             return
         self.db.delete_project(self.project_id)

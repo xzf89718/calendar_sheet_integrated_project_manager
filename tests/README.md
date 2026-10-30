@@ -31,4 +31,10 @@ xvfb-run -a python tests/smoke.py        # Windows 去掉 xvfb-run
   绑死的模块级引用（含 db._SCHEMA、importer 的 DATE/INT/FLOAT/ALIASES、
   exporter 的 COLS/HEADS）——**新增同类模块级冻结量时必须同步补进那里**；
 - GUI 用例禁用 `sleep`，断言一律 `winfo`/`pack_slaves` 几何，不做像素对比；
-- 弹 `messagebox` 的路径在无窗口管理器下会永久阻塞，测试里必须打桩。
+- 弹 `messagebox` 的路径在无窗口管理器下会永久阻塞，测试里必须打桩；
+- **双平台纪律**：开发/日常运行在 Linux（沙箱 xvfb），最终交付以
+  Windows 本机跑通为准。写测试时禁止依赖平台隐式行为——已知雷区：
+  窗口映射（Windows 需 `update()` 才 map，X11 自动）、文件编码
+  （ini/源码保持 ASCII 或显式 encoding）、路径分隔符（用 pathlib）。
+  每次交付前由用户在 Windows 上跑一遍 `pytest -q` + `smoke.py`
+  作为最终确认。

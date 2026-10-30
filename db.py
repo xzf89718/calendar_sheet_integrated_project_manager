@@ -48,6 +48,43 @@ CREATE INDEX IF NOT EXISTS idx_snap_project
 _SCHEMA = _schema_sql()
 
 
+def _recycled_schema_sql():
+    """回收站独立表（v3.1.0，B 方案：整行搬运，主表查询天然不命中）。
+
+    列结构与主表完全同构（snapshots 含全部配置字段列），外加
+    recycled_at 回收时间。恢复/彻底删除的全部逻辑在 db_recycled.py。
+    """
+    cols = ",\n    ".join(
+        f"{f['name']} {_SQL_TYPES[f['type']]}" for f in CFG.fields)
+    return f"""
+CREATE TABLE IF NOT EXISTS recycled_projects (
+    id          INTEGER PRIMARY KEY,
+    title       TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'open',
+    current_id  INTEGER,
+    created_at  TEXT NOT NULL,
+    recycled_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS recycled_snapshots (
+    id              INTEGER PRIMARY KEY,
+    project_id      INTEGER NOT NULL,
+    snapshot_at     TEXT NOT NULL,
+{cols},
+    changed_by      TEXT,
+    change_summary  TEXT,
+    recycled_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS recycled_collection_items (
+    collection_id INTEGER NOT NULL,
+    project_id    INTEGER NOT NULL,
+    position      INTEGER NOT NULL DEFAULT 0,
+    recycled_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+"""
+
+
 _DATE_RE = re.compile(
     r"(\d{4})\s*[年/\-.]\s*(\d{1,2})\s*[月/\-.]\s*(\d{1,2})")
 _FW_MAP = {0xFF01 + i: 0x21 + i for i in range(94)}  # 全角->半角（键必须是整数码点）
@@ -96,6 +133,7 @@ class Database:
         self.conn.executescript(_SCHEMA)
         self._reconcile_columns()
         self._ensure_fav_tables()
+        self._ensure_recycled_tables()
         # _migrate 已于 v1.5.5 停用（见下方注释），保留调用点仅作记录。
         # self._migrate()
 
@@ -104,12 +142,24 @@ class Database:
         SQLite 不支持删列，配置里去掉的字段列会留在表中不再使用。"""
         existing = {r[1] for r in self.conn.execute(
             "PRAGMA table_info(snapshots)")}
+        rexisting = {r[1] for r in self.conn.execute(
+            "PRAGMA table_info(recycled_snapshots)")} \
+            if self._table_exists("recycled_snapshots") else set()
         with self.conn:
             for f in CFG.fields:
                 if f["name"] not in existing:
                     self.conn.execute(
                         f"ALTER TABLE snapshots ADD COLUMN "
                         f"{f['name']} {_SQL_TYPES[f['type']]}")
+                if rexisting and f["name"] not in rexisting:
+                    self.conn.execute(
+                        f"ALTER TABLE recycled_snapshots ADD COLUMN "
+                        f"{f['name']} {_SQL_TYPES[f['type']]}")
+
+    def _table_exists(self, name):
+        return self.conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+            (name,)).fetchone() is not None
 
     # ==================== v1.5.5 起停用（保留代码仅供考古） ====================
     # 停用原因：这套迁移面向 v1.0 时代的旧库债——
@@ -227,10 +277,61 @@ class Database:
                               (status, project_id))
 
     def delete_project(self, project_id):
-        """彻底删除项目及其全部快照历史（需调用方二次确认）。"""
+        """删除项目（需调用方二次确认）。
+
+        recycle_bin 关闭（默认）：物理删除项目 + 全部快照（v2.7.3 行为）。
+        recycle_bin 开启：整行搬进独立回收表（项目 + 快照 + 收藏夹
+        索引一并备份），主表所有查询天然不再命中；恢复/彻底删除
+        由 db_recycled.py 负责，主程序不再感知。
+        """
+        if CFG.recycle_bin_enabled:
+            self._recycle_project(project_id)
+            return
         with self.conn:
             self.conn.execute("DELETE FROM snapshots WHERE project_id=?",
                               (project_id,))
+            self.conn.execute("DELETE FROM projects WHERE id=?",
+                              (project_id,))
+
+    # ---------- 回收站（v3.1.0，B 方案：只负责"搬进去"，出去归 db_recycled）
+    def _ensure_recycled_tables(self):
+        """按配置开关建表：enabled=false 的库不建，保持干净。"""
+        if not CFG.recycle_bin_enabled:
+            return
+        self.conn.executescript(_recycled_schema_sql())
+
+    def _recycle_project(self, project_id):
+        """项目 + 快照 + 收藏夹索引整体备份进回收表（单事务）。"""
+        with self.conn:
+            # 收藏夹索引备份（纯索引，跟项目走；恢复时尽力带回）。
+            # favorites 关闭的库没有 collection_items 表，跳过
+            if self._table_exists("collection_items"):
+                self.conn.execute(
+                    "INSERT INTO recycled_collection_items"
+                    "(collection_id, project_id, position) "
+                    "SELECT collection_id, project_id, position "
+                    "FROM collection_items WHERE project_id=?", (project_id,))
+                self.conn.execute("DELETE FROM collection_items "
+                                  "WHERE project_id=?", (project_id,))
+            # 快照整行搬运（id 原样保留，恢复时按占用情况决定）。
+            # 必须显式列清单：配置变更时两边表追加列的位置可能不一致
+            # （回收表尾部多 recycled_at），位置 INSERT 会错位爆 NOT NULL
+            snap_cols = (["id", "project_id", "snapshot_at"] + SNAPSHOT_FIELDS
+                         + ["changed_by", "change_summary"])
+            self.conn.execute(
+                f"INSERT INTO recycled_snapshots"
+                f"({','.join(snap_cols)}, recycled_at) "
+                f"SELECT {','.join(snap_cols)}, datetime('now','localtime') "
+                f"FROM snapshots WHERE project_id=?", (project_id,))
+            self.conn.execute("DELETE FROM snapshots WHERE project_id=?",
+                              (project_id,))
+            # 项目行搬运
+            self.conn.execute(
+                "INSERT INTO recycled_projects "
+                "(id, title, status, current_id, created_at, recycled_at) "
+                "SELECT id, title, status, current_id, created_at, "
+                "datetime('now','localtime') FROM projects WHERE id=?",
+                (project_id,))
             self.conn.execute("DELETE FROM projects WHERE id=?",
                               (project_id,))
 
