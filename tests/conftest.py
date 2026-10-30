@@ -74,6 +74,15 @@ def _patch_cfg(monkeypatch, cfg_obj):
     及相关冻结量全部指向测试配置。"""
     for mod in (db, importer, exporter):
         monkeypatch.setattr(mod, "CFG", cfg_obj)
+    # reader 也在模块级绑定了 CFG / SNAPSHOT_FIELDS / LABELS
+    # （from db/config import 在 import 时冻结，不补会拿到真实配置的量）
+    try:
+        import reader
+        monkeypatch.setattr(reader, "CFG", cfg_obj)
+        monkeypatch.setattr(reader, "SNAPSHOT_FIELDS", cfg_obj.names)
+        monkeypatch.setattr(reader, "LABELS", cfg_obj.labels)
+    except ImportError:
+        pass
     monkeypatch.setattr(config, "CFG", cfg_obj)
     monkeypatch.setattr(db, "SNAPSHOT_FIELDS", cfg_obj.names)
     monkeypatch.setattr(db, "STATUS_OPTIONS", cfg_obj.status_options)
@@ -121,6 +130,31 @@ def cfg_fav(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
+def cfg_rec(tmp_path, monkeypatch):
+    """回收站开启的变体配置。"""
+    p = tmp_path / "fields.json"
+    p.write_text(json.dumps(
+        minimal_config_data(recycle_bin={"enabled": True}),
+        ensure_ascii=False), encoding="utf-8")
+    c = config.Config(path=str(p))
+    _patch_cfg(monkeypatch, c)
+    return c
+
+
+@pytest.fixture()
+def cfg_rec_fav(tmp_path, monkeypatch):
+    """回收站 + 收藏夹双开变体。"""
+    p = tmp_path / "fields.json"
+    p.write_text(json.dumps(minimal_config_data(
+        recycle_bin={"enabled": True},
+        favorites={"enabled": True, "label": "收藏夹"}),
+        ensure_ascii=False), encoding="utf-8")
+    c = config.Config(path=str(p))
+    _patch_cfg(monkeypatch, c)
+    return c
+
+
+@pytest.fixture()
 def dbs(cfg, tmp_path):
     """已建 schema 的空库（最小配置）。"""
     database = db.Database(str(tmp_path / "test.db"))
@@ -132,6 +166,22 @@ def dbs(cfg, tmp_path):
 def db_fav(cfg_fav, tmp_path):
     """收藏夹开启的空库。"""
     database = db.Database(str(tmp_path / "fav.db"))
+    yield database
+    database.close()
+
+
+@pytest.fixture()
+def db_rec(cfg_rec, tmp_path):
+    """回收站开启的空库。"""
+    database = db.Database(str(tmp_path / "rec.db"))
+    yield database
+    database.close()
+
+
+@pytest.fixture()
+def db_rec_fav(cfg_rec_fav, tmp_path):
+    """回收站 + 收藏夹双开的空库。"""
+    database = db.Database(str(tmp_path / "recfav.db"))
     yield database
     database.close()
 

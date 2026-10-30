@@ -2,7 +2,7 @@
 """库复制器（子模块）：A/B 双库对照视图。
 
 从包根目录共享 db/config/fields.json —— 本目录不携带任何配置。
-运行：python db_copy/copy_gui.py
+运行：python -m db_copy --gui（或 python db_copy/copy_gui.py）
 """
 import os
 import sys
@@ -16,17 +16,34 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 from db import Database                       # noqa: E402
+from config import CFG                        # noqa: E402
 import db_copy.copy_core as core              # noqa: E402
 
-COLS = [("id", "ID", 60), ("title", "项目", 260),
-        ("milestone", "里程碑", 110), ("status", "状态", 90),
-        ("snaps", "快照数", 70), ("last_at", "最近更新", 150)]
+
+def _build_cols():
+    """列定义按当前 fields.json 动态拼：id/项目 + 前几个显示列 + 快照数/更新。
+
+    不硬编码 milestone——真实配置可能没这一列，硬编码会直接崩。
+    """
+    cols = [("id", "ID", 60), ("title", "项目", 260)]
+    for name, head in CFG.display_cols:
+        if name in ("id", "title"):
+            continue
+        cols.append((name, head, 110))
+        if len(cols) >= 5:          # 列太多挤不下，取前几个显示列
+            break
+    cols += [("snaps", "快照数", 70), ("last_at", "最近更新", 150)]
+    return cols
+
+
+COLS = _build_cols()
 
 
 def rowdict(r):
-    return {"id": r["id"], "title": r["title"],
-            "milestone": r["milestone"] or "", "status": r["status"] or "",
-            "snaps": r["snap_count"], "last_at": r["last_at"] or ""}
+    d = {c: ("" if r[c] is None else str(r[c])) for c, _h, _w in COLS}
+    d["id"] = r["id"]
+    d["snaps"] = r["snap_count"]
+    return d
 
 
 class FilterPopup(tk.Toplevel):
@@ -409,5 +426,10 @@ class CopierApp(tk.Tk):
         self.status.config(text=f"已复制 {np_} 个项目、{ns} 条快照到 B 库 ✓")
 
 
-if __name__ == "__main__":
+def run_gui():
     CopierApp().mainloop()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(run_gui())

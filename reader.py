@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from db import SNAPSHOT_FIELDS
+from config import CFG
 from editor import SnapshotEditor, LABELS
 
 DIFF_IGNORE = {"id", "project_id", "snapshot_at", "changed_by",
@@ -62,7 +63,6 @@ class ProjectReader(tk.Toplevel):
         # 可滚动区：只有字段标签；按钮固定在面板底部，任何文本长度都可达
         self.cur_labels = {}     # 普通字段 -> Label
         self.cur_texts = {}      # 限高字段(max_lines) -> Text+滚动条
-        from config import CFG
         for i, f in enumerate(SNAPSHOT_FIELDS):
             tk.Label(left, text=LABELS[f], fg="#666666").grid(
                 row=i, column=0, sticky="nw", padx=4, pady=1)
@@ -190,10 +190,19 @@ class ProjectReader(tk.Toplevel):
 
     def _delete(self):
         p = self.db.get_project(self.project_id)
-        ok = ConfirmDialog(self, "删除项目",
-                           f"确定要删除项目「{p['title']}」吗？\n\n"
-                           f"该项目的全部跟进历史和快照将一并删除，"
-                           f"此操作不可恢复。").result
+        if CFG.recycle_bin_enabled:
+            # 回收站开启（v3.1.0）：删除 = 移入回收站，可恢复；
+            # 彻底删除只在 db_recycled 里，带红色二次确认
+            ok = ConfirmDialog(self, "删除项目",
+                               f"确定要删除项目「{p['title']}」吗？\n\n"
+                               f"项目及其全部跟进历史将移入回收站，"
+                               f"可在 db_recycled/（命令行 python -m db_recycled 或 GUI）中"
+                               f"恢复或彻底删除。").result
+        else:
+            ok = ConfirmDialog(self, "删除项目",
+                               f"确定要删除项目「{p['title']}」吗？\n\n"
+                               f"该项目的全部跟进历史和快照将一并删除，"
+                               f"此操作不可恢复。").result
         if not ok:
             return
         self.db.delete_project(self.project_id)

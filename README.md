@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.0.0
+# 日历表格聚合项目跟进工作台 v3.1.1
 
 **面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
 做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
@@ -281,14 +281,25 @@ Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关�
 **作用域唯一**（挑项目 / 整库追加 / 按键拆 / 全库赋值 / 清洗），
 杜绝"我到底改了哪些"的歧义。
 
-| 目录 | 用途 | 运行 |
-|------|------|------|
-| `db_copy/` | A/B 双库对照，箭头把选中项目（含全部历史）追加到目标库，只新增 | `python db_copy/copy_gui.py` |
-| `db_append/` | 多源库依次全部追加进目标库（团队报数汇总） | `python db_append/append_gui.py` |
-| `db_split/` | 按键列（如负责人）拆成每人一个文件：全量含归档、空值→未分配.db、冲突拒绝 | `python db_split/split_gui.py` |
-| `db_assign/` | 全库统一给一列赋值（双只读预览，走快照可回溯） | `python db_assign/assign_gui.py` |
-| `weekreport_clean/` | 周报清洗：日期按年月日三元组匹配（横杠/斜杠/中文互通），双表预览 | `python weekreport_clean/clean_gui.py` |
-| `db_analysis/` | 数据分析（预留占位） | — |
+| 目录 | 用途 | 运行（GUI） | 运行（命令行） |
+|------|------|------|------|
+| `db_copy/` | A/B 双库对照，箭头把选中项目（含全部历史）追加到目标库，只新增 | `python -m db_copy --gui` | `python -m db_copy A.db B.db 1 2` / `--all` |
+| `db_append/` | 多源库依次全部追加进目标库（团队报数汇总） | `python -m db_append --gui` | `python -m db_append 目标.db 源1.db [源2.db...]` |
+| `db_split/` | 按键列（如负责人）拆成每人一个文件：全量含归档、空值→未分配.db、冲突拒绝 | `python -m db_split --gui` | `python -m db_split 源.db --key 城市 --dest 目录`（`--preview` 只预览） |
+| `db_assign/` | 全库统一给一列赋值（双只读预览，走快照可回溯） | `python -m db_assign --gui` | `python -m db_assign 库.db --field 城市 --value 北京 --yes`（不加 `--yes` 只预览） |
+| `weekreport_clean/` | 周报清洗：日期按年月日三元组匹配（横杠/斜杠/中文互通），双表预览 | `python weekreport_clean/clean_gui.py` | — |
+| `db_analysis/` | 数据分析（预留占位） | — | `python -m db_analysis`（占位提示） |
+| `db_recycled/` | 回收站：查看/恢复/红色永久删除（见 10.17） | `python -m db_recycled 库.db --gui` | `python -m db_recycled 库.db [--restore/--purge/--empty]` |
+
+每个子模块都是同一套四件套：`__init__.py`（导出核心）+ `*_core.py`
+（纯逻辑，CLI/GUI 共用）+ `*_gui.py`（`run_gui()` 入口）+ `__main__.py`
+（命令行）。命令行列一律按运行时的 `fields.json` 动态拼，不硬编码字段。
+
+**快捷命令（可选）**：跑一次 `setup.ps`（Windows，PowerShell：
+`powershell -ExecutionPolicy Bypass -File setup.ps`）或 `bash setup.sh`
+（Linux/macOS），生成 `db_split xxx.db ...` 式的单字命令（本质是
+`python -m db_split xxx.db ...` 的封装，自动带上包路径），并把 shim
+目录加进 PATH。脚本可重复执行，幂等。
 
 ## 十、配置：fields.json 逐条详解
 
@@ -591,7 +602,35 @@ Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关�
 | `editor.width / height / entry_width / text_width` | 840/940/52/50 | 编辑器窗口与输入框尺寸 |
 | `render_limit` | 600 | **每页渲染行数**（翻页式；30万条与600条翻页同速） |
 
-### 10.17 建议：用 AI 来改配置
+### 10.17 `recycle_bin` —— 回收站（v3.1.0，可缺省 = 关闭）
+
+```json
+"recycle_bin": {"enabled": true}
+```
+
+- `enabled`：true（本发布包内置配置已开启）时删除 = **项目 + 全部快照
+  + 收藏夹索引整体移入回收站**；false 时删除 = 物理删除，与 v2.7.3 完全
+  等价；整段缺省时按 false 处理（老配置文件不加这段，行为零变化）
+  （独立表 `recycled_*`，主表格/日历/周报/导出/通知全部天然不再
+  显示），删除确认框会说明"可在回收站中恢复"
+- 主程序**只管删进去**；查看/恢复/彻底删除由独立模块负责，
+  命令行与 GUI 双入口：
+
+```bash
+python -m db_recycled xxx.db            # 列出回收站
+python -m db_recycled xxx.db --restore 12    # 恢复（id 空闲则原位放回）
+python -m db_recycled xxx.db --restore all   # 全部恢复
+python -m db_recycled xxx.db --purge 12      # 永久删除单个
+python -m db_recycled xxx.db --empty         # 清空回收站
+python -m db_recycled xxx.db --gui           # 图形界面（恢复/红色永久删除）
+```
+
+- 恢复时原 id 已被新项目占用才分配新 id（收藏夹索引跟着指向新 id）；
+- **彻底删除（purge/empty）= 物理销毁、不可恢复**，GUI 中是红色
+  按钮 + 二次确认弹窗；命令行不给确认，执行即销毁；
+- 回收站随 .db 文件走（复制/备份库 = 连同回收站一起）。
+
+### 10.18 建议：用 AI 来改配置
 
 fields.json 是"人意图"和"程序"之间的协议层。推荐工作流：把
 fields.json 和需求发给 AI（如"加一列'竞争对手'，字符串，放简述
@@ -635,6 +674,21 @@ GROUP BY c.id;
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.1.1** 子模块命令行化 + 快捷命令：db_split / db_copy / db_append /
+  db_assign / db_recycled / db_analysis 统一为四件套包结构
+  （`__init__.py` 导出 + `*_core.py` 纯逻辑 + `*_gui.py` 的 `run_gui()`
+  + `__main__.py` 命令行），全部支持 `python -m db_xxx` 与
+  `python -m db_xxx --gui` 双入口；新增 `setup.ps`（Windows，纯英文）
+  / `setup.sh`（Linux）一键生成 `db_split` 等单字命令。修复
+  db_copy/db_append 列清单硬编码 milestone 导致真实配置下打不开的问题
+  （列改按 fields.json 动态生成）。
+- **v3.1.0** 回收站（`recycle_bin` 段开关，可缺省 = 关闭，默认与
+  v2.7.3 等价）：开启后删除 = 项目/快照/收藏夹索引整体移入独立回收
+  表，主程序全部视图天然排除；查看/恢复/彻底删除由独立模块
+  `db_recycled/` 子模块负责（命令行 + GUI 双入口，永久删除 = 红色按钮 +
+  二次确认）。恢复时原 id 空闲则原位放回（快照 id 重新分配、当前
+  指针修正、收藏夹索引带回）。为将来的跨库合并打底：删除永不静默
+  传播，永远有人工裁决口
 - **v3.0.0** 测试基建（开发者侧能力，用户无感知）：新增 `tests/`
   自动化测试套件——L1 纯逻辑单测（查询引擎全组合、导入导出往返
   一致性、配置校验器全部错误分支）、L2 布局防回归（两次 pack

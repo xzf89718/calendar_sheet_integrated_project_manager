@@ -180,6 +180,16 @@ def validate_config_data(data):
             if not t.get("columns"):
                 errs.append(f"周报模板「{t.get('name', '?')}」的 columns 不能为空"
                             f"（周报模式：列的 label 可改，列不可增删）")
+    # recycle_bin：回收站开关（v3.1.0，可缺省 = 关闭）。
+    # 关闭时删除为物理删除（与 v2.7.3 等价）；开启后删除 = 整行搬进
+    # 独立回收表（主程序所有查询天然不命中），恢复/彻底删除由
+    # db_recycled/（命令行 + GUI）负责。
+    rb = data.get("recycle_bin")
+    if rb is not None:
+        if not isinstance(rb, dict):
+            errs.append("recycle_bin 必须是对象（{enabled}）")
+        elif not isinstance(rb.get("enabled"), bool):
+            errs.append("recycle_bin.enabled 必须是 true/false")
     return errs
 
 
@@ -316,6 +326,9 @@ class Config:
         fav = data.get("favorites") or {}
         self.favorites_enabled = bool(fav.get("enabled", False))
         self.favorites_label = str(fav.get("label") or "收藏夹")
+        # 回收站开关（v3.1.0）：默认关闭 = 删除仍是物理删除
+        rb = data.get("recycle_bin") or {}
+        self.recycle_bin_enabled = bool(rb.get("enabled", False))
         bound = {k: f for k, f, _l, _c in self.calendar_dates}
         self.date_check_bounds = (bound.get("start"), bound.get("close"))
         # 表格渲染上限（v2.0 懒渲染）：筛选+排序全量进行，仅显示前 N 条，
