@@ -196,7 +196,7 @@ class ProjectReader(tk.Toplevel):
             ok = ConfirmDialog(self, "删除项目",
                                f"确定要删除项目「{p['title']}」吗？\n\n"
                                f"项目及其全部跟进历史将移入回收站，"
-                               f"可在 db_recycled（命令行或GUI）中"
+                               f"可在 db_recycled/（命令行 python -m db_recycled 或 GUI）中"
                                f"恢复或彻底删除。").result
         else:
             ok = ConfirmDialog(self, "删除项目",

@@ -606,12 +606,12 @@ Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关�
   命令行与 GUI 双入口：
 
 ```bash
-python db_recycled.py xxx.db            # 列出回收站
-python db_recycled.py xxx.db --restore 12    # 恢复（id 空闲则原位放回）
-python db_recycled.py xxx.db --restore all   # 全部恢复
-python db_recycled.py xxx.db --purge 12      # 永久删除单个
-python db_recycled.py xxx.db --empty         # 清空回收站
-python db_recycled.py xxx.db --gui           # 图形界面（恢复/红色永久删除）
+python -m db_recycled xxx.db            # 列出回收站
+python -m db_recycled xxx.db --restore 12    # 恢复（id 空闲则原位放回）
+python -m db_recycled xxx.db --restore all   # 全部恢复
+python -m db_recycled xxx.db --purge 12      # 永久删除单个
+python -m db_recycled xxx.db --empty         # 清空回收站
+python -m db_recycled xxx.db --gui           # 图形界面（恢复/红色永久删除）
 ```
 
 - 恢复时原 id 已被新项目占用才分配新 id（收藏夹索引跟着指向新 id）；
@@ -666,7 +666,7 @@ GROUP BY c.id;
 - **v3.1.0** 回收站（`recycle_bin` 段开关，可缺省 = 关闭，默认与
   v2.7.3 等价）：开启后删除 = 项目/快照/收藏夹索引整体移入独立回收
   表，主程序全部视图天然排除；查看/恢复/彻底删除由独立模块
-  `db_recycled.py` 负责（命令行 + GUI 双入口，永久删除 = 红色按钮 +
+  `db_recycled/` 子模块负责（命令行 + GUI 双入口，永久删除 = 红色按钮 +
   二次确认）。恢复时原 id 空闲则原位放回（快照 id 重新分配、当前
   指针修正、收藏夹索引带回）。为将来的跨库合并打底：删除永不静默
   传播，永远有人工裁决口

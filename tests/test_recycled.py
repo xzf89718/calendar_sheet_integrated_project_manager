@@ -157,7 +157,7 @@ def test_recycle_restore_cycle_idempotent(seeded_rec):
 
 def _run_cli(db_path, *argv):
     return subprocess.run(
-        [sys.executable, str(PROJECT_ROOT / "db_recycled.py"),
+        [sys.executable, "-m", "db_recycled",
          str(db_path), *argv],
         capture_output=True, text=True, timeout=60,
         cwd=str(PROJECT_ROOT))

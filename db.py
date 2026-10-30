@@ -52,7 +52,7 @@ def _recycled_schema_sql():
     """回收站独立表（v3.1.0，B 方案：整行搬运，主表查询天然不命中）。
 
     列结构与主表完全同构（snapshots 含全部配置字段列），外加
-    recycled_at 回收时间。恢复/彻底删除的全部逻辑在 db_recycled.py。
+    recycled_at 回收时间。恢复/彻底删除的全部逻辑在 db_recycled/ 子模块。
     """
     cols = ",\n    ".join(
         f"{f['name']} {_SQL_TYPES[f['type']]}" for f in CFG.fields)
@@ -282,7 +282,7 @@ class Database:
         recycle_bin 关闭（默认）：物理删除项目 + 全部快照（v2.7.3 行为）。
         recycle_bin 开启：整行搬进独立回收表（项目 + 快照 + 收藏夹
         索引一并备份），主表所有查询天然不再命中；恢复/彻底删除
-        由 db_recycled.py 负责，主程序不再感知。
+        由 db_recycled/ 负责，主程序不再感知。
         """
         if CFG.recycle_bin_enabled:
             self._recycle_project(project_id)

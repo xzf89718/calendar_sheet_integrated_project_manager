@@ -183,7 +183,7 @@ def validate_config_data(data):
     # recycle_bin：回收站开关（v3.1.0，可缺省 = 关闭）。
     # 关闭时删除为物理删除（与 v2.7.3 等价）；开启后删除 = 整行搬进
     # 独立回收表（主程序所有查询天然不命中），恢复/彻底删除由
-    # db_recycled.py（命令行 + GUI）负责。
+    # db_recycled/（命令行 + GUI）负责。
     rb = data.get("recycle_bin")
     if rb is not None:
         if not isinstance(rb, dict):
