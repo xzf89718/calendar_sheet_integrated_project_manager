@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 """多库追加器（子模块）：多个源库依次全部追加进目标库。
 
 从包根目录共享 db/config/fields.json —— 本目录不携带任何配置。
-运行：python db_append/append_gui.py
+运行：python db_append/append_gui.py（或 python -m db_append --gui）
 """
 import os
 import sys
@@ -11,14 +10,12 @@ import sys
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
-import os
-import sys
+
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db import Database                       # noqa: E402
-import append_core as core                     # noqa: E402
+import db_append.append_core as core          # noqa: E402
 
 
 class AppendApp(tk.Tk):
@@ -171,5 +168,10 @@ class AppendApp(tk.Tk):
         t.close()
 
 
-if __name__ == "__main__":
+def run_gui():
     AppendApp().mainloop()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(run_gui())

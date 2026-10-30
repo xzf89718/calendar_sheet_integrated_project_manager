@@ -74,6 +74,15 @@ def _patch_cfg(monkeypatch, cfg_obj):
     及相关冻结量全部指向测试配置。"""
     for mod in (db, importer, exporter):
         monkeypatch.setattr(mod, "CFG", cfg_obj)
+    # reader 也在模块级绑定了 CFG / SNAPSHOT_FIELDS / LABELS
+    # （from db/config import 在 import 时冻结，不补会拿到真实配置的量）
+    try:
+        import reader
+        monkeypatch.setattr(reader, "CFG", cfg_obj)
+        monkeypatch.setattr(reader, "SNAPSHOT_FIELDS", cfg_obj.names)
+        monkeypatch.setattr(reader, "LABELS", cfg_obj.labels)
+    except ImportError:
+        pass
     monkeypatch.setattr(config, "CFG", cfg_obj)
     monkeypatch.setattr(db, "SNAPSHOT_FIELDS", cfg_obj.names)
     monkeypatch.setattr(db, "STATUS_OPTIONS", cfg_obj.status_options)

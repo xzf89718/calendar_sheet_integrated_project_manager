@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.1.0
+# 日历表格聚合项目跟进工作台 v3.1.1
 
 **面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
 做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
@@ -281,14 +281,25 @@ Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关�
 **作用域唯一**（挑项目 / 整库追加 / 按键拆 / 全库赋值 / 清洗），
 杜绝"我到底改了哪些"的歧义。
 
-| 目录 | 用途 | 运行 |
-|------|------|------|
-| `db_copy/` | A/B 双库对照，箭头把选中项目（含全部历史）追加到目标库，只新增 | `python db_copy/copy_gui.py` |
-| `db_append/` | 多源库依次全部追加进目标库（团队报数汇总） | `python db_append/append_gui.py` |
-| `db_split/` | 按键列（如负责人）拆成每人一个文件：全量含归档、空值→未分配.db、冲突拒绝 | `python db_split/split_gui.py` |
-| `db_assign/` | 全库统一给一列赋值（双只读预览，走快照可回溯） | `python db_assign/assign_gui.py` |
-| `weekreport_clean/` | 周报清洗：日期按年月日三元组匹配（横杠/斜杠/中文互通），双表预览 | `python weekreport_clean/clean_gui.py` |
-| `db_analysis/` | 数据分析（预留占位） | — |
+| 目录 | 用途 | 运行（GUI） | 运行（命令行） |
+|------|------|------|------|
+| `db_copy/` | A/B 双库对照，箭头把选中项目（含全部历史）追加到目标库，只新增 | `python -m db_copy --gui` | `python -m db_copy A.db B.db 1 2` / `--all` |
+| `db_append/` | 多源库依次全部追加进目标库（团队报数汇总） | `python -m db_append --gui` | `python -m db_append 目标.db 源1.db [源2.db...]` |
+| `db_split/` | 按键列（如负责人）拆成每人一个文件：全量含归档、空值→未分配.db、冲突拒绝 | `python -m db_split --gui` | `python -m db_split 源.db --key 城市 --dest 目录`（`--preview` 只预览） |
+| `db_assign/` | 全库统一给一列赋值（双只读预览，走快照可回溯） | `python -m db_assign --gui` | `python -m db_assign 库.db --field 城市 --value 北京 --yes`（不加 `--yes` 只预览） |
+| `weekreport_clean/` | 周报清洗：日期按年月日三元组匹配（横杠/斜杠/中文互通），双表预览 | `python weekreport_clean/clean_gui.py` | — |
+| `db_analysis/` | 数据分析（预留占位） | — | `python -m db_analysis`（占位提示） |
+| `db_recycled/` | 回收站：查看/恢复/红色永久删除（见 10.17） | `python -m db_recycled 库.db --gui` | `python -m db_recycled 库.db [--restore/--purge/--empty]` |
+
+每个子模块都是同一套四件套：`__init__.py`（导出核心）+ `*_core.py`
+（纯逻辑，CLI/GUI 共用）+ `*_gui.py`（`run_gui()` 入口）+ `__main__.py`
+（命令行）。命令行列一律按运行时的 `fields.json` 动态拼，不硬编码字段。
+
+**快捷命令（可选）**：跑一次 `setup.ps`（Windows，PowerShell：
+`powershell -ExecutionPolicy Bypass -File setup.ps`）或 `bash setup.sh`
+（Linux/macOS），生成 `db_split xxx.db ...` 式的单字命令（本质是
+`python -m db_split xxx.db ...` 的封装，自动带上包路径），并把 shim
+目录加进 PATH。脚本可重复执行，幂等。
 
 ## 十、配置：fields.json 逐条详解
 
@@ -663,6 +674,14 @@ GROUP BY c.id;
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.1.1** 子模块命令行化 + 快捷命令：db_split / db_copy / db_append /
+  db_assign / db_recycled / db_analysis 统一为四件套包结构
+  （`__init__.py` 导出 + `*_core.py` 纯逻辑 + `*_gui.py` 的 `run_gui()`
+  + `__main__.py` 命令行），全部支持 `python -m db_xxx` 与
+  `python -m db_xxx --gui` 双入口；新增 `setup.ps`（Windows，纯英文）
+  / `setup.sh`（Linux）一键生成 `db_split` 等单字命令。修复
+  db_copy/db_append 列清单硬编码 milestone 导致真实配置下打不开的问题
+  （列改按 fields.json 动态生成）。
 - **v3.1.0** 回收站（`recycle_bin` 段开关，可缺省 = 关闭，默认与
   v2.7.3 等价）：开启后删除 = 项目/快照/收藏夹索引整体移入独立回收
   表，主程序全部视图天然排除；查看/恢复/彻底删除由独立模块

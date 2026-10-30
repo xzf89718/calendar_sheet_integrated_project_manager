@@ -7,10 +7,14 @@
 - 恢复：原 id 空闲则原样放回 + 收藏夹索引带回；id 被占才发新 id
 - 彻底删除/清空：物理销毁，只在 db_recycled
 """
+import os
 import subprocess
 import sys
 
 import pytest
+
+tk = pytest.importorskip("tkinter",
+                         reason="tkinter 不可用，跳过 GUI 用例")
 
 import db_recycled
 from db import Database
@@ -192,3 +196,55 @@ def test_cli_restore_all(seeded_rec, tmp_path):
     r = _run_cli(path, "--restore", "all")
     assert "共恢复 3 个项目" in r.stdout
     assert seeded_rec.query_projects(include_closed=True)[1] == 3
+
+
+# ---------- GUI 删除入口（reader._delete 的回收站分支） ----------
+# 无 DISPLAY 时跳过（与 test_gui_layout 同一约定；Windows 不查 DISPLAY）
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("DISPLAY") and os.name != "nt",
+    reason="无 DISPLAY（用 xvfb-run 运行）")
+
+
+def test_reader_delete_confirm_mentions_recycle_bin(seeded_rec, monkeypatch):
+    """回归：回收站开启时，reader 的删除确认文案必须提示"回收站"，
+    且 reader 模块级能拿到 CFG（曾因局部导入导致 NameError）。"""
+    import reader
+
+    assert hasattr(reader, "CFG")          # 模块级 CFG 必须存在
+    root = tk.Tk()
+    try:
+        captured = {}
+
+        class _FakeDialog:
+            def __init__(self, master, title, msg):
+                captured["msg"] = msg
+                self.result = False        # 不真删
+
+        monkeypatch.setattr(reader, "ConfirmDialog", _FakeDialog)
+        win = reader.ProjectReader(root, seeded_rec, 1)
+        win._delete()
+        assert "回收站" in captured["msg"]
+    finally:
+        root.destroy()
+
+
+def test_reader_delete_confirm_physical_when_disabled(seeded, monkeypatch):
+    """回收站关闭时，确认文案必须是物理删除提示。"""
+    import reader
+
+    root = tk.Tk()
+    try:
+        captured = {}
+
+        class _FakeDialog:
+            def __init__(self, master, title, msg):
+                captured["msg"] = msg
+                self.result = False
+
+        monkeypatch.setattr(reader, "ConfirmDialog", _FakeDialog)
+        win = reader.ProjectReader(root, seeded, 1)
+        win._delete()
+        assert "回收站" not in captured["msg"]
+        assert "不可恢复" in captured["msg"]
+    finally:
+        root.destroy()

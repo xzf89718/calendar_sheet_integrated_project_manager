@@ -10,14 +10,15 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from db import Database, SNAPSHOT_FIELDS          # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import db as _db                                # noqa: E402
+from db import Database                         # noqa: E402
 
 
 def list_projects(db):
-    sql = """
-    SELECT p.id, p.title,
-           cur.milestone AS milestone, cur.status AS status,
+    fields = ", ".join(f"cur.{f} AS {f}" for f in _db.SNAPSHOT_FIELDS)
+    sql = f"""
+    SELECT p.id, p.title, {fields},
            agg.cnt AS snap_count, agg.mx AS last_at
     FROM projects p
     LEFT JOIN snapshots cur ON cur.id = p.current_id
@@ -31,7 +32,7 @@ def list_projects(db):
 
 
 def check_compatible(db_src, db_target):
-    need = set(SNAPSHOT_FIELDS)
+    need = set(_db.SNAPSHOT_FIELDS)
     cols = {r[1] for r in db_target.conn.execute(
         "PRAGMA table_info(snapshots)")}
     missing = need - cols
@@ -43,7 +44,7 @@ def check_compatible(db_src, db_target):
 def copy_projects(db_src, db_target, pids):
     """单库内把 pids 项目追加到目标库。返回 (项目数, 快照数)。"""
     n_proj = n_snap = 0
-    cols = SNAPSHOT_FIELDS
+    cols = _db.SNAPSHOT_FIELDS
     with db_target.conn:
         for pid in pids:
             p = db_src.get_project(pid)

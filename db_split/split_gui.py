@@ -2,7 +2,7 @@
 """split_by_key 分拆器（子模块）：主库按"负责人"等键列拆成每人一个文件。
 
 团队轮转的分发环节。全量分拆（含归档）、空值进"未分配.db"、
-目标已存在拒绝执行。运行：python db_split/split_gui.py
+目标已存在拒绝执行。运行：python -m db_split --gui（或 python db_split/split_gui.py）
 """
 import os
 import sys
@@ -150,5 +150,10 @@ class SplitApp(tk.Tk):
         messagebox.showinfo("完成", msg, parent=self)
 
 
-if __name__ == "__main__":
+def run_gui():
     SplitApp().mainloop()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(run_gui())

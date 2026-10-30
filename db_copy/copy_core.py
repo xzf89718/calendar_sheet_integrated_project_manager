@@ -10,15 +10,20 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from db import Database, SNAPSHOT_FIELDS          # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import db as _db                                # noqa: E402
+from db import Database                         # noqa: E402
 
 
 def list_projects(db):
-    """项目清单：[(pid, 名称, 里程碑, 状态, 快照数, 最近更新)]"""
-    sql = """
-    SELECT p.id, p.title,
-           cur.milestone AS milestone, cur.status AS status,
+    """项目清单：id/title + 当前快照全部字段 + 快照数/最近更新。
+
+    字段列按运行时的 _db.SNAPSHOT_FIELDS 动态拼（import 时冻结的
+    from-import 会拿到错误配置的列，milestone 之类硬编码更不可行）。
+    """
+    fields = ", ".join(f"cur.{f} AS {f}" for f in _db.SNAPSHOT_FIELDS)
+    sql = f"""
+    SELECT p.id, p.title, {fields},
            agg.cnt AS snap_count, agg.mx AS last_at
     FROM projects p
     LEFT JOIN snapshots cur ON cur.id = p.current_id
@@ -33,7 +38,7 @@ def list_projects(db):
 
 def check_compatible(db_a, db_b):
     """两库字段兼容性检查：目标库必须包含当前配置的全部字段列。"""
-    need = set(SNAPSHOT_FIELDS)
+    need = set(_db.SNAPSHOT_FIELDS)
     cols_b = {r[1] for r in db_b.conn.execute(
         "PRAGMA table_info(snapshots)")}
     missing = need - cols_b
@@ -48,7 +53,7 @@ def copy_projects(db_a, db_b, pids):
     全部插入在一个事务里，失败整体回滚。
     """
     n_proj = n_snap = 0
-    cols = SNAPSHOT_FIELDS
+    cols = _db.SNAPSHOT_FIELDS
     with db_b.conn:
         for pid in pids:
             p = db_a.get_project(pid)
