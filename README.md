@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.1.1
+# 日历表格聚合项目跟进工作台 v3.2.0
 
 **面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
 做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
@@ -77,6 +77,22 @@ python main.py
 ```
 
 数据文件 `sales_pm.db` 首次启动自动创建，与程序同目录。
+
+启动选项（v3.2.0，全部可选，双击即用不变）：
+
+```bash
+python main.py                        # 聚合视图（日历+表格，默认）
+python main.py --view calendar        # 仅日历：表格和按钮行移除，
+                                      # 日历吃满窗口，底部保留"新建项目"
+python main.py --view table           # 仅表格：隐藏日历，其余原样
+python main.py --check-config         # 只校验 fields.json，不建库不启动，
+                                      # 退出码 0=通过 1=有错误（可接脚本/CI）
+```
+
+视图优先级：`--view` 命令行 > fields.json 的 `ui.default_view` > 聚合。
+视图在启动时选定，运行中不切换、不回写配置；仅日历模式下日历恒
+显示全部时间节点（该模式没有表格筛选），点条目查看/跟进、点日期
+看当天明细，交互不变。
 
 打包成 exe（可选）：装好 PyInstaller 后运行 `build_exe.ps1`
 （PowerShell），dist 目录得到全部 exe；`fields.json` 自动复制到主程序
@@ -601,6 +617,7 @@ Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关�
 | `calendar_labels.start / followup / close` | 开始/跟进/关闭 | **兼容项**：Windows 通知文案仍读它；日历上的显示名与颜色以 calendar_dates 段为准（求职版可改"投递/检查点/结项"） |
 | `editor.width / height / entry_width / text_width` | 840/940/52/50 | 编辑器窗口与输入框尺寸 |
 | `render_limit` | 600 | **每页渲染行数**（翻页式；30万条与600条翻页同速） |
+| `default_view` | 无（=aggregate） | 启动视图缺省：`aggregate`（聚合）/ `calendar`（仅日历）/ `table`（仅表格）；被 `--view` 覆盖（v3.2.0） |
 
 ### 10.17 `recycle_bin` —— 回收站（v3.1.0，可缺省 = 关闭）
 
@@ -674,6 +691,16 @@ GROUP BY c.id;
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.2.0** 三视图模式 + 主程序命令行接口。启动视图三选一：
+  **聚合**（日历+表格，现状不变）/ **仅日历**（表格与按钮行整体移除，
+  日历吃满窗口；底部保留一行"新建项目"，点条目查看跟进、点日期看
+  当天明细；日历恒显示全部时间节点）/ **仅表格**（隐藏日历，
+  其余原样）。视图启动时定、运行中不切换、不回写配置。命令行：
+  `--view calendar|table|aggregate`（优先级：命令行 > fields.json
+  的 `ui.default_view` > 聚合）；`--check-config` 只校验
+  fields.json（复用启动同款校验器），逐项列出错误、退出码
+  0=通过 1=有错误，不建库不启动 GUI，无显示环境可跑，校验通过
+  打印生效配置摘要。双击即用与库路径锚定规则完全不变
 - **v3.1.1** 子模块命令行化 + 快捷命令：db_split / db_copy / db_append /
   db_assign / db_recycled / db_analysis 统一为四件套包结构
   （`__init__.py` 导出 + `*_core.py` 纯逻辑 + `*_gui.py` 的 `run_gui()`

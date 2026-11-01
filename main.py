@@ -7,19 +7,32 @@
   editor/reader   编辑与阅读 UI
 """
 import os
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 
-from db import Database, SNAPSHOT_FIELDS
-from editor import LABELS
-from config import CFG
-from calendar_gui import CalendarWidget
-from editor import SnapshotEditor
-from reader import ProjectReader
+try:
+    from db import Database, SNAPSHOT_FIELDS
+    from editor import LABELS
+    from config import CFG
+    from calendar_gui import CalendarWidget
+    from editor import SnapshotEditor
+    from reader import ProjectReader
+except ValueError as _cfg_err:
+    # fields.json 损坏：Config() 在 import 时抛 ValueError（错误清单
+    # 全文在 _CFG_ERR）。GUI 路径据此干净退出；--check-config 路径
+    # 自行加载校验并输出清单 + 退出码，不依赖 CFG（v3.2.0）。
+    CFG = None
+    _CFG_ERR = str(_cfg_err)
+else:
+    _CFG_ERR = None
+
+# 三视图模式（v3.2.0）：启动时选定，运行中不切换
+VIEWS = ("aggregate", "calendar", "table")
 
 
 class MainApp(tk.Tk):
-    def __init__(self, db_path=None):
+    def __init__(self, db_path=None, view=None):
         super().__init__()
         if db_path is None:
             # 数据库锚定基础目录（开发=代码目录；打包=exe 目录）
@@ -40,8 +53,14 @@ class MainApp(tk.Tk):
                 raise SystemExit(1)
         else:
             self.db = Database(self.db_path)
-        self.title(CFG.product_name)
-        self._base_title = CFG.product_name   # 收藏夹模式时标题栏追加夹名
+        # 视图模式（v3.2.0）：启动时定、运行中不切换、不回写配置。
+        # view 已在入口按 命令行 --view > fields.json 缺省 > aggregate
+        # 解析过；标题栏加视图标注，避免"界面怎么变了"的困惑
+        self.view = view if view in VIEWS else "aggregate"
+        _view_mark = {"calendar": "仅日历", "table": "仅表格"}.get(self.view)
+        self._base_title = CFG.product_name + (
+            f" \u2014\u2014 [{_view_mark}]" if _view_mark else "")
+        self.title(self._base_title)   # 收藏夹模式时标题栏再追加夹名
         # 窗口按屏幕自适应：留边距，保证底部按钮一启动就可见（尺寸可配置）
         win = CFG.window
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
@@ -57,17 +76,41 @@ class MainApp(tk.Tk):
         # 只是 _query_kwargs 给现有筛选接口多传一组 id。
         self.fav_ids = None
         self.fav_coll = None          # (collection_id, name)
-        # ---- 上半：通用日历 ----
-        self.cal = CalendarWidget(
-            self,
-            get_entries=self._cal_entries,
-            on_entry_click=self._open_project,   # 点条目 -> 看项目
-            on_day_click=self._open_day,         # 点日期/还有N条 -> 当天明细
-            max_per_day=CFG.cal_ui.get("max_per_day", 1),
-            colors=_kind_colors(),               # 类别颜色：calendar_dates 配置
-        )
-        self.cal.pack(fill="x", padx=8, pady=8)
+        # ---- 上半：通用日历（v3.2.0 仅表格模式不创建） ----
+        self.cal = None
+        if self.view != "table":
+            self.cal = CalendarWidget(
+                self,
+                get_entries=self._cal_entries,
+                on_entry_click=self._open_project,   # 点条目 -> 看项目
+                on_day_click=self._open_day,     # 点日期/还有N条 -> 当天明细
+                max_per_day=CFG.cal_ui.get("max_per_day", 1),
+                colors=_kind_colors(),           # 类别颜色：calendar_dates 配置
+            )
+        if self.view == "calendar":
+            # 仅日历模式（v3.2.0）：表格 + 按钮行整体移除，日历吃满窗口；
+            # 最底保留一行，至少"新建项目"（复用 _new_project 原链路）。
+            # pack 钉位坑：按钮行第一个 pack 且 side="bottom" 锚定，
+            # 日历 fill=both 吃掉剩余空间，按钮行永不被挤没
+            cal_bar = tk.Frame(self)
+            cal_bar.pack(side="bottom", fill="x", padx=8, pady=8)
+            tk.Button(cal_bar, text="新建项目",
+                      command=self._new_project).pack(side="left", padx=4)
+            self.cal.pack(fill="both", expand=True, padx=8, pady=8)
+        elif self.cal is not None:
+            self.cal.pack(fill="x", padx=8, pady=8)
 
+        if self.view != "calendar":
+            self._build_buttons()   # 按钮行+提示行（v3.2.0 仅日历模式整体不创建）
+            self._build_list()      # 列表区（cols/tree/滚动条/启动加载/通知）
+        else:
+            # 仅日历模式：无表格无按钮行，只需日期哨兵（日历开着过夜自动翻新）
+            self._last_seen_date = None
+            self.after(60 * 1000, self._date_watch_loop)
+
+    def _build_buttons(self):
+        """按钮行 + 提示行（v3.2.0 抽出方法：
+        仅日历模式下整体不创建，仅表格模式下原样使用。"""
         # ---- 按钮行：先于列表打包，保证任何情况下底部按钮都在 ----
         btns = tk.Frame(self)
         btns.pack(fill="x", padx=8, pady=(0, 8))
@@ -128,7 +171,7 @@ class MainApp(tk.Tk):
                        "搜索=多关键词空格分隔(AND)",
             fg="#888888", anchor="w")
         self.hint_lbl.pack(fill="x", padx=12)
-        self._build_list()      # 列表区（cols/tree/滚动条/启动加载/通知）
+
 
     def _search_changed(self, *_a):
         if self._search_after is not None:
@@ -271,9 +314,11 @@ class MainApp(tk.Tk):
         today = date.today()
         if today != self._last_seen_date:
             self._last_seen_date = today
-            if (self.cal.year, self.cal.month) != (today.year, today.month):
-                self.cal.year, self.cal.month = today.year, today.month
-            self.cal.refresh()
+            cal = getattr(self, "cal", None)   # 仅表格模式无日历（v3.2.0）
+            if cal is not None:
+                if (cal.year, cal.month) != (today.year, today.month):
+                    cal.year, cal.month = today.year, today.month
+                cal.refresh()
         self.after(60 * 1000, self._date_watch_loop)
 
     def _notify_now(self):
@@ -464,6 +509,10 @@ class MainApp(tk.Tk):
 
     # ---------- 日历供给（按模式分流） ----------
     def _cal_entries(self, year, month):
+        if self.view == "calendar":
+            # 仅日历模式（v3.2.0）没有表格筛选/搜索/收藏夹：日历恒
+            # 显示全部时间节点；filtered 分支会牵扯不存在的筛选状态
+            return self.db.calendar_entries(year, month)
         if self.mode == "weekly":
             # v1.5.5 修复：此前窗口锚定"今天"，翻到其他月份会白屏。
             # 日历组件一次只查询当前查看页的年月，窗口检查是恒真的
@@ -877,9 +926,11 @@ class MainApp(tk.Tk):
         return v
 
     def reload(self):
-        self.render_offset = 0            # 任何数据变化回到第一页
-        self._render_rows()
-        self.cal.refresh()
+        if self.view != "calendar":       # 仅日历模式无表格（v3.2.0）
+            self.render_offset = 0        # 任何数据变化回到第一页
+            self._render_rows()
+        if getattr(self, "cal", None) is not None:
+            self.cal.refresh()
 
     def _query_kwargs(self, favorites=True):
         """当前筛选/搜索状态 -> SQL 查询参数（followup 模式）。
@@ -1506,6 +1557,95 @@ class DayWindow(tk.Toplevel):
         self.deiconify()
 
 
-if __name__ == "__main__":
-    app = MainApp()
+# ---------- 命令行入口（v3.2.0） ----------
+def _resolve_view(cli_view):
+    """启动视图优先级：命令行 --view > fields.json 缺省 > 内置 aggregate。"""
+    if cli_view:
+        return cli_view
+    if CFG is not None:
+        return CFG.default_view
+    return "aggregate"
+
+
+def _print_cfg_summary(out):
+    """--check-config 校验通过时的生效配置摘要（排查"我以为生效了"）。"""
+    print("生效配置摘要：", file=out)
+    print(f"  产品名: {CFG.product_name}", file=out)
+    print(f"  数据库: {CFG.db_name}（fields.json 同目录）", file=out)
+    print(f"  字段: {len(CFG.names)} 个；显示列 {len(CFG.display_cols)} 个",
+          file=out)
+    print(f"  日历模式: {CFG.calendar_mode}；"
+          f"每日条数上限 {CFG.cal_ui.get('max_per_day', 1)}", file=out)
+    print(f"  收藏夹: {'开' if CFG.favorites_enabled else '关'}；"
+          f"回收站: {'开' if CFG.recycle_bin_enabled else '关'}", file=out)
+    print(f"  缺省视图: {CFG.default_view}", file=out)
+
+
+def _run_check_config(path=None, out=None):
+    """--check-config 内核：只校验 fields.json，不建库、不创建任何
+    Tk 窗口（无显示环境可跑）。退出码 0 = 无错误，1 = 有错误。
+    校验与启动完全同源（config.validate_config_data）。path 可传，
+    供测试与将来的 db_config 复用。"""
+    import json as _json
+    out = out or sys.stdout
+    if path is None:
+        # 与 config.py 相同的锚定规则（这里不能 import config——配置
+        # 损坏时 import 它即抛异常，校验器反而拿不到）
+        base = os.path.dirname(os.path.abspath(sys.executable)) \
+            if getattr(sys, "frozen", False) \
+            else os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(base, "fields.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = _json.load(f)
+    except OSError as e:
+        print(f"配置校验未通过：读不到文件\n  {path}\n  {e}", file=out)
+        return 1
+    except ValueError as e:
+        print(f"配置校验未通过：不是合法 JSON\n  {path}\n  {e}", file=out)
+        return 1
+    try:
+        from config import validate_config_data
+        errors = validate_config_data(data)
+    except ValueError as e:
+        # config 模块级 CFG 实例化失败 = 同一份默认文件校验未过，
+        # 错误清单在异常消息里（生产路径；测试传 path 不会走到这）
+        print(f"配置校验未通过：\n{e}", file=out)
+        return 1
+    if errors:
+        print(f"配置校验未通过：{len(errors)} 处错误", file=out)
+        for e in errors:
+            print(f"  - {e}", file=out)
+        return 1
+    print("配置校验通过：fields.json 无错误", file=out)
+    if CFG is not None:
+        _print_cfg_summary(out)
+    return 0
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(
+        prog="main.py",
+        description="日历表格聚合项目跟进工作台")
+    parser.add_argument(
+        "--view", choices=VIEWS, default=None,
+        help="启动视图：aggregate(聚合,默认) / calendar(仅日历) / "
+             "table(仅表格)；缺省读 fields.json 的 ui.default_view")
+    parser.add_argument(
+        "--check-config", action="store_true",
+        help="只校验 fields.json，不建库、不启动 GUI；"
+             "退出码 0=通过 1=有错误（警告打印不计）")
+    args = parser.parse_args()
+    if args.check_config:
+        raise SystemExit(_run_check_config())
+    if CFG is None:
+        # fields.json 损坏：与校验器同源的错误清单，不弹窗、不建库
+        print(_CFG_ERR, file=sys.stderr)
+        raise SystemExit(1)
+    app = MainApp(view=_resolve_view(args.view))
     app.mainloop()
+
+
+if __name__ == "__main__":
+    main()
