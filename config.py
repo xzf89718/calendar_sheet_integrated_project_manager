@@ -190,6 +190,15 @@ def validate_config_data(data):
             errs.append("recycle_bin 必须是对象（{enabled}）")
         elif not isinstance(rb.get("enabled"), bool):
             errs.append("recycle_bin.enabled 必须是 true/false")
+    # ui.default_view：启动视图缺省（v3.2.0，可缺省 = aggregate）。
+    # 命令行 --view > 这里 > 内置 aggregate；视图在启动时定，运行中
+    # 不切换、不回写配置
+    ui = data.get("ui")
+    if isinstance(ui, dict) and "default_view" in ui:
+        if ui["default_view"] not in ("aggregate", "calendar", "table"):
+            errs.append(
+                "ui.default_view 必须是 aggregate/calendar/table 之一："
+                f"{ui['default_view']!r}")
     return errs
 
 
@@ -217,6 +226,11 @@ class Config:
         self.font = self.ui.get("font", {})
         self.col_ui = self.ui.get("columns", {})
         self.cal_ui = self.ui.get("calendar", {})
+        # 视图模式缺省（v3.2.0）：启动视图 = 命令行 --view > 这里 >
+        # 内置 aggregate。校验器已拦截非法值，这里兜底防手滑
+        dv = self.ui.get("default_view", "aggregate")
+        self.default_view = dv if dv in ("aggregate", "calendar", "table") \
+            else "aggregate"
         # 日历类别显示名，键 = 字段上的 "calendar" 标记值
         self.cal_labels = self.ui.get(
             "calendar_labels",
