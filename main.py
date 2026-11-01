@@ -345,27 +345,10 @@ class MainApp(tk.Tk):
         文件名：时间(精确到秒)-识别符-数据库文件名
         路径与识别符在 fields.json 的 backup 段配置。
         """
-        import sqlite3
-        from datetime import datetime
-        from pathlib import Path
-        cfg = CFG.backup
-        dest = Path(cfg.get("path", "backups")).expanduser()
-        if not dest.is_absolute():                # 相对路径 -> 基础目录下
-            from config import BASE_DIR
-            dest = Path(BASE_DIR) / dest
+        # 备份纯逻辑在 workbench_ui.bench_core（v3.3.0，GUI/CLI 共用一份）
         try:
-            dest.mkdir(parents=True, exist_ok=True)
-        except OSError as e:
-            messagebox.showerror("备份失败",
-                                 f"无法创建备份目录：\n{e}", parent=self)
-            return
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        ident = self._safe_ident(str(cfg.get("identifier", "备份")))
-        target = dest / f"{ts}-{ident}-{Path(self.db_path).name}"
-        try:
-            tgt = sqlite3.connect(str(target))
-            self.db.conn.backup(tgt)              # 官方在线备份，一致性快照
-            tgt.close()
+            from workbench_ui.bench_core import backup_database
+            target = backup_database(self.db, self.db_path)
         except Exception as e:                    # noqa: BLE001
             messagebox.showerror("备份失败", str(e), parent=self)
             return
@@ -1623,7 +1606,9 @@ def _run_check_config(path=None, out=None):
     return 0
 
 
-def main():
+def main(argv=None):
+    """argv=None 时取 sys.argv[1:]（GUI 直接启动）；
+    workbench_ui gui 透传时也走这里。"""
     import argparse
     parser = argparse.ArgumentParser(
         prog="main.py",
@@ -1636,7 +1621,7 @@ def main():
         "--check-config", action="store_true",
         help="只校验 fields.json，不建库、不启动 GUI；"
              "退出码 0=通过 1=有错误（警告打印不计）")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.check_config:
         raise SystemExit(_run_check_config())
     if CFG is None:

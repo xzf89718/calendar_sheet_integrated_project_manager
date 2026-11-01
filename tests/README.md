@@ -12,6 +12,24 @@
 
 ## 运行
 
+### 依赖安装（首次）
+
+```bash
+# 测试框架
+pip install pytest
+
+# GUI/导入导出用例用到 openpyxl（与主程序同一份 requirements）
+pip install openpyxl
+
+# Linux 无显示环境跑 GUI 用例（test_gui_layout / test_view_modes /
+# test_main_cli / test_workbench_ui 的 gui 相关用例）需要虚拟显示：
+#   Debian/Ubuntu:  apt-get install xvfb
+#   然后 xvfb-run -a python -m pytest tests/ -q
+# Windows 有真实桌面，不需要 xvfb，直接 python -m pytest tests/ -q
+```
+
+### 跑测试
+
 ```bash
 # L1（毫秒级，无 GUI 依赖）
 python -m pytest tests/ -q --ignore=tests/test_gui_layout.py

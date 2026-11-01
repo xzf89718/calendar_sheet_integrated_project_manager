@@ -6,7 +6,7 @@
   2. 坏配置端到端：拷整个源码树到 tmp 换坏 fields.json → 退出码 1、
      错误清单在 stdout、无 traceback（生产事故路径）
   3. 内核 in-process：_run_check_config(path=...) 对任意路径文件校验，
-     供 db_config（v3.2.1）复用同一入口
+     供 db_config（v3.3.1）复用同一入口
 """
 import json
 import os

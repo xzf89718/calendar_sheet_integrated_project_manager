@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.2.0
+# 日历表格聚合项目跟进工作台 v3.3.1
 
 **面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
 做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
@@ -67,16 +67,33 @@
 ## 一、安装与启动
 
 需要 Python 3.8+（python.org 官方版，自带 tkinter）。
+实测 3.8 ~ 3.14 stable 可顺利安装运行；**3.15 目前 pip 直接装不上
+依赖，暂不建议使用**。
 
 ```bash
-# 1. 解压后进入文件夹，安装依赖（Excel 导入导出 + Windows 通知）
+# 1. 解压后进入文件夹。部分旧环境需先升级打包工具链，
+#    否则 requirements.txt 里的包可能编译/安装失败：
+pip install --upgrade pip setuptools wheel
+
+# 2. 安装依赖（Excel 导入导出 + Windows 通知）
 pip install -r requirements.txt
 
-# 2. 启动
+# 3. 启动
 python main.py
 ```
 
 数据文件 `sales_pm.db` 首次启动自动创建，与程序同目录。
+
+排障：装依赖报 `Failed building wheel for winrt-runtime`——这是
+通知库 `windows-toasts` 的 C++ 依赖在太新的 Python（如 3.15）上
+没有预编译 wheel、源码编译失败所致。改用 Python 3.8~3.14，或按
+requirements.txt 注释换用备选通知库 `win10toast`。主程序与数据
+不受影响。
+
+开发者跑测试（普通用户可跳过）：`pip install pytest` 后
+`python -m pytest tests/ -q`（Linux 无显示环境需先
+`apt-get install xvfb` 并加 `xvfb-run -a` 前缀；Windows 直接跑）。
+详见 tests/README.md。
 
 启动选项（v3.2.0，全部可选，双击即用不变）：
 
@@ -93,6 +110,47 @@ python main.py --check-config         # 只校验 fields.json，不建库不启�
 视图在启动时选定，运行中不切换、不回写配置；仅日历模式下日历恒
 显示全部时间节点（该模式没有表格筛选），点条目查看/跟进、点日期
 看当天明细，交互不变。
+
+### 1.1 命令行工作台 workbench_ui（v3.3.0）
+
+主窗口全部 GUI 功能都有命令行版，单独的 `workbench_ui` 包实现
+（`python -m workbench_ui ...`；`setup.ps1` / `setup.sh` 之后可
+直接敲 `workbench_ui ...`）。库路径锚定 fields.json 同目录，与 GUI
+完全一致，**没有也不接受 `--db` 参数**。
+
+```bash
+python -m workbench_ui list [--closed] [--search 词]... \
+        [--where 字段=值]... [--sort 列] [--desc] [--format table|csv] \
+        [--limit N] [--offset N]      # 项目列表，id 索引列恒打头
+python -m workbench_ui show <id> [--hist N]   # 查看项目（含历史快照）
+python -m workbench_ui new --set 字段=值... [--note 文本]
+python -m workbench_ui follow <id> --set 字段=值... [--note 文本]
+python -m workbench_ui import <文件> [--template 名]
+python -m workbench_ui export <out.xlsx> [同 list 的筛选参数]
+python -m workbench_ui weekly <out.xlsx> [--date-from .. --date-to ..
+        --plan-from .. --plan-to ..]  # 日期缺省 = 本周一~日/下周一~日
+python -m workbench_ui backup          # 库备份（与 GUI 按钮同一内核）
+python -m workbench_ui notify          # 今日项目事项，只打印到终端
+python -m workbench_ui cal <年> [月] [日]   # 日历时间节点，只读打印
+python -m workbench_ui fav list|new|rename|delete|add|remove ...
+python -m workbench_ui gui [--view ...]     # 进入图形界面（= main.py）
+```
+
+要点：
+
+- `--where 字段=值` 可多次，同字段取并集；日期字段支持
+  `--where 日期=起~止`（任一端可省略）。字段名 = fields.json 的
+  `name`（报错会列出可用名）。
+- `new` / `follow` 的值校验与 GUI 完全同源（同一套
+  `validate_*` / `check_date_bounds`）；`follow` 未传的字段保持
+  现值，`--note` 写入跟进记录字段。
+- `export` 导出全量匹配行（不受 `--limit` 影响），只支持 `.xlsx`。
+- `notify` 按设计**只打印到终端**，不走系统通知（防止被脚本滥用
+  塞爆通知栏）。
+- `cal` 只读：打印某年/月/日的时间节点清单（含项目 id），供
+  `show` / `follow` 接续；不提供打开、编辑接口。
+- 退出码：0 成功；1 业务错误（消息在 stderr，无 traceback）；
+  2 参数错误。
 
 打包成 exe（可选）：装好 PyInstaller 后运行 `build_exe.ps1`
 （PowerShell），dist 目录得到全部 exe；`fields.json` 自动复制到主程序
@@ -691,6 +749,19 @@ GROUP BY c.id;
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.3.1** 测试适配（无功能变化）：`test_setup_shims` 在 Windows
+  跳过——它验证的是 setup.sh 的 bash shim + `~/.local/bin` 软链，
+  属 Linux/macOS 机制（Windows 无软链权限必失败，且触发 GBK 解码
+  警告）；Windows 的 shim 由 setup.ps1 生成，不在 pytest 覆盖范围。
+  Windows 上全套测试现为 131 passed + 1 skipped（Python 3.14 实测）
+- **v3.3.0** 命令行工作台 `workbench_ui`：主窗口全部 GUI 功能
+  命令行化（list / show / new / follow / import / export / weekly /
+  backup / notify / cal / fav，`gui` 子命令进入图形界面 = main.py）。
+  纯逻辑内核 `bench_core` 与 GUI 共用：备份一份实现、`new`/`follow`
+  的值校验同源（validate_* / check_date_bounds 自 editor.py 下沉
+  db.py，GUI/CLI 两处一份）；库路径锚定 fields.json 同目录，无
+  `--db`。`--where 字段=值` 可多次、日期支持区间；`notify` 只打印
+  终端不走系统通知；`cal` 只读打印不接编辑。退出码 0/1/2
 - **v3.2.0** 三视图模式 + 主程序命令行接口。启动视图三选一：
   **聚合**（日历+表格，现状不变）/ **仅日历**（表格与按钮行整体移除，
   日历吃满窗口；底部保留一行"新建项目"，点条目查看跟进、点日期看
