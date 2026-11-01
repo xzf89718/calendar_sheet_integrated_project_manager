@@ -163,6 +163,9 @@ def test_analysis_placeholder():
 
 # ---------- setup.sh 快捷命令 ----------
 
+@pytest.mark.skipif(sys.platform == "win32",
+                    reason="setup.sh 是 Linux/macOS 脚本（bash + "
+                           "~/.local/bin 软链），Windows 用 setup.ps1")
 def test_setup_shims(tmp_path):
     """setup.sh 生成的 shim 必须：不依赖 cwd、参数原样透传。"""
     r = subprocess.run(

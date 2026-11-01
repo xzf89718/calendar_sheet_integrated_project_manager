@@ -23,6 +23,7 @@ $Bin  = Join-Path $Root "bin"
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
 
 $Modules = @(
+    "workbench_ui",
     "db_recycled",
     "db_split",
     "db_copy",

@@ -19,7 +19,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN="$ROOT/bin"
 mkdir -p "$BIN"
 
-MODULES="db_recycled db_split db_copy db_append db_assign db_analysis"
+MODULES="workbench_ui db_recycled db_split db_copy db_append db_assign db_analysis"
 
 for m in $MODULES; do
     shim="$BIN/$m"

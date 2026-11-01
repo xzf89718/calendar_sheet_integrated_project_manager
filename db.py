@@ -20,6 +20,90 @@ _SQL_TYPES = {"date": "TEXT", "int": "INTEGER", "float": "REAL",
               "text": "TEXT", "choice": "TEXT", "status": "TEXT"}
 
 
+def validate_field_input(name, raw):
+    """单字段输入校验（v2.6.0 起在 editor.py，v3.3.0 下沉 db.py：
+    CLI（workbench_ui）也要用，db 层不认识 GUI）。
+
+    按字段类型（fields.json 的 type）分别检查：
+      date   须能被识别为真实日期（兼容全角/中文写法），统一成 YYYY-MM-DD；
+      int    必须是整数（兼容 "30%" 写法），拒绝小数与字母；
+      float  必须是实数；
+      其余   字符串/choice/status：任意文本合法，仅去首尾空白。
+    返回 (清洗后的值, 错误消息或 None)。
+    """
+    from datetime import date as _date
+    raw = "" if raw is None else str(raw).strip()
+    if not raw:
+        return "", None
+    if name in CFG.date_fields:
+        v = normalize_date(raw)
+        if v is None:
+            return raw, "必须是有效日期（如 2026-10-25、2026/10/25、2026年10月25日）"
+        try:
+            _date.fromisoformat(v)     # 格式对了还要是真实日历日
+        except ValueError:
+            return raw, f"日期不存在：{v}（请检查年/月/日）"
+        return v, None
+    if name in CFG.int_fields:
+        s = raw.rstrip("%").strip()
+        try:
+            fv = float(s)
+        except ValueError:
+            return raw, "必须是整数（如 30）"
+        if not fv.is_integer():
+            return raw, "必须是整数，不能带小数"
+        return int(fv), None
+    if name in CFG.float_fields:
+        try:
+            return float(raw), None
+        except ValueError:
+            return raw, "必须是数字（如 3.5）"
+    return raw, None          # 字符串/choice/status：始终合法
+
+
+def validate_snapshot_fields(fields):
+    """整表校验：对全部配置字段逐个过 validate_field_input。
+
+    返回 (清洗后的 dict, 错误消息列表)。错误带字段显示名，逐条列出。
+    """
+    cleaned, errors = {}, []
+    for f in CFG.names:
+        v, err = validate_field_input(f, fields.get(f, ""))
+        if err:
+            errors.append(f"「{CFG.labels.get(f, f)}」{err}")
+        cleaned[f] = v
+    return cleaned, errors
+
+
+def check_date_bounds(fields):
+    """日期范围检查器（v2.6.0，fields.json 的 date_check 段驱动）。
+
+    被检查的日期字段（date_check.fields）若有值，必须落在
+    [开始日期, 关闭日期] 内；某侧边界为空则该侧不检。enabled=false
+    或段缺省时直接放行。返回错误消息列表（空 = 通过）。
+    """
+    if not CFG.date_check_enabled:
+        return []
+    start_f, close_f = CFG.date_check_bounds
+    start_v = (fields.get(start_f) or "").strip() if start_f else ""
+    close_v = (fields.get(close_f) or "").strip() if close_f else ""
+    errors = []
+    if start_v and close_v and start_v > close_v:
+        errors.append(f"「{CFG.labels.get(start_f, start_f)}」{start_v} "
+                      f"晚于「{CFG.labels.get(close_f, close_f)}」{close_v}")
+    for f in CFG.date_check_fields:
+        v = (fields.get(f) or "").strip()
+        if not v:
+            continue
+        label = CFG.labels.get(f, f)
+        if start_v and v < start_v:
+            errors.append(f"「{label}」{v} 早于开始日期 {start_v}")
+        if close_v and v > close_v:
+            errors.append(f"「{label}」{v} 晚于关闭日期 {close_v}")
+    return errors
+
+
+
 def _schema_sql():
     cols = ",\n    ".join(
         f"{f['name']} {_SQL_TYPES[f['type']]}" for f in CFG.fields)
@@ -127,6 +211,7 @@ def diff_summary(old, new):
 
 class Database:
     def __init__(self, path="sales_pm.db"):
+        self.db_path = path                  # v3.3.0：备份等场景要用
         self.conn = sqlite3.connect(path)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys=ON")
@@ -595,6 +680,7 @@ class Database:
 
     # ---------- 快照 ----------
     def _insert_snapshot(self, project_id, changed_by, summary, fields):
+        old = self.get_current(project_id)   # 联动判定基准（None=新建首快照）
         cols = ["project_id", "changed_by", "change_summary"] + SNAPSHOT_FIELDS
         vals = [project_id, changed_by, summary] + \
                [fields.get(f) or None for f in SNAPSHOT_FIELDS]
@@ -602,17 +688,28 @@ class Database:
             f"INSERT INTO snapshots({','.join(cols)}) "
             f"VALUES ({','.join('?'*len(cols))})", vals)
         sid = cur.lastrowid
-        # 业务状态联动项目开关：status_closed 里配置的值 = 归档
-        pstatus = ("closed"
-                   if fields.get(CFG.status_field) in CFG.status_closed
-                   else "open")
-        # 项目名自动更新：厂家-客户-产品，全空则保留原名
+        # 联动判定只信"有效信息"：快照本体按传入字段原样落库（部分字段
+        # 快照的未传列 = NULL，属调用方约定），但项目行的标题/开关不能
+        # 凭部分字段判定——未传时从项目当前行继承（v3.3.2 修复的 BUG：
+        # 部分字段跟进把已完结项目误标 open、标题被"项目N"兜底覆盖；
+        # 若从上一快照继承会断链，因为上一快照也可能是部分的）。
+        oldp = self.conn.execute(
+            "SELECT status, title FROM projects WHERE id=?",
+            (project_id,)).fetchone()
+        st = fields.get(CFG.status_field)
+        if st is None and old is not None:
+            pstatus = oldp["status"]      # 未传状态：继承现开关
+        else:
+            pstatus = ("closed" if st in CFG.status_closed else "open")
         # 项目名 = 配置字段按序拼接（默认 厂家-客户-产品，JSON 的 name_fields 可改）
         name = "-".join(str(fields.get(f) or "")
                         for f in CFG.name_fields
                         if fields.get(f))
-        if not name:                      # 组合字段全空时兜底编号
-            name = f"项目{project_id}"
+        if not name:
+            if old is None:               # 新建且组合字段全空：兜底编号
+                name = f"项目{project_id}"
+            else:                         # 跟进无名称信息：保持原标题
+                name = oldp["title"]
         self.conn.execute(
             "UPDATE projects SET current_id=?, status=?, title=? "
             "WHERE id=?", (sid, pstatus, name, project_id))
