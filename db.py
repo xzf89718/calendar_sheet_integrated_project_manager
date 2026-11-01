@@ -680,6 +680,7 @@ class Database:
 
     # ---------- 快照 ----------
     def _insert_snapshot(self, project_id, changed_by, summary, fields):
+        old = self.get_current(project_id)   # 联动判定基准（None=新建首快照）
         cols = ["project_id", "changed_by", "change_summary"] + SNAPSHOT_FIELDS
         vals = [project_id, changed_by, summary] + \
                [fields.get(f) or None for f in SNAPSHOT_FIELDS]
@@ -687,17 +688,28 @@ class Database:
             f"INSERT INTO snapshots({','.join(cols)}) "
             f"VALUES ({','.join('?'*len(cols))})", vals)
         sid = cur.lastrowid
-        # 业务状态联动项目开关：status_closed 里配置的值 = 归档
-        pstatus = ("closed"
-                   if fields.get(CFG.status_field) in CFG.status_closed
-                   else "open")
-        # 项目名自动更新：厂家-客户-产品，全空则保留原名
+        # 联动判定只信"有效信息"：快照本体按传入字段原样落库（部分字段
+        # 快照的未传列 = NULL，属调用方约定），但项目行的标题/开关不能
+        # 凭部分字段判定——未传时从项目当前行继承（v3.3.2 修复的 BUG：
+        # 部分字段跟进把已完结项目误标 open、标题被"项目N"兜底覆盖；
+        # 若从上一快照继承会断链，因为上一快照也可能是部分的）。
+        oldp = self.conn.execute(
+            "SELECT status, title FROM projects WHERE id=?",
+            (project_id,)).fetchone()
+        st = fields.get(CFG.status_field)
+        if st is None and old is not None:
+            pstatus = oldp["status"]      # 未传状态：继承现开关
+        else:
+            pstatus = ("closed" if st in CFG.status_closed else "open")
         # 项目名 = 配置字段按序拼接（默认 厂家-客户-产品，JSON 的 name_fields 可改）
         name = "-".join(str(fields.get(f) or "")
                         for f in CFG.name_fields
                         if fields.get(f))
-        if not name:                      # 组合字段全空时兜底编号
-            name = f"项目{project_id}"
+        if not name:
+            if old is None:               # 新建且组合字段全空：兜底编号
+                name = f"项目{project_id}"
+            else:                         # 跟进无名称信息：保持原标题
+                name = oldp["title"]
         self.conn.execute(
             "UPDATE projects SET current_id=?, status=?, title=? "
             "WHERE id=?", (sid, pstatus, name, project_id))

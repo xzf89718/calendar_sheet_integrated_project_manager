@@ -287,3 +287,30 @@ def test_delete_project_removes_all(seeded):
     seeded.delete_project(1)
     assert seeded.get_project(1) is None
     assert seeded.get_snapshots(1) == []
+
+
+# ---------- 部分字段跟进（v3.3.2 回归：联动判定必须继承项目当前行） ----------
+
+def test_partial_snapshot_keeps_title_and_status(cfg, dbs, monkeypatch):
+    """add_snapshot 允许部分字段：标题不得被"项目N"覆盖，
+    已完结状态不得被误标回 open。"""
+    from conftest import _patch_cfg
+    _patch_cfg(monkeypatch, cfg)
+    db = dbs
+    pid = db.create_project(customer="厂家甲", product="P1",
+                            status=cfg.status_closed[0])
+    assert db.get_project(pid)["title"] == "厂家甲-P1"
+    # 只传两个字段的跟进
+    db.add_snapshot(pid, followup_note="补记一条", probability=50)
+    p = db.get_project(pid)
+    assert p["title"] == "厂家甲-P1"           # 原标题保持
+    assert p["status"] == "closed"             # 完结不被翻回 open
+
+
+def test_create_empty_name_falls_back(cfg, dbs, monkeypatch):
+    """新建且名称字段全空：仍用兜底编号（保持旧行为）。"""
+    from conftest import _patch_cfg
+    _patch_cfg(monkeypatch, cfg)
+    db = dbs
+    pid = db.create_project(brief="只有简述")
+    assert db.get_project(pid)["title"] == f"项目{pid}"
