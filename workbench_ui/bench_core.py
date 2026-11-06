@@ -268,15 +268,19 @@ def cmd_import(db, path, template=None):
 def cmd_export(db, out_path, template=None, closed=False, search=None,
                where=None, sort=None, desc=False):
     """导出全量匹配行（与 GUI 导出同语义，不受 limit 影响）。"""
-    if not str(out_path).lower().endswith(".xlsx"):
-        raise BenchError("导出只支持 .xlsx（与 GUI 导出同一模板引擎）")
+    lower = str(out_path).lower()
+    if not (lower.endswith(".xlsx") or lower.endswith(".csv")):
+        raise BenchError("导出只支持 .xlsx / .csv（按扩展名）")
     rows, _ = cmd_list(db, closed=closed, search=search, where=where,
                        sort=sort, desc=desc, limit=None)
     tpl = _find_template(template)
     if tpl is None:
         raise BenchError("没有可用模板（fields.json 的 templates 段）")
     try:
-        n = _exporter.export_with_template(rows, out_path, tpl)
+        if lower.endswith(".csv"):
+            n = _exporter.export_csv(rows, out_path, tpl)
+        else:
+            n = _exporter.export_with_template(rows, out_path, tpl)
     except Exception as e:                    # noqa: BLE001
         raise BenchError(f"导出失败：{e}")
     return n
