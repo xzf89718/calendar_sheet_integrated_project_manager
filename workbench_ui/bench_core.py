@@ -101,10 +101,18 @@ def list_columns():
 
 
 def cmd_list(db, closed=False, search=None, where=None, sort=None,
-             desc=False, limit=None, offset=0):
-    """项目列表。返回 (rows, total)。sort 缺省 = 配置 default_sort。"""
+             desc=False, limit=None, offset=0, fav=None):
+    """项目列表。返回 (rows, total)。sort 缺省 = 配置 default_sort。
+
+    fav = 收藏夹名（v3.3.4）：只看该夹内项目，且每行追加 "fav" 键 =
+    该项目所属全部收藏夹名（顿号连接），供调用方加「收藏夹」列。
+    收藏夹是纯索引，本过滤只是视图层，与导入导出的全库语义无关。
+    """
     cfg = _cfg()
     filters = parse_where(where)
+    if fav is not None:
+        cid = _find_collection(db, fav)
+        filters["id"] = set(db.collection_projects(cid))
     if sort is None:
         sort = cfg.default_sort["column"]
         desc = cfg.default_sort["desc"]
@@ -116,6 +124,13 @@ def cmd_list(db, closed=False, search=None, where=None, sort=None,
         search_fields=_search_fields(),
         sort=sort, sort_desc=desc,
         include_closed=closed, offset=offset, limit=limit)
+    if fav is not None:
+        memb = {}
+        for cid, name, _n in db.list_collections():
+            for pid, _t in db.collection_items_detail(cid):
+                memb.setdefault(pid, []).append(name)
+        for r in rows:
+            r["fav"] = "、".join(memb.get(r["id"], []))
     return rows, total
 
 

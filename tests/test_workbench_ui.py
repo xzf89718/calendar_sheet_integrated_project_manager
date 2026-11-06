@@ -162,6 +162,22 @@ def test_cli_fav_flow(pkg):
     assert r.returncode == 0
 
 
+def test_cli_list_fav_filter_and_column(pkg):
+    # v3.3.4：list --fav 夹名 = 收藏夹视图过滤 + 「收藏夹」归属列
+    run_ui(pkg, "new", "--set", "customer=厂家A")
+    run_ui(pkg, "new", "--set", "customer=厂家B")
+    assert run_ui(pkg, "fav", "new", "重点").returncode == 0
+    assert run_ui(pkg, "fav", "add", "重点", "1").returncode == 0
+    r = run_ui(pkg, "list", "--fav", "重点")
+    assert r.returncode == 0
+    assert "共 1 条" in r.stdout
+    assert "厂家A" in r.stdout and "厂家B" not in r.stdout
+    assert "收藏夹" in r.stdout.splitlines()[0]   # 归属列打表头
+    assert "重点" in r.stdout
+    # 夹名不存在 = 业务错误（退出码 1）
+    assert run_ui(pkg, "list", "--fav", "不存在").returncode == 1
+
+
 def test_cli_notify_prints_to_terminal(pkg):
     r = run_ui(pkg, "notify")
     assert r.returncode == 0

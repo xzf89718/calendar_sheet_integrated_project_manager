@@ -78,8 +78,12 @@ def cmd_list(a):
     try:
         rows, total = bc.cmd_list(
             db, closed=a.closed, search=a.search, where=a.where,
-            sort=a.sort, desc=a.desc, limit=a.limit, offset=a.offset)
+            sort=a.sort, desc=a.desc, limit=a.limit, offset=a.offset,
+            fav=a.fav)
         cols, heads = bc.list_columns()
+        if a.fav:
+            cols.append("fav")
+            heads["fav"] = "收藏夹"
         data = bc.format_csv(rows, cols, heads) if a.format == "csv" \
             else bc.format_table(rows, cols, heads)
         print(data)
@@ -261,6 +265,9 @@ def build_parser():
     sp = sub.add_parser("list", help="项目列表")
     _add_filter_args(sp)
     _add_format_args(sp)
+    sp.add_argument("--fav", default=None, metavar="收藏夹名",
+                    help="只看该收藏夹内项目，输出追加「收藏夹」归属列"
+                         "（纯索引视图过滤，不影响导入导出的全库语义）")
 
     sp = sub.add_parser("show", help="查看项目（含历史快照）")
     sp.add_argument("id", type=int, help="项目 id（list 第一列）")
