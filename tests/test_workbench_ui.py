@@ -113,10 +113,41 @@ def test_cli_csv_format(pkg):
     assert "厂家A" in r.stdout
 
 
-def test_cli_export_rejects_csv_extension(pkg):
+def test_cli_export_csv(pkg):
+    """v3.4.0：export 支持 .csv（utf-8-sig BOM + 纯 LF，Excel 双击中文正常）。"""
+    run_ui(pkg, "new", "--set", "customer=厂家A")
+    run_ui(pkg, "new", "--set", "customer=厂家B")
     r = run_ui(pkg, "export", "out.csv")
+    assert r.returncode == 0
+    assert "已导出 2 条" in r.stdout
+    data = (pkg / "out.csv").read_bytes()
+    assert data.startswith(b"\xef\xbb\xbf")     # utf-8-sig BOM
+    assert b"\r\n" not in data                    # lineterminator="\n"
+    text = data.decode("utf-8-sig")
+    assert "厂家A" in text and "厂家B" in text
+    assert len([ln for ln in text.splitlines() if ln.strip()]) == 3  # 表头+2行
+
+
+def test_cli_export_csv_roundtrip(pkg):
+    """v3.4.0 对称性验收：export csv → 清库 → import 回库，数据不丢。"""
+    run_ui(pkg, "new", "--set", "customer=厂家A", "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=厂家B")
+    assert run_ui(pkg, "export", "out.csv").returncode == 0
+    for f in pkg.glob("*.db"):
+        f.unlink()
+    r = run_ui(pkg, "import", "out.csv")
+    assert r.returncode == 0
+    assert "新建 2 条" in r.stdout
+    r = run_ui(pkg, "list", "--format", "csv")
+    assert "厂家A" in r.stdout
+    assert "立项" in r.stdout
+
+
+def test_cli_export_bad_extension_exit_1(pkg):
+    """v3.4.0：非 xlsx/csv 扩展名明确报错（旧文案只提 xlsx 已废弃）。"""
+    r = run_ui(pkg, "export", "out.txt")
     assert r.returncode == 1
-    assert ".xlsx" in r.stderr
+    assert ".xlsx / .csv" in r.stderr
 
 
 def test_cli_export_and_backup(pkg):

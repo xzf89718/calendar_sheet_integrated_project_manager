@@ -48,6 +48,21 @@ def export_with_template(rows, path, template):
     return len(rows)
 
 
+def export_csv(rows, path, template):
+    """按命名模板导出 CSV（utf-8-sig，Excel 双击打开中文不乱码）。
+    列与取值规则和 export_with_template 完全一致（const 列原样、
+    空值补 default），仅无固定列样式。返回导出行数。"""
+    import csv
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow([label for label, _f, _c in template["columns"]])
+        for r in rows:
+            w.writerow([const if field is None
+                        else _fill(r.get(field), field)
+                        for _label, field, const in template["columns"]])
+    return len(rows)
+
+
 # ---------- 周报 ----------
 def _weekly_cell(snap, field):
     """本周跟进行取值：快照记录 + 项目名。"""

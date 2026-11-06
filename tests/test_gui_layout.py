@@ -189,3 +189,20 @@ def test_reader_banner_pinned_to_top(app):
     finally:
         r.grab_release()
         r.destroy()
+
+
+def test_gui_export_csv_dispatch(app, tmp_path, monkeypatch):
+    """v3.4.0：导出按最终文件名后缀分派——.csv 走 export_csv（utf-8-sig）。"""
+    import main
+    out = tmp_path / "out.csv"
+    monkeypatch.setattr(main.filedialog, "asksaveasfilename",
+                        lambda **kw: str(out))
+    monkeypatch.setattr(main.messagebox, "showinfo", lambda *a, **k: None)
+    monkeypatch.setattr(main.messagebox, "showerror", lambda *a, **k: None)
+    monkeypatch.setattr(app, "_pick_template",
+                        lambda *_a, **_k: {"name": "全选", "columns": [
+                            ("客户", "customer", None)]})
+    app._export()
+    data = out.read_bytes()
+    assert data.startswith(b"\xef\xbb\xbf")
+    assert "客户X".encode("utf-8") in data   # seeded 项目1 的客户

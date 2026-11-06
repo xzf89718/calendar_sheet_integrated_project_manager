@@ -412,16 +412,20 @@ class MainApp(tk.Tk):
         tpl = self._pick_template("选择导出模板")
         if tpl is None:
             return
-        from exporter import export_with_template
+        from exporter import export_csv, export_with_template
         rows = self._all_rows()          # 全量匹配，不受渲染截断影响
         path = filedialog.asksaveasfilename(
             parent=self, defaultextension=".xlsx",
             initialfile=f"{tpl['name']}表格.xlsx",
-            filetypes=[("Excel", "*.xlsx")])
+            filetypes=[("Excel 或 CSV", "*.xlsx *.csv"),
+                       ("Excel", "*.xlsx"), ("CSV", "*.csv")])
         if not path:
             return
         try:
-            n = export_with_template(rows, path, tpl)
+            if path.lower().endswith(".csv"):
+                n = export_csv(rows, path, tpl)
+            else:
+                n = export_with_template(rows, path, tpl)
         except Exception as e:                      # noqa: BLE001
             messagebox.showerror("导出失败", str(e), parent=self)
             return

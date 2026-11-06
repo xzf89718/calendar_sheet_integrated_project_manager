@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.3.2
+# 日历表格聚合项目跟进工作台 v3.4.0
 
 **面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
 做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
@@ -128,7 +128,7 @@ python -m workbench_ui show <id> [--hist N]   # 查看项目（含历史快照�
 python -m workbench_ui new --set 字段=值... [--note 文本]
 python -m workbench_ui follow <id> --set 字段=值... [--note 文本]
 python -m workbench_ui import <文件> [--template 名]
-python -m workbench_ui export <out.xlsx> [同 list 的筛选参数]
+python -m workbench_ui export <out.xlsx|out.csv> [同 list 的筛选参数]
 python -m workbench_ui weekly <out.xlsx> [--date-from .. --date-to ..
         --plan-from .. --plan-to ..]  # 日期缺省 = 本周一~日/下周一~日
 python -m workbench_ui backup          # 库备份（与 GUI 按钮同一内核）
@@ -146,7 +146,9 @@ python -m workbench_ui gui [--view ...]     # 进入图形界面（= main.py）
 - `new` / `follow` 的值校验与 GUI 完全同源（同一套
   `validate_*` / `check_date_bounds`）；`follow` 未传的字段保持
   现值，`--note` 写入跟进记录字段。
-- `export` 导出全量匹配行（不受 `--limit` 影响），只支持 `.xlsx`。
+- `export` 导出全量匹配行（不受 `--limit` 影响），按扩展名分派：
+  `.xlsx` 走模板引擎，`.csv` 同列结构写文本（`utf-8-sig` 编码 + 纯
+  LF，Excel 双击中文不乱码，与导入端读取方式对称），其余扩展名报错。
 - `notify` 按设计**只打印到终端**，不走系统通知（防止被脚本滥用
   塞爆通知栏）。
 - `cal` 只读：打印某年/月/日的时间节点清单（含项目 id），供
@@ -754,6 +756,19 @@ GROUP BY c.id;
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.4.0** CSV 导出（导入导出对称补齐）：
+  ① CLI `export` 按扩展名分派：`.xlsx` 走原模板引擎；`.csv` 新增
+  `exporter.export_csv`（列结构/取值规则与 xlsx 完全一致：模板列清单、
+  const 列原样、空值补 default），`utf-8-sig` 编码 + 纯 LF——Excel
+  双击打开中文不乱码，与导入端 `utf-8-sig` 读取天然对称；其余扩展名
+  报"导出只支持 .xlsx / .csv"。原 help 文案"xlsx / csv，按扩展名"
+  自本版起成为事实；
+  ② GUI 跟进表导出文件对话框改为"Excel 或 CSV"（与导入对话框同一
+  风格），按最终文件名后缀分派生成路径；收藏夹/周报模式置灰不受影响；
+  ③ `weekly` 保持 xlsx-only 不动（双 sheet 带格式，csv 无意义）。
+  新增 4 条用例（CLI csv 编码 1、csv 往返对称 1、非法扩展名 1、GUI
+  后缀分派 1），删除 1 条过时用例（旧版"export 拒绝 csv"断言，行为已
+  反转），全套 164 passed
 - **v3.3.5** 接口补丁三连（收藏夹语义定稿）：
   ① 收藏夹面板新增"打开"按钮：与双击夹名同一入口（选中夹 → 进入
   筛选），照顾无法双击的场景（手指受伤等无障碍需求），双击保留；
