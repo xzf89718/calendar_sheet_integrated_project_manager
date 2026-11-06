@@ -476,7 +476,9 @@ class MainApp(tk.Tk):
     def _apply_mode(self):
         weekly = self.mode == "weekly"
         for b in (self.new_btn, self.import_btn, self.export_btn):
-            b.config(state="disabled" if weekly else "normal")
+            b.config(state="disabled"
+                     if (weekly or self.fav_coll is not None)
+                     else "normal")
         # 收藏夹在两种模式下都可用（v2.7.0 周报兼容：表格/日历/导出联动）
         # v2.7.2：周报模式下"加入/移出"禁用（批量增删索引属于跟进表
         # 模式操作，周报行是快照视角）
@@ -702,7 +704,14 @@ class MainApp(tk.Tk):
             on_changed=self._fav_changed)
 
     def _fav_chrome(self):
-        """收藏夹模式的界面反馈：横幅文字 + 窗口标题栏夹名。"""
+        """收藏夹模式的界面反馈：横幅文字 + 窗口标题栏夹名 +
+        导入/导出置灰（v3.3.5：收藏夹是纯索引视图，在视图里导入
+        导出语义错误，置灰与周报模式同一手法；退出后按当前模式
+        恢复，周报模式下保持置灰）。"""
+        st = "disabled" if (self.fav_coll is not None
+                            or self.mode == "weekly") else "normal"
+        self.import_btn.config(state=st)
+        self.export_btn.config(state=st)
         if self.fav_coll is None:
             self.fav_var.set("")
             self.title(self._base_title)
@@ -1302,8 +1311,8 @@ class FavoritesDialog(tk.Toplevel):
       - 非模态、不 grab、不设 transient——可最小化，开着不影响
         主程序任何操作，右上角叉即关闭；点主窗口任意处面板自动
         抬回主窗口之上（v2.7.2，不会沉到后面）；
-      - 双击夹名进入筛选（由主窗口接管模式状态，见
-        MainApp._enter_favorites），无"进入"按钮；
+      - 双击夹名或点"打开"按钮进入筛选（由主窗口接管模式状态，见
+        MainApp._enter_favorites；v3.3.3 增加按钮，照顾无法双击的场景）；
       - 无"关闭"按钮；
       - 面板打开期间，主表格临时改为多选（Ctrl/Shift），关闭即
         恢复单选——多选仅为加入收藏夹服务；
@@ -1346,6 +1355,7 @@ class FavoritesDialog(tk.Toplevel):
         btns = tk.Frame(self)
         btns.grid(row=1, column=2, padx=8, pady=(0, 4), sticky="ns")
         for text, cmd in [
+                ("打开", self._enter),
                 ("新建", self._new),
                 ("重命名", self._rename),
                 ("删除", self._delete)]:
@@ -1358,8 +1368,8 @@ class FavoritesDialog(tk.Toplevel):
         if app.mode == "weekly":
             self.add_btn.config(state="disabled")
         tk.Label(self, fg="#888888", justify="left",
-                 text="双击夹名进入筛选；打开本面板时主表格可多选\n"
-                      "（Ctrl/Shift），加入只写索引不动项目数据"
+                 text="双击夹名或点「打开」进入筛选；打开本面板时主表格\n"
+                      "可多选（Ctrl/Shift），加入只写索引不动项目数据"
                  ).grid(row=2, column=0, columnspan=2, padx=8, pady=(0, 8),
                         sticky="w")
         self._reload()

@@ -105,6 +105,67 @@ def test_fav_empty_collection_does_not_enter(app_fav, monkeypatch):
     assert a.fav_ids is None and len(calls) == 1
 
 
+# ---------- v3.3.3：收藏夹面板"打开"按钮（无障碍，照顾无法双击的用户） ----------
+
+def test_fav_dialog_has_open_button(app_fav):
+    """打开按钮 = 双击夹名的等价路径：存在、可点、回调进入筛选。"""
+    from main import FavoritesDialog
+    a = app_fav
+    entered = []
+    dlg = FavoritesDialog(a, a.db,
+                          on_enter=lambda cid, name: entered.append((cid, name)),
+                          on_changed=lambda: None)
+    try:
+        a.update()
+        # 按钮嵌在 btns Frame 里，递归收集全部后代 Button
+        stack, btns = list(dlg.winfo_children()), []
+        while stack:
+            w = stack.pop()
+            stack.extend(w.winfo_children())
+            if w.winfo_class() == "Button":
+                btns.append(w)
+        texts = [str(b.cget("text")) for b in btns]
+        assert "打开" in texts
+        cid = a.db.create_collection("重点")
+        a.db.collection_add(cid, a.db.query_project_ids())
+        dlg._reload(keep_cid=cid)
+        dlg._enter()          # 与"打开"按钮 command 同一入口
+        assert entered == [(cid, "重点")]
+    finally:
+        dlg._on_close()
+
+
+# ---------- v3.3.5：收藏夹模式下 导入/导出 置灰（纯索引视图语义） ----------
+
+def test_fav_mode_greys_import_export(app_fav):
+    a = app_fav
+    cid = a.db.create_collection("重点")
+    a.db.collection_add(cid, a.db.query_project_ids())
+    a._enter_favorites(cid, "重点")
+    a.update()
+    try:
+        assert a.import_btn.cget("state") == "disabled"
+        assert a.export_btn.cget("state") == "disabled"
+    finally:
+        a._exit_favorites()
+    a.update()
+    assert a.import_btn.cget("state") == "normal"
+    assert a.export_btn.cget("state") == "normal"
+
+
+def test_fav_exit_keeps_weekly_grey(app_fav):
+    """周报+收藏夹叠加：退出收藏夹后仍在周报模式，导入导出保持置灰。"""
+    a = app_fav
+    a._toggle_mode()                       # 进入周报模式
+    cid = a.db.create_collection("重点")
+    a.db.collection_add(cid, a.db.query_project_ids())
+    a._enter_favorites(cid, "重点")
+    a._exit_favorites()
+    a.update()
+    assert a.import_btn.cget("state") == "disabled"
+    assert a.export_btn.cget("state") == "disabled"
+
+
 # ---------- reader：历史横幅钉在内容区最上方 ----------
 
 def test_reader_banner_pinned_to_top(app):
