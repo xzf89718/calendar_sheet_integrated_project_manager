@@ -1,0 +1,4 @@
+*.cmd
+*.db
+*.pyc
+__pycache__
