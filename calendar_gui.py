@@ -131,19 +131,20 @@ class CalendarWidget(tk.Frame):
             # 点日期数字 = 查看当天所有条目
             num.bind("<Button-1>", lambda ev, s=ds: self._day(s))
             num.pack(fill="x")
-            # 每格最多"日期 + 1 个条目 + 1 条更多链接"（紧凑样式，行高有限），
+            # 每格最多"日期 + max_per_day 个条目 + 1 条更多链接"（v3.4.2：
+            # max_per_day 分视图取值，聚合 1 条紧凑样式、纯日历可到 5 条），
             # 看当天全部：点"还有N条"链接或日期数字。
             day_items = entries.get(ds, [])
             if day_items:
-                e = day_items[0]
-                color = self.colors.get(e.get("kind", "default"),
-                                        self.colors["default"])
-                tk.Button(cell, text=e["text"][:22], anchor="w",
-                          bg=color, fg="white", relief="flat",
-                          padx=2, pady=0, font=("", 10),
-                          command=lambda p=e: self._entry(p)
-                          ).pack(fill="x", padx=1)
-                more = len(day_items) - 1
+                for e in day_items[:self.max_per_day]:
+                    color = self.colors.get(e.get("kind", "default"),
+                                            self.colors["default"])
+                    tk.Button(cell, text=e["text"][:22], anchor="w",
+                              bg=color, fg="white", relief="flat",
+                              padx=2, pady=0, font=("", 10),
+                              command=lambda p=e: self._entry(p)
+                              ).pack(fill="x", padx=1)
+                more = len(day_items) - min(len(day_items), self.max_per_day)
                 if more > 0:
                     tk.Button(cell, text=f"还有{more}条 ▸",
                               anchor="w", relief="flat", pady=0,

@@ -219,3 +219,31 @@ def test_config_defaults_and_derived(cfg):
     assert cfg.calendar_mode == "all"
     assert cfg.render_limit == 600
     assert cfg.default_sort == {"column": "id", "desc": True}
+
+
+# ---- v3.4.2：ui.calendar 每日条数上限（分视图）----
+
+def test_calendar_limits_valid():
+    d = _base()
+    d.setdefault("ui", {})["calendar"] = {"max_per_day": 1,
+                                          "max_per_day_view": 5}
+    assert validate_config_data(d) == []
+
+
+def test_calendar_limit_view_default_five_when_absent():
+    """旧 fields.json 缺 max_per_day_view 键：校验放行（运行期按 5 处理）。"""
+    d = _base()
+    d.setdefault("ui", {})["calendar"] = {"max_per_day": 1}
+    assert validate_config_data(d) == []
+
+
+@pytest.mark.parametrize("bad", [0, 6, -1, "abc", True, 3.5])
+def test_calendar_limit_out_of_range_or_bad_type(bad):
+    d = _base()
+    d.setdefault("ui", {})["calendar"] = {"max_per_day": 1,
+                                          "max_per_day_view": bad}
+    assert any("max_per_day_view" in e for e in validate_config_data(d))
+    d2 = _base()
+    d2.setdefault("ui", {})["calendar"] = {"max_per_day": bad,
+                                           "max_per_day_view": 5}
+    assert any("max_per_day" in e for e in validate_config_data(d2))
