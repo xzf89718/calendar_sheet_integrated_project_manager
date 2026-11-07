@@ -206,3 +206,107 @@ def test_gui_export_csv_dispatch(app, tmp_path, monkeypatch):
     data = out.read_bytes()
     assert data.startswith(b"\xef\xbb\xbf")
     assert "客户X".encode("utf-8") in data   # seeded 项目1 的客户
+
+
+def test_import_export_button_labels(app):
+    """v3.4.0：按钮文案「导入 / 导出」——csv 落地后不再带 Excel 后缀。"""
+    assert app.import_btn.cget("text") == "导入"
+    assert app.export_btn.cget("text") == "导出"
+
+
+# ---- v3.4.2：日历每日条数分视图（max_per_day 接通渲染）----
+
+def _cell_for(app, day):
+    """日历组件里渲染了 day 号的格子（首个匹配）。"""
+    for cell in app.cal._cells:
+        for w in cell.winfo_children():
+            if w.winfo_class() == "Label" and w.cget("text") == str(day):
+                return cell
+    raise AssertionError(f"no calendar cell for day {day}")
+
+
+def _cell_buttons(cell):
+    return [w for w in cell.winfo_children() if w.winfo_class() == "Button"]
+
+
+def _seed_same_day(db, n, day="2026-06-15"):
+    """n 个项目同一天开始，造同日多条目。"""
+    for i in range(n):
+        pid = db.create_project(manufacturer=f"厂{i}", status="进行中")
+        db.add_snapshot(pid, start_date=day)
+
+
+def test_calendar_limit_aggregate_stays_one(app):
+    """聚合视图回归：每日仍只渲染 1 条 + 还有N条链接（v3.4.2 行为不变）。"""
+    _seed_same_day(app.db, 3)
+    app.cal.year, app.cal.month = 2026, 6
+    app.cal.refresh()
+    btns = _cell_buttons(_cell_for(app, 15))
+    assert len(btns) == 2                 # 1 条目 + 1 "还有2条"
+    assert any("还有2条" in b.cget("text") for b in btns)
+
+
+def test_calendar_view_shows_all_five(tmp_path):
+    """纯日历视图：每日最多渲染 5 条（max_per_day_view 缺省 = 5）。"""
+    import main
+    from db import Database
+    db = Database(str(tmp_path / "cal5.db"))
+    _seed_same_day(db, 5)
+    db.close()
+    a = main.MainApp(db_path=str(tmp_path / "cal5.db"), view="calendar")
+    try:
+        a.update()
+        a.cal.year, a.cal.month = 2026, 6
+        a.cal.refresh()
+        btns = _cell_buttons(_cell_for(a, 15))
+        assert len(btns) == 5               # 5 条全渲染，无"还有N条"
+        assert not any("还有" in b.cget("text") for b in btns)
+    finally:
+        a.destroy()
+
+
+def test_calendar_view_caps_at_five(tmp_path):
+    """纯日历视图：同日 7 条只渲染 5 条 + 还有2条（封顶生效）。"""
+    import main
+    from db import Database
+    db = Database(str(tmp_path / "cap.db"))
+    _seed_same_day(db, 7)
+    db.close()
+    a = main.MainApp(db_path=str(tmp_path / "cap.db"), view="calendar")
+    try:
+        a.update()
+        a.cal.year, a.cal.month = 2026, 6
+        a.cal.refresh()
+        btns = _cell_buttons(_cell_for(a, 15))
+        assert len(btns) == 6               # 5 条目 + 1 "还有2条"
+        assert any("还有2条" in b.cget("text") for b in btns)
+    finally:
+        a.destroy()
+
+
+def test_calendar_view_limit_configurable(tmp_path, monkeypatch):
+    """fields.json 配 max_per_day_view=3：纯日历只渲染 3 条（可配置验证）。"""
+    import json
+    import config as config_mod
+    import main
+    from conftest import minimal_config_data, _patch_cfg
+    p = tmp_path / "fields.json"
+    data = minimal_config_data()
+    data.setdefault("ui", {})["calendar"] = {"max_per_day": 1,
+                                             "max_per_day_view": 3}
+    p.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    _patch_cfg(monkeypatch, config_mod.Config(path=str(p)))
+    from db import Database
+    db = Database(str(tmp_path / "cfg.db"))
+    _seed_same_day(db, 5)
+    db.close()
+    a = main.MainApp(db_path=str(tmp_path / "cfg.db"), view="calendar")
+    try:
+        a.update()
+        a.cal.year, a.cal.month = 2026, 6
+        a.cal.refresh()
+        btns = _cell_buttons(_cell_for(a, 15))
+        assert len(btns) == 4               # 3 条目 + 1 "还有2条"
+        assert any("还有2条" in b.cget("text") for b in btns)
+    finally:
+        a.destroy()

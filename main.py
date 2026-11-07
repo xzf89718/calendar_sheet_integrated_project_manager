@@ -84,7 +84,12 @@ class MainApp(tk.Tk):
                 get_entries=self._cal_entries,
                 on_entry_click=self._open_project,   # 点条目 -> 看项目
                 on_day_click=self._open_day,     # 点日期/还有N条 -> 当天明细
-                max_per_day=CFG.cal_ui.get("max_per_day", 1),
+                # v3.4.2 分视图：纯日历吃满窗口、可放开条数；聚合/周报
+                # 格子行高有限，保持紧凑。视图在构造时一次性确定，
+                # 此处按视图选值即可，无需运行时切换。
+                max_per_day=(CFG.cal_ui.get("max_per_day_view", 5)
+                             if self.view == "calendar"
+                             else CFG.cal_ui.get("max_per_day", 1)),
                 colors=_kind_colors(),           # 类别颜色：calendar_dates 配置
             )
         if self.view == "calendar":
@@ -117,10 +122,10 @@ class MainApp(tk.Tk):
         self.new_btn = tk.Button(btns, text="新建项目",
                                  command=self._new_project)
         self.new_btn.pack(side="left", padx=4)
-        self.import_btn = tk.Button(btns, text="导入Excel",
+        self.import_btn = tk.Button(btns, text="导入",
                                     command=self._import)
         self.import_btn.pack(side="left", padx=4)
-        self.export_btn = tk.Button(btns, text="导出Excel",
+        self.export_btn = tk.Button(btns, text="导出",
                                     command=self._export)
         self.export_btn.pack(side="left", padx=4)
         tk.Button(btns, text="查看/跟进",
@@ -1571,8 +1576,9 @@ def _print_cfg_summary(out):
     print(f"  数据库: {CFG.db_name}（fields.json 同目录）", file=out)
     print(f"  字段: {len(CFG.names)} 个；显示列 {len(CFG.display_cols)} 个",
           file=out)
-    print(f"  日历模式: {CFG.calendar_mode}；"
-          f"每日条数上限 {CFG.cal_ui.get('max_per_day', 1)}", file=out)
+    print(f"  日历模式: {CFG.calendar_mode}；每日条数上限："
+          f"聚合 {CFG.cal_ui.get('max_per_day', 1)}"
+          f" / 纯日历 {CFG.cal_ui.get('max_per_day_view', 5)}", file=out)
     print(f"  收藏夹: {'开' if CFG.favorites_enabled else '关'}；"
           f"回收站: {'开' if CFG.recycle_bin_enabled else '关'}", file=out)
     print(f"  缺省视图: {CFG.default_view}", file=out)

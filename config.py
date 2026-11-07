@@ -161,6 +161,18 @@ def validate_config_data(data):
                 elif ftypes[fn] != "date":
                     errs.append(f"date_check.fields 里必须是 date 类型：{fn}")
 
+    # ui.calendar 每日条数上限（v3.4.2 起分视图；两键均可缺省，
+    # 范围 1~5：聚合格子行高有限，纯日历 5 条时格高已接近紧凑极限）
+    ui = data.get("ui")
+    if isinstance(ui, dict) and isinstance(ui.get("calendar"), dict):
+        for key in ("max_per_day", "max_per_day_view"):
+            if key in ui["calendar"]:
+                v = ui["calendar"][key]
+                if not isinstance(v, int) or isinstance(v, bool) \
+                        or not 1 <= v <= 5:
+                    errs.append(
+                        f"ui.calendar.{key} 必须是 1~5 的整数：{v!r}")
+
     # favorites：收藏夹功能开关（可缺省，缺省 = 关闭）
     fav = data.get("favorites")
     if fav is not None:
