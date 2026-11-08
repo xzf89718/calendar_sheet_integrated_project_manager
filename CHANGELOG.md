@@ -2,6 +2,17 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.6.1** weekreport_clean CLI 化（用户定）：GUI / CLI 双入口，
+启动接口与 workbench_ui 统一——`python -m weekreport_clean gui`
+进图形界面，新增 `preview`（终端逐行打印 [保留]/[丢弃] + 汇总，
+只读不写文件）与 `clean [-o 输出]`（生成清洗结果 xlsx，不带 -o
+默认 `<原名>_cleaned.xlsx` 同目录，已存在覆盖，显式 -o 父目录
+自动创建）两子命令，功能与 GUI 一一对应（结果为空拒绝写出等
+行为两入口一致）。补齐四件套包结构：`__main__.py` 命令行入口、
+`__init__.py` 导出核心、clean_core 新增 `weekly_note_label()`
+（跟进记录列定位逻辑 GUI/CLI 同源，GUI 同步改用）；退出码沿用
+0/1/2 约定。`setup.ps1` / `setup.sh` shim 清单补入本模块。新增 8
+条 subprocess 全链路用例，全套 207 passed
 - **v3.6.0** README 文档重构（用户定，裁定 7+1 条）：根 README 收敛为
 定位 / 设计哲学 / 安装与启动 / 宽版基本使用（GUI 起步，面向零基础
 = 核心设计，CLI 标「进阶」指向 workbench_ui/README.md）/ 文档导航，
@@ -20,6 +31,17 @@ GitHub 双远程仓库同步"；「更新和维护计划」删两句（"本地Fo
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.6.1** weekreport_clean CLI 化（用户定）：GUI / CLI 双入口，
+启动接口与 workbench_ui 统一——`python -m weekreport_clean gui`
+进图形界面，新增 `preview`（终端逐行打印 [保留]/[丢弃] + 汇总，
+只读不写文件）与 `clean [-o 输出]`（生成清洗结果 xlsx，不带 -o
+默认 `<原名>_cleaned.xlsx` 同目录，已存在覆盖，显式 -o 父目录
+自动创建）两子命令，功能与 GUI 一一对应（结果为空拒绝写出等
+行为两入口一致）。补齐四件套包结构：`__main__.py` 命令行入口、
+`__init__.py` 导出核心、clean_core 新增 `weekly_note_label()`
+（跟进记录列定位逻辑 GUI/CLI 同源，GUI 同步改用）；退出码沿用
+0/1/2 约定。`setup.ps1` / `setup.sh` shim 清单补入本模块。新增 8
+条 subprocess 全链路用例，全套 207 passed
 - **v3.5.2** 输出路径裁定（用户定）：`--dump-data` 改名 **`--dump`**；
   **`--png` / `--dump` 只接受目录**（一次可能产出多个文件，指定单
   文件名无法理解，显式文件名直接报错）；裸参数默认输出目录定为

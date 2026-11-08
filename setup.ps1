@@ -29,7 +29,8 @@ $Modules = @(
     "db_copy",
     "db_append",
     "db_assign",
-    "db_analysis"
+    "db_analysis",
+    "weekreport_clean"
 )
 
 foreach ($m in $Modules) {
