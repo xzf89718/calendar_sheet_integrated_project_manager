@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.4.2
+# 日历表格聚合项目跟进工作台 v3.5.0
 
 **面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
 做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
@@ -136,6 +136,10 @@ python -m workbench_ui notify          # 今日项目事项，只打印到终端
 python -m workbench_ui cal <年> [月] [日]   # 日历时间节点，只读打印
 python -m workbench_ui fav list|new|rename|delete|add|remove ...
 python -m workbench_ui gui [--view ...]     # 进入图形界面（= main.py）
+python -m db_analysis pie --field 客户 [--closed] [--top N]
+        [--where 字段=值 ...] [--date-field 名]
+        [--from YYYY-MM-DD --to YYYY-MM-DD | --last 1m|6m|1y]
+        [--png 路径.png] [--dump-data 路径.csv]   # 只读分析（v3.5.0）
 ```
 
 要点：
@@ -757,6 +761,22 @@ GROUP BY c.id;
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.5.0** db_analysis 只读分析统一入口（占位模块转正，首个算法
+  饼图）：`python -m db_analysis pie --field 字段`，铁律绝不写库
+  （专项测试：跑完库文件哈希不变）。口径：默认 open 项目当前行，
+  `--closed` 把已归档也纳入（客户自由选择）；给 `--from/--to` 或
+  `--last 1m|6m|1y` 日期区间时，每个项目取窗口内"当时最新"的快照
+  统计（用户定口径），`--date-field` 可指定快照里的 date 列（缺省
+  跟进日 snapshot_at）。`--where 字段=值` 可选可多次（与 workbench_ui
+  语法对齐：同字段并集、异字段交集）。空值归「（空）」段，取值超
+  `--top`（默认 9）长尾合并「其他」。输出终端计数表（必有）；
+  `--png` 显式才画饼图（matplotlib 可选依赖，中文按
+  Microsoft YaHei→SimHei→Noto 探测防豆腐块）；`--dump-data` 导出
+  画饼数据 csv（utf-8-sig + 纯 LF，与导出端编码纪律一致）。库锚定
+  fields.json 同目录，无 --db 参数（软件设计准则）。算法表注册结构
+  = GUI 预留数据源。新增 14 用例（计数/closed/where/日期三口径/
+  top 合并/csv 导出/只读哈希/错误参数化 5/PNG），占位断言退役 1 条，
+  全套 190 passed（PNG 1 条在无 matplotlib 环境跳过）
 - **v3.4.2** 补丁合并版（用户裁定 v3.4.1 并入，编号取消）：
   ① 按钮文案修正：「导入Excel / 导出Excel」改名「导入 / 导出」——
   v3.4.0 落地 csv 导出后按钮已不限于 Excel，旧文案作废。GUI 现行文档

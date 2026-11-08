@@ -153,12 +153,12 @@ def test_assign_dry_run_then_execute(lib):
         d.close()
 
 
-# ---------- db_analysis 占位 ----------
+# ---------- db_analysis（v3.5.0 起有真实功能，占位测试退役） ----------
 
-def test_analysis_placeholder():
-    r = _run("db_analysis")
+def test_analysis_dispatch_help():
+    r = _run("db_analysis", "--help")
     assert r.returncode == 0
-    assert "占位" in r.stdout
+    assert "pie" in r.stdout
 
 
 # ---------- setup.sh 快捷命令 ----------
