@@ -325,7 +325,7 @@ python -m db_recycled xxx.db --restore 12    # 恢复（id 空闲则原位放回
 python -m db_recycled xxx.db --restore all   # 全部恢复
 python -m db_recycled xxx.db --purge 12      # 永久删除单个
 python -m db_recycled xxx.db --empty         # 清空回收站
-python -m db_recycled xxx.db --gui           # 图形界面（恢复/红色永久删除）
+python -m db_recycled gui xxx.db      # 图形界面（恢复/红色永久删除）
 ```
 
 - 恢复时原 id 已被新项目占用才分配新 id（收藏夹索引跟着指向新 id）；

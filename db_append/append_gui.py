@@ -2,7 +2,7 @@
 """多库追加器（子模块）：多个源库依次全部追加进目标库。
 
 从包根目录共享 db/config/fields.json —— 本目录不携带任何配置。
-运行：python db_append/append_gui.py（或 python -m db_append --gui）
+运行：python db_append/append_gui.py（或 python -m db_append gui）
 """
 import os
 import sys

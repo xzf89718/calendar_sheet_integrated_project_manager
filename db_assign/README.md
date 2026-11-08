@@ -10,7 +10,7 @@
 
 | 方式 | 命令 |
 |------|------|
-| GUI | `python -m db_assign --gui` |
+| GUI | `python -m db_assign gui` |
 | 命令行（预览） | `python -m db_assign 库.db --field 城市 --value 武汉` |
 | 命令行（执行） | 同上再加 `--yes` |
 
@@ -22,7 +22,7 @@
 | `--field` | 赋值列（字段名或显示名，如 city / 城市） |
 | `--value` | 新值；缺省空 = 清空该列 |
 | `--yes` | 确认执行（不加只预览） |
-| `--gui` | 图形界面 |
+| `gui` | 图形界面 |
 
 ## 示例
 

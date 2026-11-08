@@ -4,7 +4,7 @@
 用法：
   python -m db_split <src.db> --key <键列> [--dest DIR]   执行分拆
   python -m db_split <src.db> --key <键列> --preview      只预览
-  python -m db_split --gui                                 图形界面
+  python -m db_split gui                          图形界面
 
 键列可以是字段名（city）或显示名（城市）。全量分拆（含归档）、
 空值进"未分配.db"、目标文件已存在则拒绝执行。
@@ -46,14 +46,13 @@ def main(argv=None):
     ap.add_argument("--key", help="键列（字段名或显示名，如 city / 城市）")
     ap.add_argument("--dest", help="输出目录")
     ap.add_argument("--preview", action="store_true", help="只预览不执行")
-    ap.add_argument("--gui", action="store_true", help="图形界面")
-    args = ap.parse_args(argv)
-
-    if args.gui:
+    argv = list(argv) if argv is not None else sys.argv[1:]
+    if argv and argv[0] == "gui":
         import db_split.split_gui as gui
         return gui.run_gui()
+    args = ap.parse_args(argv)
     if not args.db or not args.key:
-        ap.error("需要提供源库和 --key（或用 --gui）")
+        ap.error("需要提供源库和 --key（或用 gui）")
     field = _resolve_field(args.key)
     if field is None:
         print(f"错误：库里没有「{args.key}」这一列", file=sys.stderr)

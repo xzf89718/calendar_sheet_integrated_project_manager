@@ -3,7 +3,7 @@
 
 从包根目录共享 db/config/fields.json —— 本目录不携带任何配置。
 运行：python db_recycled/recycled_gui.py <xxx.db>
-（或命令行 python -m db_recycled <xxx.db> --gui）
+（或命令行 python -m db_recycled gui <xxx.db>）
 """
 import os
 import sys

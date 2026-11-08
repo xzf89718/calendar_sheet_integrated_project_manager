@@ -7,7 +7,7 @@
   python -m db_recycled <xxx.db> --restore all  全部恢复
   python -m db_recycled <xxx.db> --purge 12     永久删除单个
   python -m db_recycled <xxx.db> --empty        清空回收站
-  python -m db_recycled <xxx.db> --gui          图形界面
+  python -m db_recycled gui <xxx.db>     图形界面（库路径必给）
 """
 import argparse
 import sys
@@ -29,8 +29,19 @@ def _cmd_list(db):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="db_recycled", description="回收站管理（查看/恢复/彻底删除）")
+    argv = list(argv) if argv is not None else sys.argv[1:]
+    if argv and argv[0] == "gui":
+        if len(argv) < 2:
+            print("错误：gui 需要数据库路径"
+                  "（python -m db_recycled gui xxx.db）", file=sys.stderr)
+            return 2
+        db = Database(argv[1])
+        try:
+            import db_recycled.recycled_gui as gui
+            return gui.run_gui(db, argv[1])
+        finally:
+            db.close()
     ap.add_argument("db", help="数据库文件路径，如 xxx.db")
-    ap.add_argument("--gui", action="store_true", help="图形界面")
     ap.add_argument("--restore", metavar="ID|all", help="恢复项目")
     ap.add_argument("--purge", type=int, metavar="ID", help="永久删除单个")
     ap.add_argument("--empty", action="store_true", help="清空回收站")
@@ -38,9 +49,6 @@ def main(argv=None):
 
     db = Database(args.db)
     try:
-        if args.gui:
-            import db_recycled.recycled_gui as gui
-            return gui.run_gui(db, args.db)
         if args.restore:
             if args.restore == "all":
                 rows = core.list_recycled(db)

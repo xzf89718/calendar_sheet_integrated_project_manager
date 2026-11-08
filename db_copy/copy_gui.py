@@ -2,7 +2,7 @@
 """库复制器（子模块）：A/B 双库对照视图。
 
 从包根目录共享 db/config/fields.json —— 本目录不携带任何配置。
-运行：python -m db_copy --gui（或 python db_copy/copy_gui.py）
+运行：python -m db_copy gui（或 python db_copy/copy_gui.py）
 """
 import os
 import sys
