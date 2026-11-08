@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.5.0
+# 日历表格聚合项目跟进工作台 v3.5.2
 
 **面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
 做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
@@ -136,13 +136,27 @@ python -m workbench_ui notify          # 今日项目事项，只打印到终端
 python -m workbench_ui cal <年> [月] [日]   # 日历时间节点，只读打印
 python -m workbench_ui fav list|new|rename|delete|add|remove ...
 python -m workbench_ui gui [--view ...]     # 进入图形界面（= main.py）
-python -m db_analysis pie --field 客户 [--closed] [--top N]
+python -m db_analysis pie --field 字段 [--field 字段2 ...] [--closed] [--top N]
         [--where 字段=值 ...] [--date-field 名]
         [--from YYYY-MM-DD --to YYYY-MM-DD | --last 1m|6m|1y]
-        [--png 路径.png] [--dump-data 路径.csv]   # 只读分析（v3.5.0）
+        [--png [目录]] [--dump [目录]]
+        # 只读分析（v3.5.0 起；v3.5.1 起多变量共享筛选；
+        #  v3.5.2 起 --dump 改名 + 输出只接受目录 + 默认目录）
 ```
 
 要点：
+
+- `--field` 可多次：一次命令画多个变量的饼图，共享同一组筛选
+  条件；逐字段出计数表，PNG 每字段一个文件（不做多子图单文件，
+  用户定）。个别字段无匹配打印提示跳过，全部无匹配才报错。
+- `--png` / `--dump` **只接受目录**（v3.5.2 用户定：一次可能产出
+  多个文件，指定单文件名无法理解）：不带值 = 默认目录（自动创建）
+  PNG 存 `db_analysis/pie/plots/`、数据存 `db_analysis/pie/dump/`，
+  带值 = 该目录内自动命名，文件名嵌筛选摘要
+  `pie_<字段>_<筛选摘要>_<时间戳>.png/.csv`；给单文件名直接报错。
+  date 类型字段自 v3.5.1 起可作饼图变量（原值归段）。多字段 csv
+  带「字段」列，单字段保持两列。建议把 `db_analysis/pie/` 加入
+  .gitignore（输出产物不入库）。
 
 - `--where 字段=值` 可多次，同字段取并集；日期字段支持
   `--where 日期=起~止`（任一端可省略）。字段名 = fields.json 的
@@ -370,7 +384,7 @@ Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关�
 | `db_split/` | 按键列（如负责人）拆成每人一个文件：全量含归档、空值→未分配.db、冲突拒绝 | `python -m db_split --gui` | `python -m db_split 源.db --key 城市 --dest 目录`（`--preview` 只预览） |
 | `db_assign/` | 全库统一给一列赋值（双只读预览，走快照可回溯） | `python -m db_assign --gui` | `python -m db_assign 库.db --field 城市 --value 北京 --yes`（不加 `--yes` 只预览） |
 | `weekreport_clean/` | 周报清洗：日期按年月日三元组匹配（横杠/斜杠/中文互通），双表预览 | `python weekreport_clean/clean_gui.py` | — |
-| `db_analysis/` | 数据分析（预留占位） | — | `python -m db_analysis`（占位提示） |
+| `db_analysis/` | 只读数据分析：多变量饼图共享筛选，绝不写库 | — | `python -m db_analysis pie --field 客户 [--field 城市 ...]`（见 CLI 速查） |
 | `db_recycled/` | 回收站：查看/恢复/红色永久删除（见 10.17） | `python -m db_recycled 库.db --gui` | `python -m db_recycled 库.db [--restore/--purge/--empty]` |
 
 每个子模块都是同一套四件套：`__init__.py`（导出核心）+ `*_core.py`
@@ -761,6 +775,28 @@ GROUP BY c.id;
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.5.2** 输出路径裁定（用户定）：`--dump-data` 改名 **`--dump`**；
+  **`--png` / `--dump` 只接受目录**（一次可能产出多个文件，指定单
+  文件名无法理解，显式文件名直接报错）；裸参数默认输出目录定为
+  `db_analysis/pie/plots/` 与 `db_analysis/pie/dump/`（相对
+  fields.json 同目录，自动创建，建议加入 .gitignore）。测试显式
+  文件名用例全部改目录形态，错误参数化对齐「只支持目录」，新增
+  3 用例（dump 默认目录 / dump 显式目录 / png 默认目录），全套
+  196 passed（PNG 3 条在无 matplotlib 环境跳过）
+- **v3.5.1** 多变量饼图共享筛选（用户定）：`--field` 可多次，一次
+  命令画多个字段，共享同一组 `--where` / 日期区间 / `--closed`。
+  逐字段出计数表 + PNG 每字段一个文件（拒绝多子图单文件，用户定）；
+  个别字段无匹配打印提示跳过，全部无匹配才报业务错误。输出文件名
+  自动嵌筛选摘要（用户定）：`pie_<字段>_<筛选摘要>_<时间戳>`，
+  `--png` / `--dump-data` 不带值或给目录即自动命名。date 类型字段
+  解禁为饼图变量（原值归段，空值归「（空）」）。多字段 csv 加
+  「字段」列，单字段保持 v3.5.0 两列。新增 5 用例（多字段共享
+  where / date 变量解禁 / 自动文件名嵌筛选 / 多列 csv / 多 PNG
+  每字段一文件，其中 2 条 PNG 用例在无 matplotlib 环境跳过），
+  错误参数化对齐新行为（date 拒绝用例退役、csv 扩展名断言对齐新
+  裁定文案、补全空报错 1 条），全套 194 passed（PNG 2 条跳过）。
+  顺手勘误：模块表 db_analysis 行自 v3.5.0 起残留"预留占位"描述，
+  本版改正
 - **v3.5.0** db_analysis 只读分析统一入口（占位模块转正，首个算法
   饼图）：`python -m db_analysis pie --field 字段`，铁律绝不写库
   （专项测试：跑完库文件哈希不变）。口径：默认 open 项目当前行，

@@ -1,0 +1,4 @@
+# Files and directories removed in this release, relative to repo root.
+# One path per line; blank lines and lines starting with # are ignored.
+# Empty list (this file has no entries) = no deletions in this release.
+# After pasting a release, run:  powershell -File apply-deleted.ps1
