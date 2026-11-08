@@ -12,32 +12,43 @@ import csv
 from .analysis_core import AnalysisError
 
 
-def cmd_pie(db, field, closed=False, top=9, where=None,
-            date_field=None, d1=None, d2=None, dump=None, png=None):
-    """饼图内核：取数 + 归段 + 可选导出。返回 [(段名, 计数), ...]。"""
+def cmd_pies(db, fields, closed=False, top=9, where=None,
+             date_field=None, d1=None, d2=None):
+    """多变量饼图内核（v3.5.1）：逐字段取数 + 归段，共享全部筛选条件。
+    返回 [(field_name, segments), ...]——空字段由调用方决定跳过策略。"""
     from . import analysis_core as ac
-    values = ac.collect_rows(db, field, closed=closed, where=where,
-                             date_field=date_field, d1=d1, d2=d2)
-    segments = ac.aggregate(values, top=top)
+    out = []
+    for f in fields:
+        values = ac.collect_rows(db, f, closed=closed, where=where,
+                                 date_field=date_field, d1=d1, d2=d2)
+        out.append((f, ac.aggregate(values, top=top)))
+    return out
+
+
+def cmd_pie(db, field, **kw):
+    """单字段兼容包装（GUI/算法表用）。无匹配抛 AnalysisError。"""
+    results = cmd_pies(db, [field], **kw)
+    segments = results[0][1]
     if not segments:
         raise AnalysisError("没有匹配的项目（检查 --where / 日期区间 / "
                             "是否缺 --closed）")
-    if dump:
-        dump_csv(segments, dump)
-    if png:
-        render_png(segments, png, title=field)
     return segments
 
 
-def dump_csv(segments, path):
-    """画饼数据 → csv（utf-8-sig + 纯 LF）。段名表头 = 字段 label。"""
+def dump_csv(results, path):
+    """画饼数据 → csv（utf-8-sig + 纯 LF）。results =
+    [(field_label, segments), ...]；单字段保持 v3.5.0 两列格式
+    （段,计数），多字段加「字段」列。"""
     if not str(path).lower().endswith(".csv"):
         raise AnalysisError("--dump-data 只支持 .csv 路径："
                             f"{path}")
+    multi = len(results) > 1
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f, lineterminator="\n")
-        w.writerow(["段", "计数"])
-        w.writerows(segments)
+        w.writerow((["字段"] if multi else []) + ["段", "计数"])
+        for label, segs in results:
+            for k, n in segs:
+                w.writerow(([label] if multi else []) + [k, n])
 
 
 def render_png(segments, path, title=""):

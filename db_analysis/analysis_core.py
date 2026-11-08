@@ -57,14 +57,13 @@ def _parse_where(items):
 
 
 def _validate_field(field):
-    """饼图字段必须存在且不是 date 类型（date 分段无意义）。"""
+    """字段必须存在。date 类型自 v3.5.1 起允许作为饼图变量——按原始
+    日期值分段（配合 --top/「其他」兜长尾），满足"筛选里的字段也要
+    能画"（如"开始日期分布"）。"""
     ftypes = {f["name"]: f["type"] for f in CFG.fields}
     if field not in ftypes:
         raise AnalysisError(f"--field 不存在的字段：{field}"
                             f"（可用：{'、'.join(CFG.names)}）")
-    if ftypes[field] == "date":
-        raise AnalysisError(f"--field 不支持 date 类型字段：{field}"
-                            "（日期请用 --date-field/--from/--to 做区间筛选）")
     return ftypes[field]
 
 

@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""v3.5.0 db_analysis 测试：CLI 子进程 + 只读铁律 + 日期口径。
+"""v3.5.0/v3.5.1 db_analysis 测试：CLI 子进程 + 只读铁律 + 日期口径。
 
 纪律同 test_workbench_ui：subprocess + cwd=tmp 源码副本（库锚定
 fields.json 同目录）；日期口径用例直接 SQL 回写 snapshot_at 造历史。
+v3.5.1：--field 可多次共享筛选；date 类型字段解禁为饼图变量；
+输出文件名自动嵌筛选摘要。
 """
 import hashlib
 import importlib.util
@@ -138,12 +140,74 @@ def test_pie_readonly_hash_unchanged(pkg):
     assert _sha(dbp) == before
 
 
+# ---------- v3.5.1：多变量饼图共享筛选条件 ----------
+
+def test_pie_multi_field_shared_where(pkg):
+    """一个命令多个 --field：共享同一组筛选条件，逐字段出表。"""
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=沪",
+           "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=乙", "--set", "city=沪",
+           "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=丙", "--set", "city=京",
+           "--note", "立项")
+    r = run_ana(pkg, "pie", "--field", "customer", "--field", "city",
+                "--where", "city=沪")
+    assert r.returncode == 0
+    assert "共 2 个项目" in r.stdout
+    assert "丙" not in r.stdout and "京" not in r.stdout
+    assert "甲" in r.stdout and "乙" in r.stdout and "沪" in r.stdout
+
+
+def test_pie_date_field_as_pie_variable(pkg):
+    """v3.5.1 解禁：date 类型字段可作饼图变量（原值归段，空值归（空））。"""
+    run_ui(pkg, "new", "--set", "customer=甲", "--set",
+           "start_date=2026-06-01", "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=乙", "--note", "立项")
+    r = run_ana(pkg, "pie", "--field", "start_date")
+    assert r.returncode == 0
+    assert "2026-06-01" in r.stdout and "（空）" in r.stdout
+
+
+def test_pie_dump_auto_filename_embeds_where(pkg):
+    """v3.5.1 用户定：输出文件名嵌筛选摘要；裸 --dump-data 自动命名。"""
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=沪",
+           "--note", "立项")
+    r = run_ana(pkg, "pie", "--field", "customer", "--field", "city",
+                "--where", "city=沪", "--dump-data")
+    assert r.returncode == 0
+    hits = list(pkg.glob("pie_customer-city_city=沪_*.csv"))
+    assert len(hits) == 1
+    text = hits[0].read_bytes().decode("utf-8-sig")
+    assert text.splitlines()[0] == "字段,段,计数"
+    assert "customer,甲,1" in text
+    assert "city,沪,1" in text
+
+
+def test_pie_dump_multi_has_field_column(pkg):
+    """多字段导出 csv 带「字段」列；单字段保持 v3.5.0 两列格式。"""
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=沪",
+           "--note", "立项")
+    r = run_ana(pkg, "pie", "--field", "customer", "--field", "city",
+                "--dump-data", "given.csv")
+    assert r.returncode == 0
+    text = (pkg / "given.csv").read_bytes().decode("utf-8-sig")
+    assert text.splitlines()[0] == "字段,段,计数"
+    assert "customer,甲,1" in text and "city,沪,1" in text
+    # 单字段仍是两列
+    r = run_ana(pkg, "pie", "--field", "customer",
+                "--dump-data", "single.csv")
+    assert (pkg / "single.csv").read_bytes().decode(
+        "utf-8-sig").splitlines()[0] == "段,计数"
+
+
 @pytest.mark.parametrize("argv,msg", [
     (("pie", "--field", "bogus"), "不存在的字段"),
-    (("pie", "--field", "start_date"), "不支持 date 类型"),
-    (("pie", "--field", "customer", "--dump-data", "x.txt"), "只支持 .csv"),
+    (("pie", "--field", "customer", "--dump-data", "x.txt"),
+     "需要 .csv 扩展名"),
     (("pie", "--field", "customer", "--where", "bogus=1"), "不存在的字段"),
     (("pie", "--field", "customer", "--from", "bad-date"), "不是有效日期"),
+    (("pie", "--field", "customer", "--where", "customer=不存在"),
+     "所有字段都无匹配项目"),
 ])
 def test_pie_errors_exit_1(pkg, argv, msg):
     run_ui(pkg, "new", "--set", "customer=甲", "--note", "立项")
@@ -160,3 +224,15 @@ def test_pie_png_output(pkg):
     assert r.returncode == 0
     out = pkg / "pie.png"
     assert out.exists() and out.stat().st_size > 1000
+
+
+@pytest.mark.skipif(not HAS_MPL, reason="matplotlib 未安装")
+def test_pie_multi_png_one_file_per_field(pkg):
+    """v3.5.1 用户定：PNG 每字段一个文件（拒绝多子图单文件）。"""
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=沪",
+           "--note", "立项")
+    r = run_ana(pkg, "pie", "--field", "customer", "--field", "city",
+                "--where", "city=沪", "--png")
+    assert r.returncode == 0
+    pngs = list(pkg.glob("pie_*_city=沪_*.png"))
+    assert len(pngs) == 2
