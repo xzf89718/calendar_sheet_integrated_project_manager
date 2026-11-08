@@ -7,6 +7,8 @@ v3.5.2 默认输出目录 + --dump 改名）。
             [--from YYYY-MM-DD --to YYYY-MM-DD | --last 1m|6m|1y]
             [--png [路径或目录]] [--dump [路径或目录]]
 
+字段参数（--field/--where/--date-field）一律填 fields.json
+的英文 name，不用 GUI 显示 label。
 铁律：绝不写库。库锚定 fields.json 同目录（软件设计准则，
 不提供 --db 路径参数）。--field 可多次：多变量共享同一组筛选
 条件；输出文件名自动嵌入筛选摘要（v3.5.1，用户定）。
@@ -56,7 +58,9 @@ def _build_parser():
             sp.add_argument("--field", action="append", required=True,
                             metavar="字段",
                             help="统计字段，可多次（多变量共享筛选条件；"
-                                 "date 类型自 v3.5.1 起允许）")
+                                 "date 类型自 v3.5.1 起允许）。"
+                                 "填 fields.json 的英文 name，不是界面"
+                                 "显示 label；报错会列出可用字段名")
             sp.add_argument("--closed", action="store_true",
                             help="把已归档（closed）项目也纳入分析")
             sp.add_argument("--top", type=int, default=9,

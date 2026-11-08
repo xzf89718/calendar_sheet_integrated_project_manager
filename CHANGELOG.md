@@ -2,6 +2,12 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.6.3** db_analysis 字段口径文档澄清（用户定，补丁）：pie 的
+`--field` / `--where` / `--date-field` 一律匹配 fields.json 的
+**英文 name**，不用 GUI 显示 label——纯文档与 help 修正，行为
+不变（本就只认 name，报错列可用字段名）；后续 db_analysis 新
+配置遵循同一口径。模块 README 参数节加「字段口径（重要）」提示，
+--field help 同步注明
 - **v3.6.2** 子模块 GUI 入口统一为 gui 子命令（用户定）：db_copy /
 db_append / db_split / db_assign / db_recycled 五模块废弃
 `--gui` 参数，统一 `python -m db_xxx gui`，与 workbench_ui /
@@ -39,6 +45,12 @@ GitHub 双远程仓库同步"；「更新和维护计划」删两句（"本地Fo
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.6.3** db_analysis 字段口径文档澄清（用户定，补丁）：pie 的
+`--field` / `--where` / `--date-field` 一律匹配 fields.json 的
+**英文 name**，不用 GUI 显示 label——纯文档与 help 修正，行为
+不变（本就只认 name，报错列可用字段名）；后续 db_analysis 新
+配置遵循同一口径。模块 README 参数节加「字段口径（重要）」提示，
+--field help 同步注明
 - **v3.6.2** 子模块 GUI 入口统一为 gui 子命令（用户定）：db_copy /
 db_append / db_split / db_assign / db_recycled 五模块废弃
 `--gui` 参数，统一 `python -m db_xxx gui`，与 workbench_ui /
