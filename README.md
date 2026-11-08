@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.5.2
+# 日历表格聚合项目跟进工作台 v3.6.0
 
 **面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
 做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
@@ -7,13 +7,12 @@
 
 日历与表格聚合为主要视图：上半日历掌握时间安排与跟进节奏，下半
 表格做查看、搜索、筛选、汇总——两者数据同源、筛选互通。日常
-工作是**碎片化记录**（工作发生时顺手一记），历史记录作为**必要
-兜底**（异常、复盘、解释状态变化时随时可查），全部能力由
+工作是**碎片化记录**（工作发生时顺手一记），历史记录作为**必要**
+**兜底**（异常、复盘、解释状态变化时随时可查），全部能力由
 `fields.json` 配置，同一框架适配销售、求职、实验记录等不同场景。
 
 **让记录融入工作，让软件承担信息汇总，让你把精力更多地放在
 项目本身。**
-
 
 本框架为这句话而生：每次跟进存一条完整快照——谁改的、改了什么、
 什么时候、为什么，永久可查，任意两版红字对比。数据存在你自己硬盘
@@ -24,9 +23,9 @@
 - 一个项目可挂多个日期（开始/跟进/关闭/自定义），每个日期都能在日历上点击找到项目
 - 表格内容全部由 `fields.json` 配置，**改配置不改代码**，
   加一个产品形态 = 换一份 JSON
-- 六件套工具：复制 / 追加 / 分拆 / 赋值 / 周报清洗 / 分析（占位）
+- 七件套工具：复制 / 追加 / 分拆 / 赋值 / 周报清洗 / 分析 / 回收站
   + 三个现成形态（见 example/）
-- 软件免费开源（MIT），基于自托管 Fossil 仓库开发；
+- 软件免费开源（MIT），基于 git 做版本控制开发；
   定制配置与模板服务另计
 
 **联系作者：zifeng.xu@foxmail.com**
@@ -38,37 +37,14 @@
 
 - 业余时间开发，更多功能，暂时没精力更新
 - BUG会被认真对待，尽快修复
-- 本地Fossil仓库做版本控制和开发
-- 新功能和代码贡献请联系我讨论。
-
-
-
----
-
-## 目录
-
-- [一、安装与启动](#一安装与启动)
-- [一点五、三个产品形态（example/）](#一点五三个产品形态example)
-- [二、用途：它解决什么问题](#二用途它解决什么问题)
-- [三、界面总览](#三界面总览)
-- [四、项目管理](#四项目管理)
-- [五、周报模式](#五周报模式)
-- [六、导入与导出](#六导入与导出)
-- [七、Windows 通知推送](#七windows-通知推送)
-- [八、数据与备份](#八数据与备份)
-- [九、工具子模块](#九工具子模块)
-- [十、配置：fields.json 逐条详解](#十配置fieldsjson-逐条详解)
-- [十一、SQL 速查](#十一sql-速查)
-- [十二、更新日志](#十二更新日志)
-- [十三、设计思想](#十三设计思想)
 
 ---
 
 ## 一、安装与启动
 
 需要 Python 3.8+（python.org 官方版，自带 tkinter）。
-实测 3.8 ~ 3.14 stable 可顺利安装运行；**3.15 目前 pip 直接装不上
-依赖，暂不建议使用**。
+实测 3.8 ~ 3.14 stable 可顺利安装运行；**3.15 目前 pip 直接装不上**
+**依赖，暂不建议使用**。
 
 ```bash
 # 1. 解压后进入文件夹。部分旧环境需先升级打包工具链，
@@ -90,189 +66,38 @@ python main.py
 requirements.txt 注释换用备选通知库 `win10toast`。主程序与数据
 不受影响。
 
-开发者跑测试（普通用户可跳过）：`pip install pytest` 后
-`python -m pytest tests/ -q`（Linux 无显示环境需先
-`apt-get install xvfb` 并加 `xvfb-run -a` 前缀；Windows 直接跑）。
-详见 tests/README.md。
-
-启动选项（v3.2.0，全部可选，双击即用不变）：
+启动选项（全部可选，双击即用不变）：
 
 ```bash
-python main.py                        # 聚合视图（日历+表格，默认）
-python main.py --view calendar        # 仅日历：表格和按钮行移除，
-                                      # 日历吃满窗口，底部保留"新建项目"
-python main.py --view table           # 仅表格：隐藏日历，其余原样
-python main.py --check-config         # 只校验 fields.json，不建库不启动，
-                                      # 退出码 0=通过 1=有错误（可接脚本/CI）
+python main.py                  # 聚合视图（日历+表格，默认）
+python main.py --view calendar  # 仅日历：日历吃满窗口，底部保留"新建项目"
+python main.py --view table     # 仅表格：隐藏日历，其余原样
+python main.py --check-config   # 只校验 fields.json，不建库不启动
+                                # 退出码 0=通过 1=有错误（可接脚本/CI）
 ```
 
-视图优先级：`--view` 命令行 > fields.json 的 `ui.default_view` > 聚合。
-视图在启动时选定，运行中不切换、不回写配置；仅日历模式下日历恒
-显示全部时间节点（该模式没有表格筛选），点条目查看/跟进、点日期
-看当天明细，交互不变。
-
-### 1.1 命令行工作台 workbench_ui（v3.3.0）
-
-主窗口全部 GUI 功能都有命令行版，单独的 `workbench_ui` 包实现
-（`python -m workbench_ui ...`；`setup.ps1` / `setup.sh` 之后可
-直接敲 `workbench_ui ...`）。库路径锚定 fields.json 同目录，与 GUI
-完全一致，**没有也不接受 `--db` 参数**。
-
-```bash
-python -m workbench_ui list [--closed] [--search 词]... \
-        [--where 字段=值]... [--sort 列] [--desc] [--format table|csv] \
-        [--limit N] [--offset N] [--fav 收藏夹名]   # 项目列表，id 索引列
-                                      # 恒打头；--fav = 只看夹内项目并
-                                      # 追加「收藏夹」归属列（v3.3.4）
-python -m workbench_ui show <id> [--hist N]   # 查看项目（含历史快照）
-python -m workbench_ui new --set 字段=值... [--note 文本]
-python -m workbench_ui follow <id> --set 字段=值... [--note 文本]
-python -m workbench_ui import <文件> [--template 名]
-python -m workbench_ui export <out.xlsx|out.csv> [同 list 的筛选参数]
-python -m workbench_ui weekly <out.xlsx> [--date-from .. --date-to ..
-        --plan-from .. --plan-to ..]  # 日期缺省 = 本周一~日/下周一~日
-python -m workbench_ui backup          # 库备份（与 GUI 按钮同一内核）
-python -m workbench_ui notify          # 今日项目事项，只打印到终端
-python -m workbench_ui cal <年> [月] [日]   # 日历时间节点，只读打印
-python -m workbench_ui fav list|new|rename|delete|add|remove ...
-python -m workbench_ui gui [--view ...]     # 进入图形界面（= main.py）
-python -m db_analysis pie --field 字段 [--field 字段2 ...] [--closed] [--top N]
-        [--where 字段=值 ...] [--date-field 名]
-        [--from YYYY-MM-DD --to YYYY-MM-DD | --last 1m|6m|1y]
-        [--png [目录]] [--dump [目录]]
-        # 只读分析（v3.5.0 起；v3.5.1 起多变量共享筛选；
-        #  v3.5.2 起 --dump 改名 + 输出只接受目录 + 默认目录）
-```
-
-要点：
-
-- `--field` 可多次：一次命令画多个变量的饼图，共享同一组筛选
-  条件；逐字段出计数表，PNG 每字段一个文件（不做多子图单文件，
-  用户定）。个别字段无匹配打印提示跳过，全部无匹配才报错。
-- `--png` / `--dump` **只接受目录**（v3.5.2 用户定：一次可能产出
-  多个文件，指定单文件名无法理解）：不带值 = 默认目录（自动创建）
-  PNG 存 `db_analysis/pie/plots/`、数据存 `db_analysis/pie/dump/`，
-  带值 = 该目录内自动命名，文件名嵌筛选摘要
-  `pie_<字段>_<筛选摘要>_<时间戳>.png/.csv`；给单文件名直接报错。
-  date 类型字段自 v3.5.1 起可作饼图变量（原值归段）。多字段 csv
-  带「字段」列，单字段保持两列。建议把 `db_analysis/pie/` 加入
-  .gitignore（输出产物不入库）。
-
-- `--where 字段=值` 可多次，同字段取并集；日期字段支持
-  `--where 日期=起~止`（任一端可省略）。字段名 = fields.json 的
-  `name`（报错会列出可用名）。
-- `new` / `follow` 的值校验与 GUI 完全同源（同一套
-  `validate_*` / `check_date_bounds`）；`follow` 未传的字段保持
-  现值，`--note` 写入跟进记录字段。
-- `export` 导出全量匹配行（不受 `--limit` 影响），按扩展名分派：
-  `.xlsx` 走模板引擎，`.csv` 同列结构写文本（`utf-8-sig` 编码 + 纯
-  LF，Excel 双击中文不乱码，与导入端读取方式对称），其余扩展名报错。
-- `notify` 按设计**只打印到终端**，不走系统通知（防止被脚本滥用
-  塞爆通知栏）。
-- `cal` 只读：打印某年/月/日的时间节点清单（含项目 id），供
-  `show` / `follow` 接续；不提供打开、编辑接口。
-- 退出码：0 成功；1 业务错误（消息在 stderr，无 traceback）；
-  2 参数错误。
+视图优先级：`--view` 命令行 > fields.json 的 `ui.default_view` >
+聚合。视图启动时选定，运行中不切换。
 
 打包成 exe（可选）：装好 PyInstaller 后运行 `build_exe.ps1`
-（PowerShell），dist 目录得到全部 exe；`fields.json` 自动复制到主程序
-exe 旁边，改配置即改即用。整个 dist 文件夹拷到任何机器都能跑。
+（PowerShell），dist 目录得到全部 exe；`fields.json` 自动复制到
+主程序 exe 旁边，整个 dist 文件夹拷到任何机器都能跑。
 
-## 一点五、三个产品形态（example/）
+## 二、基本使用
 
-同一套代码 + 一份 fields.json = 一个产品。**换形态 = 把 example 里
-对应的文件复制为根目录 `fields.json`，重启即切换**：
+### 主窗口：三块
 
-| 形态 | 文件 | 场景 |
-|------|------|------|
-| **销售项目管理**（默认） | 根目录 fields.json | 销售/代理商跟进客户项目（客户/金额/概率/跟进） |
-| 求职投递 | example/qiuzhi_fields.json | 投简历：公司/岗位/笔试面试阶段/被拒复盘 |
-| 实验记录本 | example/shiyan_fields.json | 按日期记录实验：条件参数留痕、现象、成功/失败归档 |
-
-example/ 内同时附带各形态的 Excel 模板（`qiuzhi_模板_*.xlsx`、
-`shiyan_模板_*.xlsx`）。想为自己的业务定义第四个形态，照抄一份
-改字段即可——详见[第十章配置详解](#十配置fieldsjson-逐条详解)。
-
-### 怎么替换形态（三步）
-
-**核心一句话：无论复制哪个文件，根目录最终的文件名必须叫
-`fields.json`——程序只认这一个名字。**
-
-1. **关闭软件**（配置只在启动时读取）
-2. 备份当前配置（随意命名，如 `fields_sales.json.bak`）：
-   ```powershell
-   copy fields.json fields_sales.json.bak
-   ```
-3. 把 example 里的形态文件**复制并改名**为根目录的 `fields.json`：
-   ```powershell
-   copy example\qiuzhi_fields.json fields.json     # 切到求职版
-   copy example\shiyan_fields.json fields.json     # 切到实验记录本
-   copy fields_sales.json.bak fields.json          # 切回销售版
-   ```
-
-   注意 `copy 源文件 目标文件` 的第二个参数就是新文件名，复制
-   动作本身就完成了改名——复制完看一眼根目录，存在且只存在一份
-   `fields.json` 即成功。
-
-重启即生效。数据库不用动——新形态的字段自动补列，旧数据原样
-保留；切回时原列重新出现。建议不同形态用不同数据文件（改各形态
-JSON 里的 `db_name`，如 qiuzhi.db / shiyan.db），避免字段语义串味。
-
-## 二、用途：它解决什么问题
-
-**场景定义：一个人或一个小团队，并行跟大量项目，需要低成本地
-保持对全局的认识。**
-
-用 Excel 管项目，消耗精力的不只是项目本身，还有记录、查找、
-更新、回顾、整理这些**信息管理工作**。Excel 能记录、能筛选、
-能统计——真正的成本是维持信息可用所需的**额外心智开销**：
-
-| Excel 里的常见摩擦 | 隐含成本 | 本工作台的对策 |
-|---|---|---|
-| 需要定期打开表格全面检查 | 持续记忆、主动复盘、担心遗漏 | 日历 + 聚合视图替你盯进程 |
-| 频繁定位并修改单个项目 | 在行列结构里找上下文，操作被打断 | 围绕单个项目的表单式编辑 |
-| 工作发生后才补录 | 重新回忆、寻找上下文 | 工作发生时顺手一记（碎片化记录） |
-| 周报时重新整理分散信息 | 重复劳动，记录与汇报脱节 | 周报是日常记录的自然产物 |
-| 出问题后难以还原过去 | 依赖记忆和聊天记录 | 快照历史，任意两版红字对比 |
-
-**核心洞察**：项目越多，"管理信息"本身就越容易变成一项独立的
-工作。本工作台的目标不是比 Excel 功能多，而是把这份隐性劳动
-接过来——你只管项目，它管记录、汇总和兜底。
-
-- 行数一多就乱，格式越填越不一致（"2026/10/1" 和 "10月1日" 共存）
-- **改了什么都不知道**：预算改了、交期延了、当时为什么——三个月后
-  没人说得清，表里只剩最新一行
-- 想追溯历史？Notion 免费版只存 7 天、Airtable 2 周、飞书多维表格
-  180 天——想永久追溯请付费
-
-**适合谁**：销售、代理商、自由职业者、研发小团队、求职者——按"项目
-+ 日期 + 跟进记录"方式管理一批并行事项的个人与小团队。
-**不适合谁**：需要多人实时协作、权限矩阵、审批流的组织（本框架为
-"异步共享"的扁平团队而生：每人一份库、约定同一格式、定期追加汇总）。
-
-**一个框架，多个产品形态**（顺带的红利）：sales_pm（销售跟进）、
-qiuzhi（求职投递）、shiyan（实验记录本）共享同一份代码，
-仅 fields.json 不同——换一个业务就是换一份配置，这也是本框架
-"改配置不改代码"的佐证。
-
-## 三、界面总览
-
-主窗口分三块：
-
-- **上半：日历**——跟进表模式显示开始、跟进、关闭等日期类别（默认绿/
-  蓝/红，颜色与显示名在 calendar_dates 配置）；周报模式显示追加记录
-  （紫）
-- **中间：按钮行**——新建、导入导出、查看、备份、模式切换、收藏夹
-  （v2.7.0，favorites 开启时）、搜索；进入收藏夹模式后按钮行下方
-  出现模式横幅（当前夹名 + 移出按钮 + 退出按钮，与"共 N 条/翻页"
-  同一行、位于表格下方），窗口标题栏同步追加夹名
-- **下半：项目列表**——列由 `display_mainsheet` 配置，每列可排序可筛选，
-  超页自动翻页
+- **上半：日历**——跟进表模式显示开始、跟进、关闭等日期类别
+  （默认绿/蓝/红），周报模式显示追加记录（紫）
+- **中间：按钮行**——新建、导入导出、查看、备份、模式切换、
+  收藏夹、搜索
+- **下半：项目列表**——列由 `display_mainsheet` 配置，每列可
+  排序可筛选，超页自动翻页
 
 ### 日历操作
 
 | 操作 | 效果 |
-|---|---|
+|------|------|
 | 点条目色块 | 直接打开项目详情 |
 | 点"还有N条 ▸" | 弹出当天全部事项列表（跟随当前筛选） |
 | 点日期数字 | 同上；弹窗返回时自动重新取数刷新 |
@@ -280,29 +105,23 @@ qiuzhi（求职投递）、shiyan（实验记录本）共享同一份代码，
 
 ### 列表操作
 
-- **左键点表头**：排序，再点反向（▲/▼）；数字列按数值、文本不区分大小写
-- **多选**：平时为单选；**收藏夹面板打开期间**可配合 Ctrl/Shift 多选
-  （关闭面板即恢复单选），用于把多个项目批量加入收藏夹
-- **右键点表头**：筛选——日期列为"从~到"区间框，其余列为勾选清单；
-  多列叠加，全不选 = 全不显示；表头 🔽 标记在筛列
-- **搜索**（按钮行最右）：点按钮弹输入框，子串匹配、不区分大小写，
-  空格分隔多关键词取 AND，命中字段前标红点 🔴（仅显示层，导出无标记）
+- **左键点表头**：排序，再点反向（▲/▼）；数字列按数值
+- **右键点表头**：筛选——日期列为"从~到"区间框，其余列为勾选
+  清单；多列叠加
+- **搜索**：子串匹配、不区分大小写，空格分隔多关键词取 AND，
+  命中字段前标红点 🔴
 - **双击行**：打开项目详情
-- **翻页**：超过一页时列表下方"上一页/下一页"，提示"第 X~Y 条 / 共 N 条"；
-  筛选/排序/搜索自动回第一页
-- **列宽**：只增不减；基线 = 表头宽 + 排序/筛选箭头余量（×3）
-
-**默认排序**：打开按开始日期倒序（最新置顶）。配置见
-`default_sort`；配置有误自动退路 id 倒序，不报错。
-
-## 四、项目管理
+- **翻页**：列表下方"上一页/下一页"，提示"第 X~Y 条 / 共 N 条"
+- **默认排序**：打开按开始日期倒序（最新置顶），配置见
+  `default_sort`
 
 ### 新建与跟进
 
 「新建项目」填表保存（项目名自动生成 = `name_fields` 配置的字段
 按序拼接，如 厂家-客户-产品）。之后每次联系客户：打开项目 →
-「编辑/添加跟进」→ 改字段、写跟进记录 → 保存 = 生成一条**完整快照**。
-改动说明留空会自动生成（如"里程碑: Lead → Quotation; 金额: 50 → 48"）。
+「编辑/添加跟进」→ 改字段、写跟进记录 → 保存 = 生成一条**完整
+快照**。改动说明留空会自动生成（如"里程碑: Lead → Quotation;
+金额: 50 → 48"）。
 
 里程碑建议值：Lead / Qualified Lead / Quotation / Under negotiation /
 Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关闭**——
@@ -316,661 +135,65 @@ Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关�
 - **查看选中版本**：历史列表选中一条，左侧整版切到该版本快照
   （横幅提示，一键回到最新）
 - **对比选中两条**：逐字段差异红色高亮，跟进记录全文对照
-- **删除项目**：屏幕正中弹窗二次确认，删除后不可恢复
+- **删除项目**：弹窗二次确认，进入回收站可恢复（见
+  db_recycled/README.md）
 
-## 五、周报模式
+### 周报模式
 
-点「周报模式」切换（再点切回）：
+点「周报模式」切换：日历与表格改显每天的追加记录（`[追加] 项目
+名`，紫）；「导出周报」弹窗两行日期区间（本周跟进 + 下周计划），
+合并导出为一个 xlsx 的两个工作表。周报是只读视图——数据唯一
+入口是跟进表。
 
-- 日历与表格改显**每天的追加记录**（`[追加] 项目名`，紫），
-  表格窗口跟随日历当前查看月 ±1（跨年正确）
-- 列由 `weekly_sheet` 配置；显示已关闭、筛选、排序照常生效；
-  默认按追加时间倒序（最近跟进置顶）
-- 新建/导入/导出 Excel 置灰（原位保留）；「导出周报」可用：
-  弹窗两行日期区间（本周跟进 + 下周计划），合并导出为一个 xlsx
-  的两个工作表
-- **周报是只读视图，不可导入**——数据唯一入口是跟进表
+### 导入与导出
 
-## 六、导入与导出
+「导入」→ 选模板 → 选文件（xlsx/csv）：一行 = 一个项目，日期
+格式不拘，模板外列自动忽略并提示。「导出」→ 只导出列表筛出的，
+按文件名后缀生成 xlsx 或 csv（csv 为 utf-8-sig，Excel 双击中文
+不乱码）。模板措辞和界面显示名可以不一样，只要 `field` 指向同一
+字段名。
 
-### 导入
+## 三、进阶：命令行与更多文档
 
-「导入」→ 选模板 → 选文件（xlsx/csv）：
-
-- 一行 = 一个项目，项目名自动组合；整行为空/重复表头行跳过
-- 日期格式不拘（2026年10月20日 / 2026/10/20 / 序列号 / Excel 日期格）
-- 概率 90 或 90% 皆可；模板外列自动忽略并提示
-- 状态空 → 自动填 `import_default_status`；缺列值按字段 default 兜底
-
-### 导出（只导出列表筛出的）
-
-「导出」→ 选模板 → 存盘（按文件名后缀生成 xlsx 或 csv）。内置模板：
-
-| 模板 | 说明 |
-|---|---|
-| 十四列模板 / 五列简表 / 十二列模板 / 六列简表 | 客户/外部格式，措辞按对方习惯，字段与本框架同源 |
-| 通用 / 全选 | = 全量字段，导入导出完全可逆 |
-| 标准 | 14 列通用格式，厂家默认值可配 |
-| 周报 | 导出专用（kind=weekly），不进通用导入导出选择器 |
-
-**模板措辞和界面显示名可以不一样**（"价值" = 界面的"金额（USD）"）——
-只要 `field` 指向同一字段名，模板/界面/编辑器/数据库四方读写同一值。
-
-## 七、Windows 通知推送
-
-启动 1.5 秒后自动推送当天事项汇总；每 30 分钟检查、跨天自动再推；
-「今日推送」立即测试。依赖 `windows-toasts`（未装时点推送会提示安装
-命令，不影响其他功能）。通知走系统本机 API，不携带数据出机。
-
-## 八、数据与备份
-
-- **一键备份**：自动生成 `时间(精确到秒)-识别符-数据库文件名`，
-  SQLite 官方在线备份接口（运行中也能安全备份）；路径与识别符在
-  `backup` 段配置（相对路径基于程序目录，支持中文）
-- 数据 = **单个 `.db` 文件**，手动备份 = 复制它
-- 任何 SQLite 工具可直接打开；快照平铺存储，离开本框架依然可读
-- 损坏的 db 启动时报错退出，不误伤数据
-
-## 九、工具子模块
-
-与主程序共享 fields.json，各自独立运行。设计纪律：每个工具
-**作用域唯一**（挑项目 / 整库追加 / 按键拆 / 全库赋值 / 清洗），
-杜绝"我到底改了哪些"的歧义。
-
-| 目录 | 用途 | 运行（GUI） | 运行（命令行） |
-|------|------|------|------|
-| `db_copy/` | A/B 双库对照，箭头把选中项目（含全部历史）追加到目标库，只新增 | `python -m db_copy --gui` | `python -m db_copy A.db B.db 1 2` / `--all` |
-| `db_append/` | 多源库依次全部追加进目标库（团队报数汇总） | `python -m db_append --gui` | `python -m db_append 目标.db 源1.db [源2.db...]` |
-| `db_split/` | 按键列（如负责人）拆成每人一个文件：全量含归档、空值→未分配.db、冲突拒绝 | `python -m db_split --gui` | `python -m db_split 源.db --key 城市 --dest 目录`（`--preview` 只预览） |
-| `db_assign/` | 全库统一给一列赋值（双只读预览，走快照可回溯） | `python -m db_assign --gui` | `python -m db_assign 库.db --field 城市 --value 北京 --yes`（不加 `--yes` 只预览） |
-| `weekreport_clean/` | 周报清洗：日期按年月日三元组匹配（横杠/斜杠/中文互通），双表预览 | `python weekreport_clean/clean_gui.py` | — |
-| `db_analysis/` | 只读数据分析：多变量饼图共享筛选，绝不写库 | — | `python -m db_analysis pie --field 客户 [--field 城市 ...]`（见 CLI 速查） |
-| `db_recycled/` | 回收站：查看/恢复/红色永久删除（见 10.17） | `python -m db_recycled 库.db --gui` | `python -m db_recycled 库.db [--restore/--purge/--empty]` |
-
-每个子模块都是同一套四件套：`__init__.py`（导出核心）+ `*_core.py`
-（纯逻辑，CLI/GUI 共用）+ `*_gui.py`（`run_gui()` 入口）+ `__main__.py`
-（命令行）。命令行列一律按运行时的 `fields.json` 动态拼，不硬编码字段。
-
-**快捷命令（可选）**：跑一次 `setup.ps`（Windows，PowerShell：
-`powershell -ExecutionPolicy Bypass -File setup.ps`）或 `bash setup.sh`
-（Linux/macOS），生成 `db_split xxx.db ...` 式的单字命令（本质是
-`python -m db_split xxx.db ...` 的封装，自动带上包路径），并把 shim
-目录加进 PATH。脚本可重复执行，幂等。
-
-## 十、配置：fields.json 逐条详解
-
-**改配置不改代码。关闭软件 → 编辑 → 重启生效。** 五个铁律：
-
-1. 程序只在启动时读配置，运行中不变
-2. 新增字段自动补列（`ALTER TABLE`），旧数据原样保留
-3. 删字段 = 列留在库里不再使用（SQLite 不支持删列）
-4. 改坏 JSON → 启动报错退出，恢复原文件即可
-5. `_` 开头的键是注释，程序自动忽略——放心写给人看的话
-
-### 10.0 顶层键总览（按文件顺序）
-
-| 键 | 类型 | 管什么 |
-|----|------|--------|
-| `product_name` | 字符串 | 窗口标题、通知署名 |
-| `db_name` | 字符串 | 数据库文件名（首启创建） |
-| `name_fields` | 数组 | 项目名由哪几列拼接 |
-| `fields` | 数组 | **数据定义**：字段清单（核心） |
-| `status_closed` | 数组 | 哪些状态值算"归档/结案" |
-| `calendar_mode` | 字符串 | 日历渲染模式 |
-| `split` | 对象 | db_split 输出文件名配方 |
-| `default_sort` | 对象 | 跟进表打开时的默认排序 |
-| `backup` | 对象 | 备份目录与文件名识别符 |
-| `search` | 对象 | 搜索框匹配哪些字段 |
-| `import_default_status` | 字符串 | 导入时状态为空的兜底值 |
-| `templates` | 数组 | 导入导出模板 |
-| `display_mainsheet` | 数组 | 主表：列的原名/别名/开关/筛选/顺序 |
-| `weekly_sheet` | 对象 | 周报表格列 |
-| `ui` | 对象 | 窗口/字体/列宽/渲染上限/编辑器 |
-| `calendar_dates` | 数组 | 日历日期类别（法定四类 + 自定义） |
-| `date_check` | 对象 | 保存跟进时的日期范围检查器（可缺省） |
-| `favorites` | 对象 | 收藏夹开关与显示名（可缺省 = 关闭） |
-
-### 10.1 `product_name` / `db_name`
-
-```json
-"product_name": "日历表格聚合项目跟进工作台",
-"db_name": "sales_pm.db"
-```
-
-- `product_name`：窗口标题栏、Windows 通知的署名。**改产品名只动
-  这一行**——求职版填"求职项目跟进"，实验版填"实验记录本"，
-  同一个 exe 行为完全不同。
-- `db_name`：数据库文件名。改它等于换新库（旧库文件还在，用
-  Database 工具或改回名字继续用）。**不要随意改**——改了之后软件
-  会以为自己是空的。
-
-### 10.2 `name_fields`
-
-```json
-"name_fields": ["manufacturer", "customer", "product"]
-```
-
-项目名的组合配方：按数组顺序取各字段的当前值、用 `-` 连接、空值
-跳过。效果：厂家=AdvR、客户=XX水厂、产品=P-100 → 项目名
-`AdvR-XX水厂-P-100`。列表、日历、模板"项目"列全部用它。
-换产品形态时改这里即可（求职版 = `["customer", "product"]` =
-公司-岗位）。
-
-### 10.3 `fields` —— 数据定义（最核心的一段）
-
-数组，每项一个字段，**数组顺序 = 编辑器/详情页/导出的字段顺序**。
-
-```json
-{"name": "start_date", "label": "开始日期", "type": "date",
- "calendar": "start", "default": ""}
-```
-
-| 键 | 取值 | 配置效果 |
-|----|------|---------|
-| `name` | 英文字段名 | **数据库列名，创建后不要再改**（改了 = 新列，旧列闲置）。习惯用 snake_case |
-| `label` | 中文显示名 | 编辑器标签、列表表头（未配 alias 时）、模板表头默认、筛选弹窗标题 |
-| `type` | date / text / choice / status / int / float | **决定行为**：date→日期归一化+区间筛选+日历类别；choice→下拉建议值；status→归档逻辑（见 10.4）；int/float→数值排序+数字校验 |
-| `choices` | 字符串数组 | choice/status 的下拉建议值。**仍可自由输入**，只是给建议 |
-| `default` | 与 type 匹配的值 | 三处生效：编辑器新建预填、导入补空、导出补空 |
-| `multiline` | true | 编辑器给多行大文本框（带滚动条） |
-| `height` | 行数 | 编辑器大文本框高度；详情页限高见 `max_lines` |
-| `max_lines` | 行数 | 详情页该字段以固定行数+滚动条显示，防长文撑爆窗口 |
-| `calendar` | "start" / "followup" / "close" | **旧式**日历类别标记（v2.5.0 起由 `calendar_dates` 段接管，见 10.15）：写了会自动转换成 calendar_dates 配置，新配置的字段不必再写 |
-
-**一个框架里恰好一个** `type: "status"` 的字段——它是唯一影响程序
-行为的变量（见下节）。
-
-### 10.4 状态语义：`status_closed` + 状态字段
-
-```json
-{"name": "status", "label": "状态", "type": "status",
- "choices": ["跟进中", "成单", "关闭"], "default": "跟进中"},
-"status_closed": ["成单", "关闭"]
-```
-
-- 状态字段的**建议值列表**随意；`status_closed` 里列出的值是
-  "归档"判定：项目从默认列表和日历消失（「显示已关闭」可找回，
-  历史全保留）
-- 销售版语义：成单/关闭 = 归档；求职版：已Offer/已拒/已放弃 = 归档；
-  **逻辑固定，取值可改**——想换成"赢单/丢单"，改两个数组即可
-- 存档判断在每次保存快照时执行（`add_snapshot`），改配置后对
-  新保存生效
-
-### 10.5 `split` —— db_split 输出文件名配方
-
-```json
-"split": {"components": ["field", "key", "time"], "prefix": ""}
-```
-
-| 键 | 效果 |
-|----|------|
-| `components` | 文件名组成部分及顺序：`prefix`(前缀文本) / `field`(键列名) / `key`(键值，空→未分配) / `time`(执行时间 YYYYMMDD-HHMMSS)；空段自动跳过 |
-| `prefix` | 前缀文本（如"团队A"），需在 components 里含 "prefix" 才生效 |
-
-默认产出 `厂家_张三_20261020-113000.db`；改
-`["prefix", "key"]` + `"prefix": "团队A"` 产出 `团队A_张三.db`。
-
-### 10.6 `default_sort`
-
-```json
-"default_sort": {"column": "start_date", "desc": true}
-```
-
-跟进表打开时的默认排序。`column` 填字段名或 `"id"`；`desc` true=倒序。
-**兜底**：键缺失、column 不是字段也不是 id、类型不对——一律落回
-`id 倒序`（最新置顶），永不报错。
-
-### 10.7 `backup`
-
-```json
-"backup": {"path": "backups", "identifier": "备份"}
-```
-
-- `path`：备份目录。相对路径基于程序目录；支持绝对路径、`~`、中文
-- `identifier`：备份文件名中间的识别符，产物为
-  `20261020-221530-备份-sales_pm.db`
-- 备份用 SQLite 官方在线备份接口，软件运行中也能安全执行
-
-### 10.8 `search`
-
-```json
-"search": {"fields": ["customer", "city", "product", ...]}
-```
-
-搜索框匹配的字段范围（子串、不区分大小写、多关键词空格 AND）。
-增删字段名即可调整；这些字段命中时列表标红点。
-
-### 10.9 `import_default_status`
-
-导入时某行状态为空 → 自动填这个值。销售版"跟进中"，求职版"投递中"。
-
-### 10.10 `templates` —— 导入导出模板
-
-数组，每项一个模板，模板选择器按顺序显示。三种形态：
-
-**① 全量模板**
-
-```json
-{"name": "通用", "columns": "all"}
-```
-
-= 全部字段按 fields 顺序。导入导出完全可逆，适合备份迁移。
-
-**② 字段模板**（客户/外部格式）
-
-```json
-{"name": "十四列模板", "defaults": {"manufacturer": ""},
- "columns": [
-   {"field": "start_date", "label": "开始时间"},
-   {"field": "customer",   "label": "终端客户"},
-   {"label": "拥有者", "const": ""}
- ]}
-```
-
-| 键 | 效果 |
-|----|------|
-| 列 `field` | 该列对应的数据库字段（表头可用 label 改成对方习惯的措辞） |
-| 列 `label` | 导出表头/导入匹配名；不写 = 字段默认 label |
-| 列 `label+const`（无 field） | **不在库里的列**：导出填 const 值，导入忽略（如"拥有者"） |
-| `defaults` | 导入时给字段的固定赋值：文件里没有这列也能统一填（如全表厂家） |
-
-导入匹配规则：表头与"模板 label 或字段默认 label"一致即对上
-（两种写法都认）。
-
-**③ 周报模板**（导出专用）
-
-```json
-{"name": "周报", "kind": "weekly", "columns": [
-  {"date": "snapshot_at", "label": "日期"},
-  {"name": true, "label": "项目"},
-  {"field": "followup_note", "label": "跟进记录"},
-  {"field": "change_summary", "label": "改动说明"}
-]}
-```
-
-`kind: "weekly"` 表示周报导出专用（不出现在通用导入导出选择器，
-**不可导入**）。列的三种键：`date`=追加时间列（snapshot_at）；
-`name`=项目名列（按 name_fields 组合）；`field`=普通快照字段。
-
-### 10.11 `display_mainsheet` —— 主表显示配置
-
-数组，每项一列，**数组顺序 = 列顺序**。
-
-```json
-{"name": "customer", "alias": "客户方", "on": true, "filter": "range"}
-```
-
-| 键 | 取值 | 效果 |
-|----|------|------|
-| `name` | 字段名或 `"id"` | 该列数据源；id 也是普通条目，可关可改名可挪位 |
-| `alias` | 字符串，可空 | 列表表头别名；空 = 字段默认 label |
-| `on` | true / false | false = 主表隐藏该列。**数据仍在，导出全量不受影响** |
-| `filter` | "list"（默认）/ "range" | 右键筛选形态：勾选清单 / "从~到"日期区间（留空不限、可只填一端） |
-
-规则：没写进这里的新字段自动补到末尾（on=true）；字段级固定列宽
-也可在此加 `"width": 200（px，只增不减）`。
-
-### 10.12 `calendar_mode`
-
-```json
-"calendar_mode": "all"    // 或 "filtered"
-```
-
-- `all`（默认）：日历显示当月所有进行中项目的时间节点
-- `filtered`：**跟随表格筛选**——日历只渲染当前筛选/搜索后的项目
-  （点"还有N条"/日期弹窗同样跟随，同一数据入口）
-
-### 10.13 `weekly_sheet`
-
-```json
-"weekly_sheet": {"columns": ["snapshot_at", "project", "milestone",
-                             "status", "probability", "change_summary"]}
-```
-
-周报表格的列。内置列：`snapshot_at`（追加时间）、`project`（项目名）、
-`change_summary`（改动说明）；其余写字段名。数组顺序 = 列顺序。
-
-### 10.14 `favorites` —— 收藏夹（v2.7.0，可缺省 = 关闭）
-
-```json
-"favorites": {"enabled": true, "label": "收藏夹"}
-```
-
-- `enabled`：false 时按钮行不出现收藏夹按钮，db 也不建相关表
-- `label`：按钮/面板显示名
-
-收藏夹 = **项目 id 的命名集合（纯索引）**，存在 db 文件里
-（`collections` / `collection_items` 两张表，旧库打开自动补建），
-按库独立。点按钮在按钮下方弹出**非模态**收藏夹面板（可最小化、
-不锁主窗口、右上角叉关闭）：左侧夹列表（名称 + 项目数），**双击
-夹名进入筛选**；右侧新建/重命名/删除/加入（把主表格选中项目加入
-此夹，只写索引不动项目数据）。面板打开期间主表格临时变为多选
-（Ctrl/Shift，关闭即恢复单选）；点主窗口任意处面板自动抬回主窗口
-之上，不会沉到后面。
-进入收藏夹模式后主表格和日历**同步**只显示夹内项目（与列筛选、
-搜索叠加），列表上方出现模式横幅（与"共 N 条"同一行）和
-"退出收藏夹模式"按钮，**窗口
-标题栏追加夹名**；快捷键 **Ctrl+1~9 直达前 9 个收藏夹、Ctrl+0
-退出模式**（输入框内不抢键）；进入模式后「导入 / 导出」
-置灰（v3.3.5：收藏夹是纯索引视图，导入导出永远是全库操作）。
-周报模式同样联动：周报表格、周报
-日历（追加记录）、周报导出都只含夹内项目，模式内可自由切换两种
-视图；周报下搜索词会匹配项目名列；**周报模式下"加入/移出"按钮
-禁用（置灰）**；收藏夹模式下「导入 / 导出」同样置灰
-（v3.3.5，替代旧表述"跟进表导出不受模式影响"）；重启软件自动退出模式。
-
-### 10.15 `calendar_dates` —— 日历日期类别（本软件特色）
-
-```json
-"calendar_dates": [
-  {"key": "start",    "field": "start_date",    "label": "开始", "color": "#2e7d32",  "show_calendar": true},
-  {"key": "followup", "field": "next_followup", "label": "跟进", "color": "#1565c0", "show_calendar": true},
-  {"key": "close",    "field": "close_date",    "label": "关闭", "color": "#c62828", "show_calendar": true},
-  {"key": "append",   "label": "追加", "color": "#6a1b9a", "show_calendar": true},
-  {"key": "tapeout",  "field": "tapeout", "label": "流片", "color": "#e65100", "show_calendar": true}
-]
-```
-
-**一个项目挂多个日期，每个日期都能在日历上点击找到项目**——这是
-本工作台区别于 Excel 的核心体验，全部由此段配置驱动：
-
-- 法定四类必须有：`start` / `followup` / `close`（各绑定一个
-  date 类型字段）+ `append`（追加记录，无字段，用快照时间，
-  周报模式用）；缺任何一类启动报错并指明缺谁
-- 四类之后的条目 = **自由增加的日期类别**：任意 date 字段 +
-  自定义 key / 显示名 / 颜色（如示例的"流片"）
-- 每项五键：`key` 类别标识、`field` 日期字段名（append 省略）、
-  `label` 日历与弹窗显示名、`color` 条目颜色 `#RRGGBB`、
-  `show_calendar` 该类日期是否上日历（false = 数据保留但日历不显示；
-  表格显隐与列顺序由 display_mainsheet 管）
-- 说明文字（法定四类要求、追加格式等）写在数组外的 `_` 开头注释键里，
-  数组条目内只保留上述配置键
-- 不写此段时自动从旧式配置（字段上的 calendar 标记）转换
-
-### 10.16 `ui` —— 界面参数
-
-| 键 | 默认 | 效果 |
-|----|------|------|
-| `window.width / height / margin_x / margin_y` | 1480/860/80/120 | 窗口尺寸上限与屏幕边距（按屏幕自适应取小） |
-| `font.default` | 12 | 全局字体（磅） |
-| `font.tree_rowheight` | 38 | 列表行高（px） |
-| `font.heading_size` | 13 | 表头字号 |
-| `columns.min_width / max_width` | 70 / 360 | 列宽上下限（配合只增不减规则） |
-| `calendar.max_per_day` | 1 | 聚合视图（含周报模式）日历每格最多显示几条；更多折叠为"还有N条"（v3.4.2 起真正生效，此前存而未用） |
-| `calendar.max_per_day_view` | 5 | 纯日历视图（`--view calendar`）每格最多显示几条；可配 1~5，缺本键按 5 处理（v3.4.2） |
-| `calendar_labels.start / followup / close` | 开始/跟进/关闭 | **兼容项**：Windows 通知文案仍读它；日历上的显示名与颜色以 calendar_dates 段为准（求职版可改"投递/检查点/结项"） |
-| `editor.width / height / entry_width / text_width` | 840/940/52/50 | 编辑器窗口与输入框尺寸 |
-| `render_limit` | 600 | **每页渲染行数**（翻页式；30万条与600条翻页同速） |
-| `default_view` | 无（=aggregate） | 启动视图缺省：`aggregate`（聚合）/ `calendar`（仅日历）/ `table`（仅表格）；被 `--view` 覆盖（v3.2.0） |
-
-### 10.17 `recycle_bin` —— 回收站（v3.1.0，可缺省 = 关闭）
-
-```json
-"recycle_bin": {"enabled": true}
-```
-
-- `enabled`：true（本发布包内置配置已开启）时删除 = **项目 + 全部快照
-  + 收藏夹索引整体移入回收站**；false 时删除 = 物理删除，与 v2.7.3 完全
-  等价；整段缺省时按 false 处理（老配置文件不加这段，行为零变化）
-  （独立表 `recycled_*`，主表格/日历/周报/导出/通知全部天然不再
-  显示），删除确认框会说明"可在回收站中恢复"
-- 主程序**只管删进去**；查看/恢复/彻底删除由独立模块负责，
-  命令行与 GUI 双入口：
+喜欢终端的用户可以用命令行完成同样的事（进阶内容，零基础可
+跳过）：
 
 ```bash
-python -m db_recycled xxx.db            # 列出回收站
-python -m db_recycled xxx.db --restore 12    # 恢复（id 空闲则原位放回）
-python -m db_recycled xxx.db --restore all   # 全部恢复
-python -m db_recycled xxx.db --purge 12      # 永久删除单个
-python -m db_recycled xxx.db --empty         # 清空回收站
-python -m db_recycled xxx.db --gui           # 图形界面（恢复/红色永久删除）
+python -m workbench_ui list                 # 项目列表
+python -m workbench_ui new --set 客户=XX --set 金额=50
+python -m workbench_ui follow 3 --set 概率=80 --note 已报价
+python -m workbench_ui export out.xlsx      # 导出筛出项
+python -m workbench_ui backup               # 一键备份
 ```
 
-- 恢复时原 id 已被新项目占用才分配新 id（收藏夹索引跟着指向新 id）；
-- **彻底删除（purge/empty）= 物理销毁、不可恢复**，GUI 中是红色
-  按钮 + 二次确认弹窗；命令行不给确认，执行即销毁；
-- 回收站随 .db 文件走（复制/备份库 = 连同回收站一起）。
+完整命令集与规则见 [workbench_ui/README.md](workbench_ui/README.md)。
 
-### 10.18 建议：用 AI 来改配置
+**快捷命令（可选）**：跑一次 `setup.ps1`（Windows PowerShell：
+`powershell -ExecutionPolicy Bypass -File setup.ps`）或
+`bash setup.sh`（Linux/macOS），生成 `db_split xxx.db ...` 式的
+单字命令（本质是 `python -m db_split xxx.db ...` 的封装），并把
+shim 目录加进 PATH。脚本幂等，可重复执行。
 
-fields.json 是"人意图"和"程序"之间的协议层。推荐工作流：把
-fields.json 和需求发给 AI（如"加一列'竞争对手'，字符串，放简述
-后面"）→ 贴回 → 重启生效；启动报错就把报错发回给 AI。本 README
-就是写给 AI 看的说明书。
+| 想看什么 | 去哪看 |
+|----------|--------|
+| 三个产品形态（销售/求职/实验，换形态教程） | [example/README.md](example/README.md) |
+| fields.json 逐条配置详解 + SQL 速查 | [FIELDS-CONFIG.md](FIELDS-CONFIG.md) |
+| 全部版本更新历史 | [CHANGELOG.md](CHANGELOG.md) |
+| 命令行工作台（全部 GUI 功能的 CLI 版） | [workbench_ui/README.md](workbench_ui/README.md) |
+| 复制 / 追加 / 分拆 / 赋值 / 周报清洗 / 分析 / 回收站 | 各模块目录内 README.md |
+| 设计细节、边界与诚实声明 | 本文档末节「设计哲学」 |
 
-## 十一、SQL 速查（贴合本框架）
+改配置的方法：把 fields.json 和需求发给 AI（如"加一列'竞争对手'，
+字符串，放简述后面"）→ 贴回 → 重启生效；启动报错就把报错发回
+给 AI。FIELDS-CONFIG.md 就是写给 AI 看的说明书。
 
-数据模型：`projects` + `snapshots`（一条跟进一行），平铺、ISO 日期。
-DB Browser for SQLite 打开 `.db` 即可练习：
+---
 
-```sql
--- ① 项目列表（界面骨架）
-SELECT p.id, p.title, s.milestone, s.status, s.next_followup
-FROM projects p JOIN snapshots s ON s.id = p.current_id
-WHERE p.status = 'open' ORDER BY p.id;
--- ② 单项目历史（详情页时间线）
-SELECT * FROM snapshots WHERE project_id = 5 ORDER BY snapshot_at;
--- ③ 周报区间取数
-SELECT s.*, p.title FROM snapshots s JOIN projects p ON p.id = s.project_id
-WHERE date(s.snapshot_at) BETWEEN '2026-10-12' AND '2026-10-18';
--- ④ 更新 = 追加新快照（本框架从不用 UPDATE 改历史）
-BEGIN;
-INSERT INTO snapshots(project_id, snapshot_at, followup_note, status)
-VALUES (5, datetime('now','localtime'), '本次跟进内容', '跟进中');
-UPDATE projects SET current_id = last_insert_rowid() WHERE id = 5;
-COMMIT;
--- ⑤ 项目聚合
-SELECT p.title, COUNT(*) AS n, MAX(s.snapshot_at) AS last
-FROM projects p JOIN snapshots s ON s.project_id = p.id
-GROUP BY p.id ORDER BY last DESC;
--- ⑥ 索引排查
-EXPLAIN QUERY PLAN SELECT * FROM snapshots WHERE project_id = 5;
--- ⑦ 收藏夹（favorites 开启时建表；纯索引，删夹/删项目级联清索引）
-SELECT c.name AS 收藏夹, COUNT(i.project_id) AS 项目数
-FROM collections c LEFT JOIN collection_items i ON i.collection_id = c.id
-GROUP BY c.id;
-```
+LICENSE: MIT（Copyright (c) 2026 Ken）
 
-## 十二、更新日志
+开发历史由 git 管理，Gitee/GitHub 双远程仓库同步。
 
-版本规则：修复动第三位，功能动第二位，结构动第一位。
-
-- **v3.5.2** 输出路径裁定（用户定）：`--dump-data` 改名 **`--dump`**；
-  **`--png` / `--dump` 只接受目录**（一次可能产出多个文件，指定单
-  文件名无法理解，显式文件名直接报错）；裸参数默认输出目录定为
-  `db_analysis/pie/plots/` 与 `db_analysis/pie/dump/`（相对
-  fields.json 同目录，自动创建，建议加入 .gitignore）。测试显式
-  文件名用例全部改目录形态，错误参数化对齐「只支持目录」，新增
-  3 用例（dump 默认目录 / dump 显式目录 / png 默认目录），全套
-  196 passed（PNG 3 条在无 matplotlib 环境跳过）
-- **v3.5.1** 多变量饼图共享筛选（用户定）：`--field` 可多次，一次
-  命令画多个字段，共享同一组 `--where` / 日期区间 / `--closed`。
-  逐字段出计数表 + PNG 每字段一个文件（拒绝多子图单文件，用户定）；
-  个别字段无匹配打印提示跳过，全部无匹配才报业务错误。输出文件名
-  自动嵌筛选摘要（用户定）：`pie_<字段>_<筛选摘要>_<时间戳>`，
-  `--png` / `--dump-data` 不带值或给目录即自动命名。date 类型字段
-  解禁为饼图变量（原值归段，空值归「（空）」）。多字段 csv 加
-  「字段」列，单字段保持 v3.5.0 两列。新增 5 用例（多字段共享
-  where / date 变量解禁 / 自动文件名嵌筛选 / 多列 csv / 多 PNG
-  每字段一文件，其中 2 条 PNG 用例在无 matplotlib 环境跳过），
-  错误参数化对齐新行为（date 拒绝用例退役、csv 扩展名断言对齐新
-  裁定文案、补全空报错 1 条），全套 194 passed（PNG 2 条跳过）。
-  顺手勘误：模块表 db_analysis 行自 v3.5.0 起残留"预留占位"描述，
-  本版改正
-- **v3.5.0** db_analysis 只读分析统一入口（占位模块转正，首个算法
-  饼图）：`python -m db_analysis pie --field 字段`，铁律绝不写库
-  （专项测试：跑完库文件哈希不变）。口径：默认 open 项目当前行，
-  `--closed` 把已归档也纳入（客户自由选择）；给 `--from/--to` 或
-  `--last 1m|6m|1y` 日期区间时，每个项目取窗口内"当时最新"的快照
-  统计（用户定口径），`--date-field` 可指定快照里的 date 列（缺省
-  跟进日 snapshot_at）。`--where 字段=值` 可选可多次（与 workbench_ui
-  语法对齐：同字段并集、异字段交集）。空值归「（空）」段，取值超
-  `--top`（默认 9）长尾合并「其他」。输出终端计数表（必有）；
-  `--png` 显式才画饼图（matplotlib 可选依赖，中文按
-  Microsoft YaHei→SimHei→Noto 探测防豆腐块）；`--dump-data` 导出
-  画饼数据 csv（utf-8-sig + 纯 LF，与导出端编码纪律一致）。库锚定
-  fields.json 同目录，无 --db 参数（软件设计准则）。算法表注册结构
-  = GUI 预留数据源。新增 14 用例（计数/closed/where/日期三口径/
-  top 合并/csv 导出/只读哈希/错误参数化 5/PNG），占位断言退役 1 条，
-  全套 190 passed（PNG 1 条在无 matplotlib 环境跳过）
-- **v3.4.2** 补丁合并版（用户裁定 v3.4.1 并入，编号取消）：
-  ① 按钮文案修正：「导入Excel / 导出Excel」改名「导入 / 导出」——
-  v3.4.0 落地 csv 导出后按钮已不限于 Excel，旧文案作废。GUI 现行文档
-  （§六导入导出、§10.14 收藏夹语义）同步更新；v3.3.5 changelog 历史
-  条目保持原文（描述当时事实）；
-  ② 日历每日条数分视图可配置：`ui.calendar.max_per_day_view`（纯日历
-  视图缺省 5，可配 1~5）与既有 `max_per_day`（聚合/周报，维持 1）分开。
-  勘误修复：`max_per_day` 自引入起存而未用（渲染硬编码每格 1 条），
-  本版接通渲染——每格循环画前 N 条，溢出折叠"还有N条"。视图在
-  MainApp 构造时按 `--view` 一次性选定，无需运行时切换；check-config
-  摘要改为同时显示两值并校验 1~5。周报模式沿用聚合的 1 条。
-  新增用例 13 条（按钮文案 1、校验 8：合法 1/缺键兼容 1/越界与类型
-  参数化 6、GUI 渲染 4：聚合回归 1/纯日历 5 条 1/封顶 1/可配置 1），
-  删除 1 条过时用例（旧版"export 拒绝 csv"断言，v3.4.0 已反转），
-  全套 177 passed
-- **v3.4.0** CSV 导出（导入导出对称补齐）：
-  ① CLI `export` 按扩展名分派：`.xlsx` 走原模板引擎；`.csv` 新增
-  `exporter.export_csv`（列结构/取值规则与 xlsx 完全一致：模板列清单、
-  const 列原样、空值补 default），`utf-8-sig` 编码 + 纯 LF——Excel
-  双击打开中文不乱码，与导入端 `utf-8-sig` 读取天然对称；其余扩展名
-  报"导出只支持 .xlsx / .csv"。原 help 文案"xlsx / csv，按扩展名"
-  自本版起成为事实；
-  ② GUI 跟进表导出文件对话框改为"Excel 或 CSV"（与导入对话框同一
-  风格），按最终文件名后缀分派生成路径；收藏夹/周报模式置灰不受影响；
-  ③ `weekly` 保持 xlsx-only 不动（双 sheet 带格式，csv 无意义）；
-  ④ 按钮文案跟进：「导入Excel / 导出Excel」改名「导入 / 导出」——
-  csv 落地后按钮已不限于 Excel，旧文案是 v3.4.0 之前的事实陈述，故
-  记于本版而非历史条目；README 现行文档同步更新。
-  新增 4 条用例（CLI csv 编码 1、csv 往返对称 1、非法扩展名 1、GUI
-  后缀分派 1），删除 1 条过时用例（旧版"export 拒绝 csv"断言，行为已
-  反转），另加按钮文案回归 1 条，全套 165 passed
-- **v3.3.5** 接口补丁三连（收藏夹语义定稿）：
-  ① 收藏夹面板新增"打开"按钮：与双击夹名同一入口（选中夹 → 进入
-  筛选），照顾无法双击的场景（手指受伤等无障碍需求），双击保留；
-  ② `workbench_ui list` 新增 `--fav 收藏夹名`：只看该夹内项目，输出
-  追加「收藏夹」归属列（该项目所属全部收藏夹，顿号连接）；夹名不
-  存在按业务错误退出码 1；纯索引的视图层过滤，与导入导出的全库
-  语义无关；
-  ③ 收藏夹模式下「导入Excel / 导出Excel」置灰：收藏夹是纯索引
-  （软链接）视图，在视图里导入导出语义错误；置灰与周报模式同一
-  手法，退出后按当前模式恢复（周报叠加时保持置灰）。CLI 无模式
-  状态，import/export 恒为全库操作、不接受收藏夹参数——两种入口
-  语义一致声明。
-  新增 4 条回归用例（GUI 面板按钮 1、CLI 子进程 1、模式置灰 2），
-  全套 161 passed
-- **v3.3.2** 修复 `add_snapshot` 部分字段跟进的联动误判：项目名被
-  "项目N"兜底覆盖、已完结项目被误标回 open。联动判定改为"未传字段从
-  项目当前行继承"（GUI/CLI 全字段跟进本就不受影响，走数据库 API 的
-  部分字段调用才会踩到；从上一快照继承会断链——上一快照也可能是
-  部分的）；新增 2 条回归用例
-- **v3.3.1** 测试适配：`test_setup_shims` 在 Windows
-  跳过——它验证的是 setup.sh 的 bash shim + `~/.local/bin` 软链，
-  属 Linux/macOS 机制（Windows 无软链权限必失败，且触发 GBK 解码
-  警告）；Windows 的 shim 由 setup.ps1 生成，不在 pytest 覆盖范围。
-  Windows 上全套测试现为 131 passed + 1 skipped（Python 3.14 实测）
-- **v3.3.0** 命令行工作台 `workbench_ui`：主窗口全部 GUI 功能
-  命令行化（list / show / new / follow / import / export / weekly /
-  backup / notify / cal / fav，`gui` 子命令进入图形界面 = main.py）。
-  纯逻辑内核 `bench_core` 与 GUI 共用：备份一份实现、`new`/`follow`
-  的值校验同源（validate_* / check_date_bounds 自 editor.py 下沉
-  db.py，GUI/CLI 两处一份）；库路径锚定 fields.json 同目录，无
-  `--db`。`--where 字段=值` 可多次、日期支持区间；`notify` 只打印
-  终端不走系统通知；`cal` 只读打印不接编辑。退出码 0/1/2
-- **v3.2.0** 三视图模式 + 主程序命令行接口。启动视图三选一：
-  **聚合**（日历+表格，现状不变）/ **仅日历**（表格与按钮行整体移除，
-  日历吃满窗口；底部保留一行"新建项目"，点条目查看跟进、点日期看
-  当天明细；日历恒显示全部时间节点）/ **仅表格**（隐藏日历，
-  其余原样）。视图启动时定、运行中不切换、不回写配置。命令行：
-  `--view calendar|table|aggregate`（优先级：命令行 > fields.json
-  的 `ui.default_view` > 聚合）；`--check-config` 只校验
-  fields.json（复用启动同款校验器），逐项列出错误、退出码
-  0=通过 1=有错误，不建库不启动 GUI，无显示环境可跑，校验通过
-  打印生效配置摘要。双击即用与库路径锚定规则完全不变
-- **v3.1.1** 子模块命令行化 + 快捷命令：db_split / db_copy / db_append /
-  db_assign / db_recycled / db_analysis 统一为四件套包结构
-  （`__init__.py` 导出 + `*_core.py` 纯逻辑 + `*_gui.py` 的 `run_gui()`
-  + `__main__.py` 命令行），全部支持 `python -m db_xxx` 与
-  `python -m db_xxx --gui` 双入口；新增 `setup.ps`（Windows，纯英文）
-  / `setup.sh`（Linux）一键生成 `db_split` 等单字命令。修复
-  db_copy/db_append 列清单硬编码 milestone 导致真实配置下打不开的问题
-  （列改按 fields.json 动态生成）。
-- **v3.1.0** 回收站（`recycle_bin` 段开关，可缺省 = 关闭，默认与
-  v2.7.3 等价）：开启后删除 = 项目/快照/收藏夹索引整体移入独立回收
-  表，主程序全部视图天然排除；查看/恢复/彻底删除由独立模块
-  `db_recycled/` 子模块负责（命令行 + GUI 双入口，永久删除 = 红色按钮 +
-  二次确认）。恢复时原 id 空闲则原位放回（快照 id 重新分配、当前
-  指针修正、收藏夹索引带回）。为将来的跨库合并打底：删除永不静默
-  传播，永远有人工裁决口
-- **v3.0.0** 测试基建（开发者侧能力，用户无感知）：新增 `tests/`
-  自动化测试套件——L1 纯逻辑单测（查询引擎全组合、导入导出往返
-  一致性、配置校验器全部错误分支）、L2 布局防回归（两次 pack
-  顺序 BUG 变成永久用例）、L3 发布前冒烟脚本；`python -m pytest
-  tests/ -q` 全绿成为每次发布的强制检查项。软件功能与 v2.7.3
-  完全一致。
-- **v2.7.3** 布局修复：① 收藏夹模式横幅与"共 N 条/翻页"合并为同一行，
-  并保证该行锚定底部（表格下方）、窗口纵向紧张时不被吞掉——小窗口下
-  "移出/退出收藏夹"始终可见（此前非最大化窗口底部被裁掉）；
-  ② 项目详情里查看历史版本时，"正在查看历史版本"横幅停靠内容区
-  最上方、只占一行（此前从滚动面板里弹出，被画布挤得占掉半页）
-- **v2.7.2** 收藏夹交互修正：点主窗口任意处收藏夹面板自动抬回
-  主窗口之上（不再沉到后面）；面板按钮更名为 新建/重命名/删除/
-  加入；模式横幅在退出按钮左侧新增"移出"（把主表格选中项目从
-  当前夹剔除索引，只删索引不动项目数据，夹空自动退出模式）；
-  周报模式下"加入/移出"禁用置灰（收藏夹其余功能周报下照常可用；
-  修复周报下打开收藏夹面板空窗口的问题）
-- **v2.7.1** 收藏夹交互定稿：模式指示加强（窗口标题栏追加夹名 +
-  按钮行下方模式横幅）；收藏夹面板新增"重命名此夹"；快捷键
-  Ctrl+1~9 直达前 9 个收藏夹、Ctrl+0 退出模式；面板内不再显示
-  夹内项目清单（选择的结果直接体现在日历与表格）；修复周报模式下
-  搜索词不匹配项目名列导致切换视图空表的问题；README 全面修订
-  （配置总览补齐 calendar_dates / date_check / favorites 等键、
-  章节编号去重、过期内容更新）
-- **v2.7.0** 收藏夹（favorites 段开关）：db 里新增
-  collections/collection_items 两张纯索引表（存项目 id 引用，
-  项目数据只有一份）；按钮行"收藏夹"按钮 → 建夹/删夹/重命名/把
-  表格选中项目加入夹；进入收藏夹模式后主表格与日历同步只显示夹内
-  项目（沿用现有筛选接口传 id 集合）；表头筛选的取值列表跟随视野；
-  进入模式自动清除已有列筛选；收藏夹面板为非模态——不锁主窗口、
-  可最小化、双击夹名即进入筛选、右上角叉关闭，面板打开期间主表格
-  临时支持 Ctrl/Shift 多选用于批量加入收藏夹；周报模式全面联动
-  （周报表格、周报日历、周报导出只含夹内项目）；跟进表导出不受
-  模式影响；重启自动退出模式；enabled=false 时按钮不出现、db 不建表
-- **v2.6.0** 配置校验器（启动即全量核对 fields.json，错误逐条列出：
-  法定三日期字段、status、status_closed 必须在；周报法定四类
-  start/followup/close/append 锁定，仅 label/颜色/日历显隐可配）；
-  calendar_dates 每项新增 show_calendar（该类日期在日历显示与否；表格
-  显隐与顺序仍由 display_mainsheet 管）；
-  编辑器字段类型校验（日期/整数/实数逐字段弹错）；
-  保存跟进时日期范围检查器（date_check 段：被检日期须在
-  开始~关闭之间，开关与检查字段 JSON 可配）
-- **v2.5.1** 更新README，作者联系方式，维护承诺等
-- **v2.5.0** 更名"日历表格聚合项目跟进工作台"；日历日期类别全
-  配置化（calendar_dates：开始/跟进/关闭/追加的显示名与颜色可配，
-  可无限追加自定义日期字段——一个项目多个日历日期的特色由硬编码
-  变为配置能力）；README 按设计评估重写定位与设计哲学
-- **v2.4.1** 开源版精简：根目录仅提供全选模板 xlsx（周报模板保留在
-  JSON、不发 xlsx 文件）；内置周报默认列兜底
-- **v2.4.0** 开源版：新增 example/ 形态模板（求职、实验记录本）；
-  根目录 fields.json 精简为必要模板；README 重写开头与联系方式
-  （zifeng.xu@foxmail.com，欢迎捐赠/模板定制/咨询）
-- **v2.3.0** db_split 输出文件名配方 JSON 化（split.components 四成分
-  可排序 + prefix 前缀）；build_exe.ps1 全面重制（六件套全收录）
-- **v2.2.0** 更名"日期表格聚合项目管理框架"（日历与表格聚合界面）；
-  还有N条弹窗返回自动刷新；新增 db_split 按键分拆器（团队轮转分发
-  环节）；db_analysis 占位；客户模板中性化命名；README 全面重构 +
-  JSON 逐条详解
-- v2.1.x 数据层 SQL 化（翻页式，30万启动约5秒）；列宽只增不减；
-  默认排序 JSON 化（有误兜底 id 倒序）；日历弹窗统一数据入口
-- v1.6.x 日期区间筛选；日历跟随筛选；批量赋值器 db_assign
-- v1.5.x 周报模式；周报清洗器；PyInstaller；发布检查制度
-- v1.4.x 周报只读视图化；标准/全选模板
-- v1.3.x 单包发布；子模块化；LICENSE（MIT, Ken）
-- v1.2.x 显示列可配（display_mainsheet）
-- v1.1.x 历史穿越；db_copy/db_append
-- v1.0.x 快照追溯、日历、搜索红点、筛选排序、模板、默认值、
-  备份、通知
-
-## 十三、设计思想
+## 四、设计哲学
 
 **起点是对 Excel 项目管理方式的反思。** 长期使用 Excel 跟进项目
 后逐渐发现：消耗精力的不只是项目本身，还有记录、查找、更新、
@@ -986,25 +209,12 @@ GROUP BY c.id;
    不是每周重启的整理任务。
 3. **历史追溯是低频但重要的兜底**：历史的目的不是经常翻旧账，
    而是在异常、复盘、需要解释"为什么变了"时保留查清事实的可能。
-   它是可靠性能力，不应成为日常负担。
 
 **日历与表格服务于不同的认知任务**：日历帮你看时间安排和跟进
 节奏，表格帮你做查看、搜索、筛选、汇总——二者不是重复呈现，
 而是时间维度和集合维度两种理解工作的方式。
 
-**关于 Fossil 的影响**：开发中受到 Fossil 的启发，但借鉴的不是
-某个具体功能，而是它对**工具设计取舍与工作流完整性**的态度——
-认真思考工具怎样才能让工作更连贯、让使用者少承担不必要的复杂度。
-这个软件也遵循同样的朴素性：不是从宏大蓝图一次诞生，而是在实际
-使用中发现问题、形成设想、逐步实现。
-
 **边界与诚实**：本工作台服务"异步共享"的扁平团队——每人一份库、
 同一格式、定期追加汇总；不做实时协作、并发写入与冲突消解。
-效率提升目前只有开发者本人的使用体验，未经客观测量，不作为
-宣传指标。它是一项有清晰问题意识的个人软件实践，价值由真实
-用户的长期使用来检验。
-
-**谱系**：为解决自己的历史管理而生，恰好也运行在 SQLite 上。
-开发历史由自托管 Fossil 仓库管理，Gitee/GitHub 为只读镜像。
-
-LICENSE: MIT（Copyright (c) 2026 Ken）
+它是一项有清晰问题意识的个人软件实践，价值由真实用户的长期
+使用来检验。
