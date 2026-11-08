@@ -14,3 +14,6 @@ windows-toasts>=1.1
 # Windows 官方版 Python 自带 tkinter；
 # 若用精简版 Python 报错 "No module named tkinter"，
 # 请改用 python.org 官方安装包。
+
+# 可选：db_analysis 饼图 PNG（不出图也能用，计数表不受影响）
+# matplotlib>=3.8
