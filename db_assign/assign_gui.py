@@ -7,7 +7,7 @@
 - 预览是纯内存模拟，不触碰数据库；执行才写库（每项目一条新快照）
 
 典型场景：JSON 加新列后整库补值；某列全库统一改口径。
-运行：python -m db_assign --gui（或 python db_assign/assign_gui.py）
+运行：python -m db_assign gui（或 python db_assign/assign_gui.py）
 """
 import os
 import sys

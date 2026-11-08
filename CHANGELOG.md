@@ -2,6 +2,14 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.6.2** 子模块 GUI 入口统一为 gui 子命令（用户定）：db_copy /
+db_append / db_split / db_assign / db_recycled 五模块废弃
+`--gui` 参数，统一 `python -m db_xxx gui`，与 workbench_ui /
+weekreport_clean 启动风格一致（`--gui` 现报参数错误 exit 2）；
+db_recycled 的 gui 子命令带库路径（`gui <xxx.db>`，必给）。
+5 份模块 README / FIELDS-CONFIG 回收站命令示例 / 各 *_gui.py 运行
+提示同步更新。新增 6 条回归用例（5 模块 --gui 拒收参数化 +
+db_recycled gui 缺库路径），全套 213 passed
 - **v3.6.1** weekreport_clean CLI 化（用户定）：GUI / CLI 双入口，
 启动接口与 workbench_ui 统一——`python -m weekreport_clean gui`
 进图形界面，新增 `preview`（终端逐行打印 [保留]/[丢弃] + 汇总，
@@ -31,6 +39,14 @@ GitHub 双远程仓库同步"；「更新和维护计划」删两句（"本地Fo
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.6.2** 子模块 GUI 入口统一为 gui 子命令（用户定）：db_copy /
+db_append / db_split / db_assign / db_recycled 五模块废弃
+`--gui` 参数，统一 `python -m db_xxx gui`，与 workbench_ui /
+weekreport_clean 启动风格一致（`--gui` 现报参数错误 exit 2）；
+db_recycled 的 gui 子命令带库路径（`gui <xxx.db>`，必给）。
+5 份模块 README / FIELDS-CONFIG 回收站命令示例 / 各 *_gui.py 运行
+提示同步更新。新增 6 条回归用例（5 模块 --gui 拒收参数化 +
+db_recycled gui 缺库路径），全套 213 passed
 - **v3.6.1** weekreport_clean CLI 化（用户定）：GUI / CLI 双入口，
 启动接口与 workbench_ui 统一——`python -m weekreport_clean gui`
 进图形界面，新增 `preview`（终端逐行打印 [保留]/[丢弃] + 汇总，

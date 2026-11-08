@@ -12,7 +12,7 @@
 
 | 方式 | 命令 |
 |------|------|
-| GUI | `python -m db_copy --gui` |
+| GUI | `python -m db_copy gui` |
 | 命令行 | `python -m db_copy A.db B.db 1 2` |
 | 命令行（全部） | `python -m db_copy A.db B.db --all` |
 
@@ -24,13 +24,13 @@
 | `dst` | 目标库 B 路径 |
 | `pids` | 要复制的项目 id，可多个 |
 | `--all` | 复制全部项目 |
-| `--gui` | 图形界面 |
+| `gui` | 图形界面 |
 
 ## 示例
 
 ```bash
 # 1. 图形界面：左右双库对照，勾选后箭头追加
-python -m db_copy --gui
+python -m db_copy gui
 
 # 2. 把 A.db 里的项目 3、7、12 追加进 B.db
 python -m db_copy A.db B.db 3 7 12

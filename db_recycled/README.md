@@ -12,7 +12,7 @@
 
 | 方式 | 命令 |
 |------|------|
-| GUI | `python -m db_recycled 库.db --gui` |
+| GUI | `python -m db_recycled gui 库.db` |
 | 命令行 | `python -m db_recycled 库.db`（列出回收站） |
 
 ## 命令行参数
@@ -23,7 +23,7 @@
 | `--restore ID\|all` | 恢复项目；`all` = 全部恢复 |
 | `--purge ID` | 永久删除单个（物理销毁，不可恢复） |
 | `--empty` | 清空回收站 |
-| `--gui` | 图形界面（恢复 / 红色永久删除按钮 + 二次确认） |
+| `gui <库>` | 图形界面（恢复 / 红色永久删除按钮 + 二次确认；库路径必给） |
 
 ## 示例
 

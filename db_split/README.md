@@ -12,7 +12,7 @@
 
 | 方式 | 命令 |
 |------|------|
-| GUI | `python -m db_split --gui` |
+| GUI | `python -m db_split gui` |
 | 命令行 | `python -m db_split 源.db --key 负责人 --dest 输出目录` |
 
 ## 命令行参数
@@ -23,7 +23,7 @@
 | `--key` | 键列（字段名或显示名，如 city / 城市） |
 | `--dest` | 输出目录 |
 | `--preview` | 只预览拆分结果，不写出文件 |
-| `--gui` | 图形界面 |
+| `gui` | 图形界面 |
 
 ## 示例
 
@@ -35,7 +35,7 @@ python -m db_split team.db --key 负责人 --dest out/ --preview
 python -m db_split team.db --key 负责人 --dest out/
 
 # 3. 图形界面（等价操作）
-python -m db_split --gui
+python -m db_split gui
 ```
 
 输出文件名示例：`负责人_张三_20261108-103000.db`

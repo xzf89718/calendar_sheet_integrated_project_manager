@@ -3,7 +3,7 @@
 
 用法：
   python -m db_assign <xxx.db> --field <列> --value <值> [--yes]
-  python -m db_assign --gui
+  python -m db_assign gui
 
 作用域 = 库内全部项目（与 GUI 一致，刻意不做子集选择）。
 默认只预览不写库；加 --yes 才真正执行。
@@ -37,14 +37,13 @@ def main(argv=None):
     ap.add_argument("--field", help="赋值列（字段名或显示名，如 city / 城市）")
     ap.add_argument("--value", default="", help="新值（默认空=清空该列）")
     ap.add_argument("--yes", action="store_true", help="确认执行（默认只预览）")
-    ap.add_argument("--gui", action="store_true", help="图形界面")
-    args = ap.parse_args(argv)
-
-    if args.gui:
+    argv = list(argv) if argv is not None else sys.argv[1:]
+    if argv and argv[0] == "gui":
         import db_assign.assign_gui as gui
         return gui.run_gui()
+    args = ap.parse_args(argv)
     if not args.db or not args.field:
-        ap.error("需要提供数据库和 --field（或用 --gui）")
+        ap.error("需要提供数据库和 --field（或用 gui）")
     field = _resolve_field(args.field)
     if field is None:
         print(f"错误：库里没有「{args.field}」这一列", file=sys.stderr)
