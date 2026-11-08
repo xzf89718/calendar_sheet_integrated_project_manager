@@ -90,14 +90,8 @@ class CleanApp(tk.Tk):
         except Exception as e:                          # noqa: BLE001
             messagebox.showerror("读取失败", str(e), parent=self)
             return
-        # 跟进记录列：优先周报模板标签，其次包含"跟进"
-        prefer = None
-        tpl = next((t for t in CFG.templates
-                    if t.get("kind") == "weekly"), None)
-        if tpl:
-            for label, field, _c in tpl["columns"]:
-                if field == "followup_note":
-                    prefer = label
+        # 跟进记录列：优先周报模板标签，其次包含"跟进"（与 CLI 同源）
+        prefer = core.weekly_note_label(CFG.templates)
         self.note_idx = core.find_note_idx(self.headers, prefer)
         self._fill(self.tree_up, self.rows)
         self.tree_low.delete(*self.tree_low.get_children())

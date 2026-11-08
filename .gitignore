@@ -2,3 +2,4 @@
 *.db
 *.pyc
 __pycache__
+db_analysis/pie/

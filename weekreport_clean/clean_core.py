@@ -3,7 +3,7 @@
 
 规则：对每一行，取第一列（修改日期），规范化后与"跟进记录"列的
 文本做子串匹配——日期出现在跟进记录里的行保留，其余丢弃。
-纯函数设计，不依赖 GUI。
+纯函数设计，不依赖 GUI/CLI。
 """
 import re
 
@@ -69,4 +69,18 @@ def find_note_idx(headers, prefer):
     for i, h in enumerate(headers):
         if "跟进" in h:
             return i
+    return None
+
+
+def weekly_note_label(templates):
+    """从 fields.json 周报模板取「跟进记录」列的优先标签；无则 None。
+
+    templates: config.CFG.templates（columns 已展开为
+    (表头, 字段名或None, 固定值或None) 三元组）。
+    """
+    tpl = next((t for t in templates if t.get("kind") == "weekly"), None)
+    if tpl:
+        for label, field, _c in tpl["columns"]:
+            if field == "followup_note":
+                return label
     return None
