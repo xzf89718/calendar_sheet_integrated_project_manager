@@ -1,15 +1,21 @@
 # -*- coding: utf-8 -*-
-"""db_analysis：只读数据分析统一入口（v3.5.0；v3.5.1 多变量饼图）。
+"""db_analysis：只读数据分析统一入口（v3.5.0；v3.5.1 多变量饼图；
+v3.5.2 默认输出目录 + --dump 改名）。
 
     python -m db_analysis pie --field 客户 [--field 城市 ...] [--closed]
             [--top N] [--where 字段=值 ...] [--date-field 名]
             [--from YYYY-MM-DD --to YYYY-MM-DD | --last 1m|6m|1y]
-            [--png [路径或目录]] [--dump-data [路径或目录]]
+            [--png [路径或目录]] [--dump [路径或目录]]
 
 铁律：绝不写库。库锚定 fields.json 同目录（软件设计准则，
 不提供 --db 路径参数）。--field 可多次：多变量共享同一组筛选
 条件；输出文件名自动嵌入筛选摘要（v3.5.1，用户定）。
-退出码：0 成功 / 1 业务错误（stderr，无 traceback）/ 2 参数错误。
+v3.5.2（用户定）：--dump-data 改名 --dump；输出只接受目录（一次
+可能产出多个文件，指定单文件名无法理解）——裸 --png 默认存
+db_analysis/pie/plots/、裸 --dump 默认存 db_analysis/pie/dump/
+（均相对 fields.json 同目录，自动创建）；显式目录按用户指定。
+退出码：0 成功 / 1 业务错误（stderr，无 traceback）/
+2 参数错误。
 """
 import argparse
 import os
@@ -70,13 +76,16 @@ def _build_parser():
             sp.add_argument("--to", dest="date_to", default=None,
                             metavar="YYYY-MM-DD")
             sp.add_argument("--png", nargs="?", const="__AUTO__",
-                            default=None, metavar="路径或目录",
-                            help="另存 PNG 饼图，每字段一个文件（需 matplotlib）；"
-                                 "不带值或给目录 = 自动命名（文件名嵌筛选摘要）")
-            sp.add_argument("--dump-data", nargs="?", const="__AUTO__",
-                            default=None, metavar="路径或目录",
-                            help="导出画饼数据 csv（utf-8-sig）；不带值或给"
-                                 "目录 = 自动命名（文件名嵌筛选摘要）")
+                            default=None, metavar="目录",
+                            help="另存 PNG 饼图，每字段一个文件（需 matplotlib）"
+                                 "；只接受目录：不带值 = db_analysis/pie/"
+                                 "plots/，带值 = 该目录内自动命名"
+                                 "（文件名嵌筛选摘要）")
+            sp.add_argument("--dump", nargs="?", const="__AUTO__",
+                            default=None, metavar="目录",
+                            help="导出画饼数据 csv（utf-8-sig）；只接受目录："
+                                 "不带值 = db_analysis/pie/dump/，带值 = "
+                                 "该目录内自动命名（文件名嵌筛选摘要）")
     return p
 
 
@@ -122,24 +131,28 @@ def _cond_summary(a, d1, d2):
     return _safe("_".join(parts)) if parts else "全量"
 
 
-def _resolve_out(base, stem, ext, conds, multi):
-    """输出路径裁定：__AUTO__（裸参数）或目录 → 自动命名
-    pie_<字段>_<筛选摘要>_<时间戳>.<ext>；显式文件名 → 单字段原样，
-    多字段把字段名插到扩展名前。"""
+def _resolve_out(base, stem, ext, conds, default_dir):
+    """输出路径裁定（v3.5.2 用户定：只接受目录，产出可能是多个
+    文件，指定单文件名无法理解——显式文件一律报错）。裸参数
+    (__AUTO__) → 默认目录（png = db_analysis/pie/plots/，csv =
+    db_analysis/pie/dump/）内自动命名
+    pie_<字段>_<筛选摘要>_<时间戳>.<ext>；显式目录 → 该目录内
+    自动命名。"""
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     auto = f"pie_{_safe(stem)}_{conds}_{ts}{ext}"
     if base == "__AUTO__":
-        return auto
+        return os.path.join(default_dir, auto)
     if os.path.isdir(base):
         return os.path.join(base, auto)
-    if multi:
-        root, e = os.path.splitext(base)
-        if e.lower() != ext:
-            raise AnalysisError(f"输出路径需要 {ext} 扩展名：{base}")
-        return f"{root}_{_safe(stem)}{e}"
-    if not base.lower().endswith(ext):
-        raise AnalysisError(f"输出路径需要 {ext} 扩展名：{base}")
-    return base
+    raise AnalysisError(
+        f"输出只支持目录（一次可能产出多个文件）：{base}")
+
+
+def _ensure_parent(path):
+    """自动命名的输出目录可能不存在，显式创建（v3.5.2）。"""
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
 
 
 def main(argv=None):
@@ -186,16 +199,22 @@ def main(argv=None):
             for f, label, segments in results:
                 _print_table(f, segments, a.closed)
             conds = _cond_summary(a, d1, d2)
-            multi = len(results) > 1
             if a.png:
+                plot_dir = os.path.join(BASE_DIR, "db_analysis",
+                                        "pie", "plots")
                 for f, label, segments in results:
-                    path = _resolve_out(a.png, label, ".png", conds, multi)
+                    path = _resolve_out(a.png, label, ".png", conds,
+                                        plot_dir)
+                    _ensure_parent(path)
                     algo_pie.render_png(segments, path, title=label)
                     print(f"PNG 已写出：{path}")
-            if a.dump_data:
+            if a.dump:
+                dump_dir = os.path.join(BASE_DIR, "db_analysis",
+                                        "pie", "dump")
                 stem = "-".join(label for _f, label, _s in results)
-                path = _resolve_out(a.dump_data, stem, ".csv", conds,
-                                    False)
+                path = _resolve_out(a.dump, stem, ".csv", conds,
+                                    dump_dir)
+                _ensure_parent(path)
                 algo_pie.dump_csv([(label, segments)
                                    for _f, label, segments in results],
                                   path)

@@ -3,7 +3,7 @@
 
 - 计数表输出在 __main__.py（终端必有）；
 - PNG 需要 matplotlib（可选依赖，缺失由 CLI 端提示跳过）；
-- --dump-data 导出画饼用的段数据：csv，utf-8-sig + 纯 LF，
+- --dump 导出画饼用的段数据：csv，utf-8-sig + 纯 LF，
   与 v3.4.0 导出端编码纪律一致（Excel 双击中文不乱码）。
 """
 
@@ -40,7 +40,7 @@ def dump_csv(results, path):
     [(field_label, segments), ...]；单字段保持 v3.5.0 两列格式
     （段,计数），多字段加「字段」列。"""
     if not str(path).lower().endswith(".csv"):
-        raise AnalysisError("--dump-data 只支持 .csv 路径："
+        raise AnalysisError("--dump 只支持 .csv 路径："
                             f"{path}")
     multi = len(results) > 1
     with open(path, "w", newline="", encoding="utf-8-sig") as f:

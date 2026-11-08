@@ -4,7 +4,8 @@
 纪律同 test_workbench_ui：subprocess + cwd=tmp 源码副本（库锚定
 fields.json 同目录）；日期口径用例直接 SQL 回写 snapshot_at 造历史。
 v3.5.1：--field 可多次共享筛选；date 类型字段解禁为饼图变量；
-输出文件名自动嵌筛选摘要。
+输出文件名自动嵌筛选摘要。v3.5.2：--dump 改名 + 裸参数默认输出
+目录 db_analysis/pie/{plots,dump}/。
 """
 import hashlib
 import importlib.util
@@ -118,10 +119,14 @@ def test_pie_top_merges_tail(pkg):
 
 def test_pie_dump_data_csv(pkg):
     run_ui(pkg, "new", "--set", "customer=甲", "--note", "立项")
+    outdir = pkg / "outdir"
+    outdir.mkdir()
     r = run_ana(pkg, "pie", "--field", "customer",
-                "--dump-data", "out.csv")
+                "--dump", str(outdir))
     assert r.returncode == 0
-    raw = (pkg / "out.csv").read_bytes()
+    hits = list(outdir.glob("pie_customer_*.csv"))
+    assert len(hits) == 1
+    raw = hits[0].read_bytes()
     assert raw.startswith(b"\xef\xbb\xbf")          # utf-8-sig BOM
     assert b"\r\n" not in raw                        # 纯 LF
     text = raw.decode("utf-8-sig")
@@ -135,7 +140,7 @@ def test_pie_readonly_hash_unchanged(pkg):
     dbp = pkg / "sales_pm.db"
     before = _sha(dbp)
     r = run_ana(pkg, "pie", "--field", "customer",
-                "--dump-data", "out.csv")
+                "--dump")
     assert r.returncode == 0
     assert _sha(dbp) == before
 
@@ -169,13 +174,13 @@ def test_pie_date_field_as_pie_variable(pkg):
 
 
 def test_pie_dump_auto_filename_embeds_where(pkg):
-    """v3.5.1 用户定：输出文件名嵌筛选摘要；裸 --dump-data 自动命名。"""
+    """v3.5.1 用户定：输出文件名嵌筛选摘要；裸 --dump 自动命名。"""
     run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=沪",
            "--note", "立项")
     r = run_ana(pkg, "pie", "--field", "customer", "--field", "city",
-                "--where", "city=沪", "--dump-data")
+                "--where", "city=沪", "--dump")
     assert r.returncode == 0
-    hits = list(pkg.glob("pie_customer-city_city=沪_*.csv"))
+    hits = list(pkg.glob("db_analysis/pie/dump/pie_customer-city_city=沪_*.csv"))
     assert len(hits) == 1
     text = hits[0].read_bytes().decode("utf-8-sig")
     assert text.splitlines()[0] == "字段,段,计数"
@@ -187,23 +192,65 @@ def test_pie_dump_multi_has_field_column(pkg):
     """多字段导出 csv 带「字段」列；单字段保持 v3.5.0 两列格式。"""
     run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=沪",
            "--note", "立项")
+    givendir = pkg / "givendir"
+    givendir.mkdir()
     r = run_ana(pkg, "pie", "--field", "customer", "--field", "city",
-                "--dump-data", "given.csv")
+                "--dump", str(givendir))
     assert r.returncode == 0
-    text = (pkg / "given.csv").read_bytes().decode("utf-8-sig")
+    hits = list(givendir.glob("pie_customer-city_*.csv"))
+    assert len(hits) == 1
+    text = hits[0].read_bytes().decode("utf-8-sig")
     assert text.splitlines()[0] == "字段,段,计数"
     assert "customer,甲,1" in text and "city,沪,1" in text
     # 单字段仍是两列
+    singledir = pkg / "singledir"
+    singledir.mkdir()
     r = run_ana(pkg, "pie", "--field", "customer",
-                "--dump-data", "single.csv")
-    assert (pkg / "single.csv").read_bytes().decode(
+                "--dump", str(singledir))
+    assert len(list(singledir.glob("*.csv"))) == 1
+    hits = list(singledir.glob("*.csv"))
+    assert hits[0].read_bytes().decode(
         "utf-8-sig").splitlines()[0] == "段,计数"
+
+
+# ---------- v3.5.2：默认输出目录 + --dump 改名 ----------
+
+def test_pie_dump_default_dir(pkg):
+    """v3.5.2 用户定：裸 --dump 默认存 db_analysis/pie/dump/。"""
+    run_ui(pkg, "new", "--set", "customer=甲", "--note", "立项")
+    r = run_ana(pkg, "pie", "--field", "customer", "--dump")
+    assert r.returncode == 0
+    hits = list(pkg.glob("db_analysis/pie/dump/pie_customer_*.csv"))
+    assert len(hits) == 1
+    assert "甲,1" in hits[0].read_bytes().decode("utf-8-sig")
+
+
+def test_pie_dump_explicit_dir(pkg):
+    """显式给目录仍按用户指定（不进默认目录）。"""
+    run_ui(pkg, "new", "--set", "customer=甲", "--note", "立项")
+    outdir = pkg / "myout"
+    outdir.mkdir()
+    r = run_ana(pkg, "pie", "--field", "customer",
+                "--dump", str(outdir))
+    assert r.returncode == 0
+    hits = list(outdir.glob("pie_customer_*.csv"))
+    assert len(hits) == 1
+
+
+@pytest.mark.skipif(not HAS_MPL, reason="matplotlib 未安装")
+def test_pie_png_default_dir(pkg):
+    """v3.5.2 用户定：裸 --png 默认存 db_analysis/pie/plots/。"""
+    run_ui(pkg, "new", "--set", "customer=甲", "--note", "立项")
+    r = run_ana(pkg, "pie", "--field", "customer", "--png")
+    assert r.returncode == 0
+    hits = list(pkg.glob("db_analysis/pie/plots/pie_customer_*.png"))
+    assert len(hits) == 1 and hits[0].stat().st_size > 1000
 
 
 @pytest.mark.parametrize("argv,msg", [
     (("pie", "--field", "bogus"), "不存在的字段"),
-    (("pie", "--field", "customer", "--dump-data", "x.txt"),
-     "需要 .csv 扩展名"),
+    (("pie", "--field", "customer", "--dump", "x.txt"),
+     "只支持目录"),
     (("pie", "--field", "customer", "--where", "bogus=1"), "不存在的字段"),
     (("pie", "--field", "customer", "--from", "bad-date"), "不是有效日期"),
     (("pie", "--field", "customer", "--where", "customer=不存在"),
@@ -220,10 +267,12 @@ def test_pie_errors_exit_1(pkg, argv, msg):
 @pytest.mark.skipif(not HAS_MPL, reason="matplotlib 未安装")
 def test_pie_png_output(pkg):
     run_ui(pkg, "new", "--set", "customer=甲", "--note", "立项")
-    r = run_ana(pkg, "pie", "--field", "customer", "--png", "pie.png")
+    outdir = pkg / "outdir"
+    outdir.mkdir()
+    r = run_ana(pkg, "pie", "--field", "customer", "--png", str(outdir))
     assert r.returncode == 0
-    out = pkg / "pie.png"
-    assert out.exists() and out.stat().st_size > 1000
+    hits = list(outdir.glob("pie_customer_*.png"))
+    assert len(hits) == 1 and hits[0].stat().st_size > 1000
 
 
 @pytest.mark.skipif(not HAS_MPL, reason="matplotlib 未安装")
@@ -234,5 +283,5 @@ def test_pie_multi_png_one_file_per_field(pkg):
     r = run_ana(pkg, "pie", "--field", "customer", "--field", "city",
                 "--where", "city=沪", "--png")
     assert r.returncode == 0
-    pngs = list(pkg.glob("pie_*_city=沪_*.png"))
+    pngs = list(pkg.glob("db_analysis/pie/plots/pie_*_city=沪_*.png"))
     assert len(pngs) == 2
