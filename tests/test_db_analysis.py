@@ -285,3 +285,166 @@ def test_pie_multi_png_one_file_per_field(pkg):
     assert r.returncode == 0
     pngs = list(pkg.glob("db_analysis/pie/plots/pie_*_city=沪_*.png"))
     assert len(pngs) == 2
+
+
+# ---------- v3.8.0 timeline：项目分类时间点可视化（markdown 表格） ----------
+
+def _mk(pkg, customer, start, nxt=None, close=None, extra=()):
+    args = ["new", "--set", f"customer={customer}",
+            "--set", f"start_date={start}", "--note", "立项"]
+    if nxt:
+        args += ["--set", f"next_followup={nxt}"]
+    if close:
+        args += ["--set", f"close_date={close}"]
+    args += list(extra)
+    assert run_ui(pkg, *args).returncode == 0
+
+
+def test_timeline_basic_md_table(pkg):
+    """默认 rolling 窗口：md 表格头、12 个月列、着色 #、全部项目章。"""
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    r = run_ana(pkg, "timeline")
+    assert r.returncode == 0, r.stderr
+    assert "## 全部项目（1 个项目）" in r.stdout
+    assert "| 项目 | 日差 | 开始日期 | 最后跟进 | 下一个跟进日期 | 项目关闭日期 | 窗外 |" in r.stdout
+    for m in ("26-05", "26-11", "27-04"):      # 当月-6 ~ 当月+5
+        assert m in r.stdout
+    assert '<font color="#2e7d32">#</font>' in r.stdout   # 开始行绿
+    assert '<font color="#1565c0">#</font>' in r.stdout   # 最后跟进蓝
+    assert '<font color="#e65100">#</font>' in r.stdout   # 跟进橙
+    assert "甲" in r.stdout
+
+
+def test_timeline_year_mode_january_first(pkg):
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    r = run_ana(pkg, "timeline", "--mode", "year")
+    assert r.returncode == 0, r.stderr
+    head = r.stdout.splitlines()
+    tbl = next(l for l in head if l.startswith("| 项目 |"))
+    assert "26-01" in tbl and "26-12" in tbl and "27-04" not in tbl
+
+
+def test_timeline_split_four_chapters_in_order(pkg):
+    """四章顺序：逾期未跟进 → 待跟进 → 未排跟进 → 已关闭；
+    已关闭章只画开始/关闭两格（每项目 2 行数据）。"""
+    _mk(pkg, "逾期", "2026-09-01", "2026-11-01")     # diff = -9
+    _mk(pkg, "正常", "2026-11-01", "2026-11-25")     # diff = +15
+    _mk(pkg, "无排期", "2026-08-01")
+    _mk(pkg, "已成单", "2026-05-01", close="2026-10-01")
+    with _db(pkg) as c:
+        c.execute("UPDATE projects SET status='closed' "
+                  "WHERE id=(SELECT MAX(id) FROM projects)")
+    r = run_ana(pkg, "timeline", "--split")
+    assert r.returncode == 0, r.stderr
+    i1 = r.stdout.index("## 逾期未跟进")
+    i2 = r.stdout.index("## 待跟进")
+    i3 = r.stdout.index("## 未排跟进")
+    i4 = r.stdout.index("## 已关闭")
+    assert i1 < i2 < i3 < i4
+    assert "## 全部项目" not in r.stdout
+    # 已关闭章内：已成单 只有 2 行（开始/关闭），无跟进格
+    arch = r.stdout[i4:]
+    assert arch.count("| 已成单") == 1
+
+
+def test_timeline_archived_outside_month_annotated(pkg):
+    """窗口外的时间点进「窗外」列标注月份，不画 #。"""
+    _mk(pkg, "老单", "2024-03-01", close="2024-06-01")
+    with _db(pkg) as c:
+        c.execute("UPDATE projects SET status='closed' WHERE id=1")
+    r = run_ana(pkg, "timeline")
+    assert r.returncode == 0, r.stderr
+    assert "24-03" in r.stdout and "24-06" in r.stdout   # 窗外月份
+
+
+def test_timeline_where_filter_and_sort_desc(pkg):
+    _mk(pkg, "甲", "2026-11-01", "2026-11-12")     # diff +2
+    _mk(pkg, "乙", "2026-11-01", "2026-11-30")     # diff +20
+    r = run_ana(pkg, "timeline", "--where", "customer=乙")
+    assert r.returncode == 0, r.stderr
+    assert "乙" in r.stdout and "甲" not in r.stdout
+    r2 = run_ana(pkg, "timeline", "--sort", "diff", "--desc")
+    assert r2.returncode == 0, r2.stderr
+    assert r2.stdout.index("| 乙 | 20 |") < r2.stdout.index("| 甲 | 2 |")
+    r3 = run_ana(pkg, "timeline", "--sort", "customer", "--desc")
+    assert r3.returncode == 0
+
+
+def test_timeline_sort_bad_field_errors(pkg):
+    _mk(pkg, "甲", "2026-11-01")
+    r = run_ana(pkg, "timeline", "--sort", "bogus")
+    assert r.returncode == 1
+    assert "--sort 不存在的字段" in r.stderr
+
+
+def test_timeline_path_writes_md_and_refuses_file(pkg):
+    """--path 只接受目录：裸参数写 db_analysis/timeline/ 自动命名；
+    显式文件路径报错（v3.5.2 规矩）。"""
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    r = run_ana(pkg, "timeline", "--path")
+    assert r.returncode == 0, r.stderr
+    hits = list(pkg.glob("db_analysis/timeline/timeline_*.md"))
+    assert len(hits) == 1
+    text = hits[0].read_text(encoding="utf-8")
+    assert "项目时间线图" in text and "<font color=" in text
+    outdir = pkg / "outdir"
+    outdir.mkdir()
+    r = run_ana(pkg, "timeline", "--path", str(outdir))
+    assert r.returncode == 0
+    assert len(list(outdir.glob("timeline_*.md"))) == 1
+    r = run_ana(pkg, "timeline", "--path", str(outdir / "x.md"))
+    assert r.returncode == 1
+    assert "只支持目录" in r.stderr
+
+
+def test_timeline_dump_csv_to_stdout(pkg):
+    """--dump：csv 文本打印到终端，纯 # 不着色。"""
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    r = run_ana(pkg, "timeline", "--dump")
+    assert r.returncode == 0, r.stderr
+    assert "项目,日差,开始日期,最后跟进,下一个跟进日期,项目关闭日期,窗外" in r.stdout
+    assert ",26-05," in r.stdout
+    assert "<font" not in r.stdout.split("项目,日差", 1)[1]
+
+
+def test_timeline_cols_validation(pkg):
+    _mk(pkg, "甲", "2026-11-01")
+    r = run_ana(pkg, "timeline", "--cols", "customer", "x", "y", "z")
+    assert r.returncode == 1
+    assert "--cols 必须是 date 类型字段" in r.stderr
+    r = run_ana(pkg, "timeline", "--cols", "start_date", "last",
+                "next_followup", "close_date")
+    assert r.returncode == 0, r.stderr
+    assert "| 开始日期 | 最后跟进 | 下一个跟进日期 | 项目关闭日期 |" in r.stdout
+
+
+def test_timeline_colors_validation(pkg):
+    _mk(pkg, "甲", "2026-11-01")
+    r = run_ana(pkg, "timeline", "--colors", "red", "#111111",
+                "#222222", "#333333")
+    assert r.returncode == 1
+    assert "#RRGGBB" in r.stderr
+
+
+# ---------- timeline 纯逻辑单元测试（不 subprocess） ----------
+
+def test_timeline_window_rolling_six_back_five_fwd():
+    from db_analysis.algo_timeline import window_months
+    from datetime import date
+    months = window_months("rolling", today=date(2026, 11, 10))
+    assert len(months) == 12
+    assert months[0][:2] == (2026, 5)          # 当月-6
+    assert months[-1][:2] == (2027, 4)         # 当月+5
+    labels = [l for _y, _m, l in months]
+    assert labels[0] == "26-05" and labels[-1] == "27-04"
+    year = window_months("year", today=date(2026, 3, 1))
+    assert year[0][:2] == (2026, 1) and year[-1][:2] == (2026, 12)
+
+
+def test_timeline_split_groups_excludes_empty_chapters():
+    from db_analysis.algo_timeline import split_groups
+    rows = [{"archived": False, "diff": -1},
+            {"archived": False, "diff": 3},
+            {"archived": True, "diff": None}]
+    groups = split_groups(rows)
+    assert [n for n, _g in groups] == ["逾期未跟进", "待跟进", "已关闭"]

@@ -2,6 +2,32 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.8.0** db_analysis timeline：项目分类时间点可视化（用户定，
+  需求文档「项目时间点可视化-日历表格聚合」）：
+  ① **命名定案：不叫甘特图**——甘特图 = 持续时间条 + 完成百分比 +
+  依赖关系；本软件只有离散时间点 + 类别，不做进度评估（给证据
+  不给结论）；
+  ② **markdown 表格输出**：每项目 4 行（对应 4 个日期，默认从
+  calendar_dates 推导：开始/最后跟进（最新快照，特殊值 `last`）/
+  下个跟进/关闭，--cols 可指定），12 个月窗口每月一列，在日期
+  所属月份格画着色 `<font color>` `#`；窗口 = year（当年）或
+  rolling（当月-6 至 当月+5，默认）；窗口外时间点不丢弃，「窗外」
+  列标注实际月份；4 行默认绿/蓝/橙/红，--colors 可指定；
+  ③ **输出形式（用户定）**：终端始终打印 md，`--path` 只接受
+  目录、另存 `timeline_<模式>_<筛选>_<排序>_<时间戳>.md`
+  （_resolve_out 泛化出 prefix 参数）；`--dump` 把表格数据以 csv
+  文本打印到终端（纯 # 不着色）；
+  ④ **--sort** 任意库字段或 diff（日差 = --cols 第三列 − 今天）
+  升降序，缺省 diff 升序、无日差垫底；**--split** 四章（用户定）：
+  逾期未跟进 → 待跟进 → 未排跟进 → 已关闭（归档从 status_closed
+  读，projects.status 布尔化口径，归档章只画开始/关闭两格）；
+  **--where** 复用 analysis_core 解析；取数当前行口径、open +
+  closed 全取；
+  ⑤ 新增 `db_analysis/algo_timeline.py`（取数/分章/排序/渲染/
+  dump 分层，`today` 可注入保测试确定性）；db_analysis README
+  增 timeline 章节。测试 +12（md 网格/窗口两模式/四章顺序/窗外
+  标注/where+sort/path 只接受目录/dump/--cols/--colors 校验/
+  rolling 窗口单元/空章剔除），全量 251 passed
 - **v3.7.2** CLI 全命令图标开关（用户定）：
   ① **workbench_ui 全部子命令接入**（list/show/new/follow/import/
   export/weekly/backup/notify/cal/fav 及其二级动作），--show-icon /
