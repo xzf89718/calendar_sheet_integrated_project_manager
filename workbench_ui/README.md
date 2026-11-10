@@ -15,13 +15,15 @@ python -m workbench_ui new --set 字段=值... [--note 文本]
 python -m workbench_ui follow <id> --set 字段=值... [--note 文本]
 python -m workbench_ui import <文件> [--template 名]
 python -m workbench_ui export <out.xlsx|out.csv> [同 list 的筛选参数]
-python -m workbench_ui weekly <out.xlsx> [--date-from .. --date-to ..
-        --plan-from .. --plan-to ..]  # 日期缺省 = 本周一~日/下周一~日
+python -m workbench_ui weekly <out.xlsx> [--date-from .. --date-to ..]
+                                           [--plan-from .. --plan-to ..]
+                                           # 日期缺省 = 本周一~日/下周一~日
 python -m workbench_ui backup          # 库备份（与 GUI 按钮同一内核）
 python -m workbench_ui notify          # 今日项目事项，只打印到终端
 python -m workbench_ui cal <年> [月] [日]   # 日历时间节点，只读打印
 python -m workbench_ui fav list|new|rename|delete|add|remove ...
-python -m workbench_ui gui [--view ...]     # 进入图形界面（= main.py）
+python -m workbench_ui gui [--view ...] [--show-icon|--no-show-icon]   # 进入图形界面（= main.py；闪屏开关，命令行覆盖 fields.json 的 ui.show_icon）
+python -m workbench_ui --show-icon                      # CLI 单独播放品牌图标 3 秒后退出（不进 GUI）
 ```
 要点：
 - `--where 字段=值` 可多次，同字段取并集；日期字段支持

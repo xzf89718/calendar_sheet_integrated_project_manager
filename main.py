@@ -14,7 +14,7 @@ from tkinter import ttk, messagebox, filedialog, simpledialog
 try:
     from db import Database, SNAPSHOT_FIELDS
     from editor import LABELS
-    from config import CFG
+    from config import BASE_DIR, CFG
     from calendar_gui import CalendarWidget
     from editor import SnapshotEditor
     from reader import ProjectReader
@@ -1626,6 +1626,13 @@ def _run_check_config(path=None, out=None):
     return 0
 
 
+def _show_icon_splash(ms=3000):
+    """v3.7.1 起转发到 show_icon.gui_splash（本函数保留仅为兼容
+    既有调用与测试入口）。"""
+    from show_icon import gui_splash
+    gui_splash(ms=ms)
+
+
 def main(argv=None):
     """argv=None 时取 sys.argv[1:]（GUI 直接启动）；
     workbench_ui gui 透传时也走这里。"""
@@ -1638,16 +1645,36 @@ def main(argv=None):
         help="启动视图：aggregate(聚合,默认) / calendar(仅日历) / "
              "table(仅表格)；缺省读 fields.json 的 ui.default_view")
     parser.add_argument(
+        "--show-icon", dest="show_icon", action="store_true",
+        help="GUI：启动前在屏幕中央显示品牌图标 3 秒（闪屏，透明底）；"
+             "CLI（如 --check-config）：先打印终端图标（不停顿）再执行"
+             "命令；强制开，覆盖 ui.show_icon")
+    parser.add_argument(
+        "--no-show-icon", dest="no_show_icon", action="store_true",
+        help="强制关闭品牌闪屏（覆盖 fields.json 的 ui.show_icon）")
+    parser.add_argument(
         "--check-config", action="store_true",
         help="只校验 fields.json，不建库、不启动 GUI；"
              "退出码 0=通过 1=有错误（警告打印不计）")
     args = parser.parse_args(argv)
     if args.check_config:
+        # v3.7.2：CLI 命令同样接图标开关——终端图标先播（行流输出、
+        # 不停顿），随后立即执行原命令。fields.json 损坏时 config
+        # 导入即抛错，开关无裁决意义，跳过图标走下方错误清单。
+        try:
+            from show_icon import tty_if_wanted
+            tty_if_wanted(args.show_icon, args.no_show_icon)
+        except ValueError:
+            pass
         raise SystemExit(_run_check_config())
     if CFG is None:
         # fields.json 损坏：与校验器同源的错误清单，不弹窗、不建库
         print(_CFG_ERR, file=sys.stderr)
         raise SystemExit(1)
+    from show_icon import gui_splash, resolve_show_icon
+    if resolve_show_icon(args.show_icon, args.no_show_icon,
+                         CFG.show_icon):
+        gui_splash()
     app = MainApp(view=_resolve_view(args.view))
     app.mainloop()
 

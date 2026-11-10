@@ -3,7 +3,7 @@
 
 用法：
   python -m db_append <target.db> <src.db> [src2.db...]   依次全部追加
-  python -m db_append gui                   图形界面
+  python -m db_append gui [--show-icon|--no-show-icon]                   图形界面
 
 只新增：目标库已有数据不会被修改或删除；快照时间/内容原样保留，
 当前状态指向时间最新的一条。重复执行会产生重复项目（追加语义）。
@@ -24,9 +24,15 @@ def main(argv=None):
     ap.add_argument("sources", nargs="*", help="源库路径（可多个）")
     argv = list(argv) if argv is not None else sys.argv[1:]
     if argv and argv[0] == "gui":
+        from show_icon import gui_icon_flags, splash_if_wanted
+        _on, _off = gui_icon_flags(argv[1:])
+        splash_if_wanted(_on, _off)
         import db_append.append_gui as gui
         return gui.run_gui()
+    from show_icon import add_icon_flags, tty_if_wanted
+    add_icon_flags(ap)
     args = ap.parse_args(argv)
+    tty_if_wanted(args.show_icon, args.no_show_icon)
     if not args.target or not args.sources:
         ap.error("需要提供目标库和至少一个源库（或用 gui）")
 

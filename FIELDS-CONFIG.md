@@ -304,6 +304,7 @@
 | `editor.width / height / entry_width / text_width` | 840/940/52/50 | 编辑器窗口与输入框尺寸 |
 | `render_limit` | 600 | **每页渲染行数**（翻页式；30万条与600条翻页同速） |
 | `default_view` | 无（=aggregate） | 启动视图缺省：`aggregate`（聚合）/ `calendar`（仅日历）/ `table`（仅表格）；被 `--view` 覆盖（v3.2.0） |
+| `show_icon` | false | 品牌闪屏：启动主界面前屏幕中央显示图标 3 秒（512px 无边框透明底）；被 `--show-icon` / `--no-show-icon` 覆盖（v3.7.1） |
 
 ### 10.17 `recycle_bin` —— 回收站（v3.1.0，可缺省 = 关闭）
 

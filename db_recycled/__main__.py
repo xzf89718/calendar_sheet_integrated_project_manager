@@ -7,7 +7,7 @@
   python -m db_recycled <xxx.db> --restore all  全部恢复
   python -m db_recycled <xxx.db> --purge 12     永久删除单个
   python -m db_recycled <xxx.db> --empty        清空回收站
-  python -m db_recycled gui <xxx.db>     图形界面（库路径必给）
+  python -m db_recycled gui [--show-icon|--no-show-icon] <xxx.db>     图形界面（库路径必给）
 """
 import argparse
 import sys
@@ -31,21 +31,28 @@ def main(argv=None):
         prog="db_recycled", description="回收站管理（查看/恢复/彻底删除）")
     argv = list(argv) if argv is not None else sys.argv[1:]
     if argv and argv[0] == "gui":
-        if len(argv) < 2:
+        from show_icon import gui_icon_flags, splash_if_wanted
+        _on, _off = gui_icon_flags(argv[1:])
+        _db_args = [a for a in argv[1:] if not a.startswith("-")]
+        if not _db_args:
             print("错误：gui 需要数据库路径"
                   "（python -m db_recycled gui xxx.db）", file=sys.stderr)
             return 2
-        db = Database(argv[1])
+        splash_if_wanted(_on, _off)
+        db = Database(_db_args[0])
         try:
             import db_recycled.recycled_gui as gui
-            return gui.run_gui(db, argv[1])
+            return gui.run_gui(db, _db_args[0])
         finally:
             db.close()
     ap.add_argument("db", help="数据库文件路径，如 xxx.db")
     ap.add_argument("--restore", metavar="ID|all", help="恢复项目")
     ap.add_argument("--purge", type=int, metavar="ID", help="永久删除单个")
     ap.add_argument("--empty", action="store_true", help="清空回收站")
+    from show_icon import add_icon_flags, tty_if_wanted
+    add_icon_flags(ap)
     args = ap.parse_args(argv)
+    tty_if_wanted(args.show_icon, args.no_show_icon)
 
     db = Database(args.db)
     try:

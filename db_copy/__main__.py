@@ -4,7 +4,7 @@
 用法：
   python -m db_copy <A.db> <B.db> <pid...>   把 A 库选中的项目复制到 B 库
   python -m db_copy <A.db> <B.db> --all      复制 A 库全部项目
-  python -m db_copy gui                     图形界面（A/B 对照视图）
+  python -m db_copy gui [--show-icon|--no-show-icon]   图形界面（A/B 对照视图）
 
 只新增：B 库已有数据不会被修改或删除；项目与快照在 B 库获得全新 id，
 快照时间与内容原样保留（含完整历史）。
@@ -25,9 +25,15 @@ def main(argv=None):
     ap.add_argument("--all", action="store_true", help="复制全部项目")
     argv = list(argv) if argv is not None else sys.argv[1:]
     if argv and argv[0] == "gui":
+        from show_icon import gui_icon_flags, splash_if_wanted
+        _on, _off = gui_icon_flags(argv[1:])
+        splash_if_wanted(_on, _off)
         import db_copy.copy_gui as gui
         return gui.run_gui()
+    from show_icon import add_icon_flags, tty_if_wanted
+    add_icon_flags(ap)
     args = ap.parse_args(argv)
+    tty_if_wanted(args.show_icon, args.no_show_icon)
     if not args.src or not args.dst:
         ap.error("需要提供源库和目标库（或用 gui）")
     if not args.all and not args.pids:

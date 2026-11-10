@@ -90,6 +90,8 @@ def _build_parser():
                             help="导出画饼数据 csv（utf-8-sig）；只接受目录："
                                  "不带值 = db_analysis/pie/dump/，带值 = "
                                  "该目录内自动命名（文件名嵌筛选摘要）")
+        from show_icon import add_icon_flags
+        add_icon_flags(sp)                      # 各算法子命令接受双开关
     return p
 
 
@@ -161,6 +163,8 @@ def _ensure_parent(path):
 
 def main(argv=None):
     a = _build_parser().parse_args(argv)
+    from show_icon import tty_if_wanted
+    tty_if_wanted(a.show_icon, a.no_show_icon)
     fn = ALGOS[a.algo][0]
     db = Database(os.path.join(BASE_DIR, CFG.db_name))
     try:
