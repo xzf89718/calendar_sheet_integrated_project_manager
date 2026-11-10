@@ -3,7 +3,11 @@
 
 用法：
     python -m workbench_ui <子命令> [选项]
-    python -m workbench_ui gui [--view aggregate|calendar|table]
+    python -m workbench_ui gui [--view aggregate|calendar|table] [--show-icon|--no-show-icon]
+    python -m workbench_ui --show-icon   # CLI 单独用：终端品牌字符画（#$& ASCII，绿#蓝&红$）
+    python -m workbench_ui <子命令> [--show-icon|--no-show-icon]
+                                         # v3.7.2：每个子命令都接受图标开关，
+                                         # 先播图标（不停顿）再执行命令
 
 子命令 = 主窗口全部 GUI 功能：
     list  项目列表（索引、筛选、排序、分页）
@@ -261,6 +265,9 @@ def build_parser():
         prog=PROG,
         description="日历+表格聚合项目工作台 —— 命令行接口")
     sub = p.add_subparsers(dest="cmd", metavar="子命令")
+    # v3.7.2：每个子命令都接受 --show-icon / --no-show-icon（覆盖
+    # fields.json 的 ui.show_icon），图标先播（行流、不停顿）再执行
+    from show_icon import add_icon_flags
 
     sp = sub.add_parser("list", help="项目列表")
     _add_filter_args(sp)
@@ -331,6 +338,15 @@ def build_parser():
     fp.add_argument("name")
     fp.add_argument("ids", type=int, nargs="+")
 
+    # 每个子命令（含 fav 二级动作）都注入 --show-icon / --no-show-icon；
+    # sp._subparsers 是参数组，真正的子解析器表在 _group_actions 里
+    for sp in list(sub.choices.values()):
+        add_icon_flags(sp)
+        inner = getattr(sp, "_subparsers", None)
+        if inner is not None:
+            for act in inner._group_actions:
+                for sp2 in act.choices.values():
+                    add_icon_flags(sp2)
     return p
 
 
@@ -342,11 +358,25 @@ def main(argv=None):
         import main as _main_mod
         _main_mod.main(av[1:])
         return
+    # --show-icon 单独使用 = CLI standalone：终端品牌字符画（#$&
+    # ASCII，绿#蓝&红$），打印后退出，不进 GUI；放在 argparse 之前
+    # 拦截，避免被当未知参数报错。图标缺失/损坏时 stderr 提示，退出码 1。
+    if av == ["--show-icon"]:
+        try:
+            from show_icon import tty_icon
+            tty_icon()
+        except (FileNotFoundError, ValueError, OSError) as e:
+            print(f"无法显示品牌图标：{e}", file=sys.stderr)
+            sys.exit(1)
+        return
     parser = build_parser()
     args = parser.parse_args(av)              # 参数错误 -> 退出码 2
     if not args.cmd:
         parser.print_help()
         sys.exit(2)
+    # v3.7.2：图标先播（行流输出、不停顿），随后立即执行子命令
+    from show_icon import tty_if_wanted
+    tty_if_wanted(args.show_icon, args.no_show_icon)
     try:
         globals()["cmd_" + args.cmd](args)
     except bc.BenchError as e:

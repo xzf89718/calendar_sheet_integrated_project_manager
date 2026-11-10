@@ -66,6 +66,8 @@ def _fmt_cell(v, width=28):
 
 
 def cmd_preview(args):
+    from show_icon import tty_if_wanted
+    tty_if_wanted(args.show_icon, args.no_show_icon)
     headers, rows, note_idx = _load(args.file)
     note_name = _note_idx_or_die(note_idx, headers)
     kept, dropped = clean_rows(headers, rows, note_idx)
@@ -84,6 +86,8 @@ def cmd_preview(args):
 
 
 def cmd_clean(args):
+    from show_icon import tty_if_wanted
+    tty_if_wanted(args.show_icon, args.no_show_icon)
     headers, rows, note_idx = _load(args.file)
     _note_idx_or_die(note_idx, headers)
     kept, dropped = clean_rows(headers, rows, note_idx)
@@ -113,7 +117,9 @@ def cmd_clean(args):
     return 0
 
 
-def cmd_gui(_args):
+def cmd_gui(args):
+    from show_icon import splash_if_wanted
+    splash_if_wanted(args.show_icon, args.no_show_icon)
     from .clean_gui import CleanApp
     CleanApp().mainloop()
     return 0
@@ -138,6 +144,10 @@ def main(argv=None):
 
     g = sub.add_parser("gui", help="图形界面")
     g.set_defaults(func=cmd_gui)
+
+    from show_icon import add_icon_flags
+    for sp in (p, c, g):                        # 每个子命令都接受双开关
+        add_icon_flags(sp)
 
     args = ap.parse_args(argv)
     try:

@@ -4,7 +4,7 @@
 用法：
   python -m db_split <src.db> --key <键列> [--dest DIR]   执行分拆
   python -m db_split <src.db> --key <键列> --preview      只预览
-  python -m db_split gui                          图形界面
+  python -m db_split gui [--show-icon|--no-show-icon]                          图形界面
 
 键列可以是字段名（city）或显示名（城市）。全量分拆（含归档）、
 空值进"未分配.db"、目标文件已存在则拒绝执行。
@@ -17,7 +17,8 @@ import db_split.split_core as core
 
 
 def _resolve_field(name_or_label):
-    """字段名或显示名 -> 字段名，找不到返回 None。"""
+    """字段名或显示名 -> 字段名，找不到返回 None。  python -m db_split gui [--show-icon|--no-show-icon]  图形界面（品牌图标开关，覆盖 ui.show_icon）
+"""
     from config import CFG
     cols = [c for c, _h in CFG.display_cols if c != "id"]
     if name_or_label in cols:
@@ -48,9 +49,15 @@ def main(argv=None):
     ap.add_argument("--preview", action="store_true", help="只预览不执行")
     argv = list(argv) if argv is not None else sys.argv[1:]
     if argv and argv[0] == "gui":
+        from show_icon import gui_icon_flags, splash_if_wanted
+        _on, _off = gui_icon_flags(argv[1:])
+        splash_if_wanted(_on, _off)
         import db_split.split_gui as gui
         return gui.run_gui()
+    from show_icon import add_icon_flags, tty_if_wanted
+    add_icon_flags(ap)
     args = ap.parse_args(argv)
+    tty_if_wanted(args.show_icon, args.no_show_icon)
     if not args.db or not args.key:
         ap.error("需要提供源库和 --key（或用 gui）")
     field = _resolve_field(args.key)

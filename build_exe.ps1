@@ -9,8 +9,19 @@
 # ============================================
 $ErrorActionPreference = 'Stop'
 
+# Repo root = this script's own directory (robust in powershell.exe and pwsh)
+$Root = $PSScriptRoot
+if (-not $Root) { $Root = (Get-Location).Path }
+
 function Build-One($name, $entry) {
     Write-Host "`n=== Building $name (entry: $entry) ===" -ForegroundColor Cyan
+    # Absolute path: PyInstaller resolves --icon relative to the .spec
+    # directory (build\$name), not the script directory.
+    $iconArgs = @()
+    $iconPath = Join-Path $Root 'icon\pm_workbench_icon.ico'
+    if (Test-Path $iconPath) {
+        $iconArgs = @('--icon', $iconPath)
+    }
     pyinstaller --onefile --console --name $name `
         --paths . `
         --collect-all windows_toasts `
@@ -18,6 +29,7 @@ function Build-One($name, $entry) {
         --workpath "build\$name" `
         --specpath "build\$name" `
         --noconfirm `
+        @iconArgs `
         $entry
     if ($LASTEXITCODE -ne 0) { throw "$name build failed (exit $LASTEXITCODE)" }
 }

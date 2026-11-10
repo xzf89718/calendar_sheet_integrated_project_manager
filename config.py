@@ -211,6 +211,11 @@ def validate_config_data(data):
             errs.append(
                 "ui.default_view 必须是 aggregate/calendar/table 之一："
                 f"{ui['default_view']!r}")
+    # ui.show_icon：品牌闪屏开关（v3.7.1，可缺省 = false）。
+    # 命令行 --show-icon / --no-show-icon 覆盖此值
+    if isinstance(ui, dict) and "show_icon" in ui:
+        if not isinstance(ui["show_icon"], bool):
+            errs.append("ui.show_icon 必须是 true/false")
     return errs
 
 
@@ -243,6 +248,9 @@ class Config:
         dv = self.ui.get("default_view", "aggregate")
         self.default_view = dv if dv in ("aggregate", "calendar", "table") \
             else "aggregate"
+        # 品牌闪屏开关（v3.7.1）：缺省 false；--show-icon / --no-show-icon
+        # 命令行可覆盖
+        self.show_icon = bool(self.ui.get("show_icon", False))
         # 日历类别显示名，键 = 字段上的 "calendar" 标记值
         self.cal_labels = self.ui.get(
             "calendar_labels",

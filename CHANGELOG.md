@@ -2,6 +2,134 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.7.2** CLI 全命令图标开关（用户定）：
+  ① **workbench_ui 全部子命令接入**（list/show/new/follow/import/
+  export/weekly/backup/notify/cal/fav 及其二级动作），--show-icon /
+  --no-show-icon 注入每个子解析器，统一裁决于 fields.json 的
+  ui.show_icon；补齐 v3.7.1 植入时遗漏的最后一个 CLI 入口；
+  ② **main.py CLI 路径**（--check-config）接入 tty_if_wanted；
+  ③ 语义统一：CLI 下图标行流先播、**不停顿**，播完立即执行原命令
+  （GUI 闪屏 3 秒保持不变）；文档串/README 同步更新（顺带修正
+  "半块字符堆叠"过时描述为 #$& ASCII 字符画）。测试 +2（子命令
+  help 暴露开关含 fav 二级、check-config 在 pty 下图标先于校验
+  输出），全量 236 passed。
+  **卡顿修复（同日用户实测：--show-icon 明显卡顿）**：脚本写盘
+  虽有缓存，但 v3.7.2 初版每次运行仍先 `render_ascii()` 纯 Python
+  解码 1MB PNG（实测 760ms）。改为**惰性采样**：`_existing_script`
+  只查脚本存在与否，存在则跳过 PNG 解码与写盘直接加载执行；重复
+  运行开销只剩子进程启动（Linux 实测 3ms，Windows 另加
+  powershell 启动，为脚本方案的固有成本）。测试 +1（缓存命中
+  打桩 render_ascii 抛错仍渲染成功），全量 237 passed。
+  **定稿（同日用户定）：默认只跑 scripts/ 里的脚本，重采样手动**：
+  运行时不再校验脚本内容是否过期（存在即执行，零 stat 头读、
+  零 PNG 解码）；仅脚本缺失时兜底生成一次。更换图标后的重新采样
+  为手动动作——新增命令行入口 `python show_icon.py [--icon 路径]
+  [--cols N]`（regen_scripts 函数），幂等重写 ps1 + sh 两脚本，
+  README 增「图标脚本手动重采样」一节。测试 +2（regen 双脚本
+  写出且 ps1 纯 ASCII、`python show_icon.py` 入口冒烟），
+  全量 239 passed。
+  **ANSI 兜底移除（同日用户定：兜不住且多占代码）**：tty_icon 脚
+  本加载失败静默放弃，不再退回 ANSI 渲染（render_tty 约 20 行
+  整体删除，os.system("") 开 VT 一并移除）；图标缺失仍抛
+  FileNotFoundError，workbench_ui 独立 --show-icon 入口的
+  stderr + 退出码 1 语义不变。测试 ±0（删 ANSI 兜底用例、加无
+  兜底行为锁），全量 239 passed
+- **v3.7.1** 品牌闪屏三项收尾（用户定，5 条要求）：
+  ① **`ui.show_icon` 入 JSON**（可缺省 = false），命令行
+  `--show-icon` / `--no-show-icon` 覆盖之（裁决优先级
+  CLI > JSON > false；config 校验必须是 bool）；
+  ② **GUI 闪屏 512px**（≈500px，Tk subsample 无 PIL），**透明底**
+  ——窗口底色品红 + Windows `-transparentcolor` 键控穿透（图标
+  不含品红，安全）；
+  ③ **CLI `--show-icon` 终端图标**：自写最小 PNG 解码器（标准库
+  zlib，8-bit RGBA/RGB 非隔行子集）+ ANSI 24-bit 颜色 + "▀/▄"
+  半块字符按 alpha 上下堆叠，44 格宽，Windows 自动开 VT；
+  闪屏实现抽为独立模块 `show_icon.py`（gui_splash / render_tty /
+  decode_png_rgba / resolve_show_icon）。顺手修复 2 处 README
+  断行（跨行行内代码、weekly 用法 Synopsis 断行）。样例
+  fields.json 加 `ui.show_icon`。测试 +5（裁决优先级、PNG 解码、
+  ANSI 输出、缺图标报错、开关缺省），全量 223 passed。
+  **返修（同日用户实测）**：经典 Windows 控制台忽略 24-bit 颜色
+  序列 → 图标全白。终端渲染加**颜色降级链**：truecolor → 256 色
+  → 16 色（`PMWB_ICON_COLORS` 环境变量可强制；按 COLORTERM /
+  WT_SESSION / TERM_PROGRAM 自动检测；Windows 经典控制台按
+  256 色，其余保守 16 色）。16 色档 RGB 最近邻映射标准调色板，
+  品牌三色 + 白依然可辨。调研 term-image（Windows 有限支持、
+  依赖 Pillow）与 chafa（外部 exe）后**不引入依赖**，自写渲染器
+  保底（用户造轮子哲学）。测试 +3（检测/覆盖、三档量化、三档
+  渲染冒烟），全量 226 passed。
+  **子模块全植入（同日追加，用户定）**：品牌图标接入全部 7 个
+  子模块（db_copy/db_append/db_split/db_assign/db_recycled/
+  weekreport_clean/db_analysis）的 GUI 与 CLI——GUI 入口闪屏
+  （gui 拦截路径在 argparse 前解析双开关），CLI 入口打印终端
+  图标（仅 stdout 为交互终端时，管道/重定向静默跳过，不污染
+  pie 计数表等机器可读输出）；db_recycled gui 顺带支持开关与库
+  路径任意顺序。共享助手集中在 show_icon.py（add_icon_flags /
+  want_icon / splash_if_wanted / tty_if_wanted / gui_icon_flags），
+  各模块零逻辑复制。测试 +4（7 模块 help 暴露开关、管道防污染、
+  拦截解析、覆盖裁决），全量 230 passed。
+  **返修2（同日用户实测 Git Bash / PowerShell 5.1）**：上述静态
+  环境变量启发式在经典 conhost 上不可靠——转义序列被消费（VT
+  已开）但 24-bit 与 256 色 SGR 均被静默忽略，图标仍全白。改为
+  **运行时探测**：向终端发 OSC 4 调色板查询（`\x1b]4;1;?`），
+  xterm/mintty/kitty 系应答 `rgb:` 即判 256 色安全，0.3s 超时
+  无应答（经典 conhost 不认 OSC）→ 落到 **16 色基础 SGR**（最老
+  终端也认），扁平色图标 16 色下视觉近乎无损。检测顺序：环境
+  变量强制 → truecolor 环境提示 → OSC 4 探测 → 16 地板。测试
+  +1（探测注入 256/16 两分支），全量 231 passed。
+  **返修3（同日用户实测 PowerShell 5.1 经典控制台仍全灰）**：根
+  因是该类控制台对 24-bit/256 色 SGR 静默忽略（用户强制的
+  truecolor 恰是最差档）。不再纯 ANSI 死磕：Windows 真控制台改走
+  **Win32 控制台 API 直写**（`WriteConsoleOutputAttribute` /
+  `WriteConsoleOutputCharacterW`），逐格设 16 色属性（最近邻映射
+  Windows 默认调色板）——这是 PowerShell 自身上色的原生机制，
+  不经 VT/转义序列，Win7 以来所有 Windows 控制台均支持；mintty/
+  Git Bash 等非控制台句柄自动退回 ANSI 路径。采样逻辑抽为
+  render_cells，与 ANSI 渲染共用。测试 +3（采样矩阵、Win16 量化、
+  ANSI 与矩阵结构一致），全量 234 passed。
+  **返修4（同日用户裁定）**：不深入系统 API（坐标直写受窗口大小/
+  位置影响，且名字压进图标、越画越少）；改为 **scripts/ 薄脚本方案**
+  （用户定，兼顾可读性、维护性、速率）：Python 完成 PNG 采样与量化，
+  生成 RLE 数据 + 通用渲染循环的薄脚本存根目录 `scripts/`，再加载
+  执行——`show_icon.ps1` 用 `[Console]` 颜色（PowerShell 原生机制，
+  经典控制台无需 ANSI/VT；纯 ASCII，产品名经 -Name 参数传入，遵守
+  PS 脚本不含中文的规矩）；`show_icon.sh` 走 ANSI（mintty 等真终
+  端，printf 逐行）。脚本头带图标 mtime/size 标记，图标未变跳过重
+  生成；两份脚本随包预生成；找不到 powershell/bash 或执行失败退回
+  ANSI 降级链兜底。Win32 ctypes 直写代码整段移除。测试 +5（RLE 段
+  化、ps1 纯 ASCII 与数据合法性、sh 端到端 bash 执行、ANSI 兜底、
+  脚本路径），全量 239 passed。
+  **返修5（同日用户实测 + 用户定稿，符号方案重做）**：PowerShell
+  实测暴露两 bug——①半块字符 ▀/▄ 经 [Console]::Write 按 GBK
+  控制台输出编码写出，U+2580/2584 不可编码全部退化成 `?`；②
+  WriteLine 换行时控制台以当前背景色填充行尾，拖出彩色长条。
+  用户裁定**弃用花哨符号**：终端图标改用 `#$&` 三符号 + 空格，
+  绿区 #、蓝区 &、红区 $、白细节白色 #（Ubuntu/Debian version 横幅
+  ASCII logo 风格），按字符 2:1 纵横比采样、格内平均色归类 4 基准
+  色。纯 ASCII + 16 色 bright SGR，根上免疫编码/字体/VT 问题；
+  truecolor/256 探测降级链（OSC4 查询、调色板量化）随精细渲染
+  一并移除，代码显著瘦身。Git Bash 归并 ps1 路径（powershell
+  子进程经 winpty 翻译控制台颜色），sh 仅留 POSIX。换行填色 bug
+  修复（换行前重置为终端原色）。测试重写 -7 +8（字符画合法性、
+  类别符号映射、RLE、ps1/sh 生成与 bash 端到端、后端判别、双路径
+  渲染），全量 234 passed
+- **v3.7.0** exe 图标支持 + 品牌图标入库（用户定，插队）：
+  根目录新建 `icon/` 文件夹，存用户处理好的品牌图标两文件——
+  `pm_workbench_icon.png`（1024 透明底，README 顶部相对路径
+  引用）与 `pm_workbench_icon.ico`（16~256 多尺寸，
+  `build_exe.ps1` 探测 `icon\pm_workbench_icon.ico`，存在则全部
+  6 个 exe 套 --icon，**绝对路径**传入规避 PyInstaller 按 spec
+  目录解析相对路径的坑；不存在则跳过不阻断构建）。README 图标
+  引用 width=300。新增 **`--show-icon` 品牌闪屏**（同日追加）：
+  `main.py --show-icon` 或 `python -m workbench_ui gui
+  --show-icon`，启动主界面前屏幕中央显示
+  icon/pm_workbench_icon.png 3 秒（256px 无边框，Tk subsample
+  缩放、无 PIL 依赖）；图标锚定 fields.json 同目录，缺失/读取
+  失败静默跳过。顺手修复 build_exe.ps1 `$Root` 未定义空值 bug
+  （顶部 `$PSScriptRoot` 赋值 + Get-Location 兜底）。217 passed
+  （+4 新用例：参数解析×3、闪屏生命周期×1——后者抓到
+  PhotoImage 先于 Tk() 创建的平台差异，已修）。顺手勘误：
+  CHANGELOG 历史条目重复粘贴一整段，本版清除
 - **v3.6.3** db_analysis 字段口径文档澄清（用户定，补丁）：pie 的
 `--field` / `--where` / `--date-field` 一律匹配 fields.json 的
 **英文 name**，不用 GUI 显示 label——纯文档与 help 修正，行为
@@ -42,34 +170,6 @@ GitHub 双远程仓库同步"；「更新和维护计划」删两句（"本地Fo
 做版本控制和开发""新功能和代码贡献请联系我讨论。"）。勘误：工具
 清单"分析（占位）"自 v3.5.0 起已转正、回收站漏列，本版改正为七
 件套。新增 9 份文档。纯文档版，无代码改动，196 passed 原样回归
-
-版本规则：修复动第三位，功能动第二位，结构动第一位。
-
-- **v3.6.3** db_analysis 字段口径文档澄清（用户定，补丁）：pie 的
-`--field` / `--where` / `--date-field` 一律匹配 fields.json 的
-**英文 name**，不用 GUI 显示 label——纯文档与 help 修正，行为
-不变（本就只认 name，报错列可用字段名）；后续 db_analysis 新
-配置遵循同一口径。模块 README 参数节加「字段口径（重要）」提示，
---field help 同步注明
-- **v3.6.2** 子模块 GUI 入口统一为 gui 子命令（用户定）：db_copy /
-db_append / db_split / db_assign / db_recycled 五模块废弃
-`--gui` 参数，统一 `python -m db_xxx gui`，与 workbench_ui /
-weekreport_clean 启动风格一致（`--gui` 现报参数错误 exit 2）；
-db_recycled 的 gui 子命令带库路径（`gui <xxx.db>`，必给）。
-5 份模块 README / FIELDS-CONFIG 回收站命令示例 / 各 *_gui.py 运行
-提示同步更新。新增 6 条回归用例（5 模块 --gui 拒收参数化 +
-db_recycled gui 缺库路径），全套 213 passed
-- **v3.6.1** weekreport_clean CLI 化（用户定）：GUI / CLI 双入口，
-启动接口与 workbench_ui 统一——`python -m weekreport_clean gui`
-进图形界面，新增 `preview`（终端逐行打印 [保留]/[丢弃] + 汇总，
-只读不写文件）与 `clean [-o 输出]`（生成清洗结果 xlsx，不带 -o
-默认 `<原名>_cleaned.xlsx` 同目录，已存在覆盖，显式 -o 父目录
-自动创建）两子命令，功能与 GUI 一一对应（结果为空拒绝写出等
-行为两入口一致）。补齐四件套包结构：`__main__.py` 命令行入口、
-`__init__.py` 导出核心、clean_core 新增 `weekly_note_label()`
-（跟进记录列定位逻辑 GUI/CLI 同源，GUI 同步改用）；退出码沿用
-0/1/2 约定。`setup.ps1` / `setup.sh` shim 清单补入本模块。新增 8
-条 subprocess 全链路用例，全套 207 passed
 - **v3.5.2** 输出路径裁定（用户定）：`--dump-data` 改名 **`--dump`**；
   **`--png` / `--dump` 只接受目录**（一次可能产出多个文件，指定单
   文件名无法理解，显式文件名直接报错）；裸参数默认输出目录定为

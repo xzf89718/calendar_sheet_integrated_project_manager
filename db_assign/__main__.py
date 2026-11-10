@@ -3,7 +3,7 @@
 
 用法：
   python -m db_assign <xxx.db> --field <列> --value <值> [--yes]
-  python -m db_assign gui
+  python -m db_assign gui [--show-icon|--no-show-icon]   图形界面（品牌图标开关覆盖 ui.show_icon）
 
 作用域 = 库内全部项目（与 GUI 一致，刻意不做子集选择）。
 默认只预览不写库；加 --yes 才真正执行。
@@ -19,7 +19,8 @@ import db_assign.assign_core as core
 
 
 def _resolve_field(name_or_label):
-    """字段名或显示名 -> 字段名，找不到返回 None。"""
+    """字段名或显示名 -> 字段名，找不到返回 None。
+    """
     from config import CFG
     cols = [c for c, _h in CFG.display_cols if c != "id"]
     if name_or_label in cols:
@@ -39,9 +40,15 @@ def main(argv=None):
     ap.add_argument("--yes", action="store_true", help="确认执行（默认只预览）")
     argv = list(argv) if argv is not None else sys.argv[1:]
     if argv and argv[0] == "gui":
+        from show_icon import gui_icon_flags, splash_if_wanted
+        _on, _off = gui_icon_flags(argv[1:])
+        splash_if_wanted(_on, _off)
         import db_assign.assign_gui as gui
         return gui.run_gui()
+    from show_icon import add_icon_flags, tty_if_wanted
+    add_icon_flags(ap)
     args = ap.parse_args(argv)
+    tty_if_wanted(args.show_icon, args.no_show_icon)
     if not args.db or not args.field:
         ap.error("需要提供数据库和 --field（或用 gui）")
     field = _resolve_field(args.field)
