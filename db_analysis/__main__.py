@@ -7,7 +7,7 @@ v3.5.2 默认输出目录 + --dump 改名；v3.8.0 timeline 时间线图）。
             [--from YYYY-MM-DD --to YYYY-MM-DD | --last 1m|6m|1y]
             [--png [路径或目录]] [--dump [路径或目录]]
 
-    python -m db_analysis timeline [--mode year|rolling] [--cols 4个字段]
+    python -m db_analysis timeline [--mode year|rolling] [--cols 3个字段]
             [--colors 4个#RRGGBB] [--sort 字段|diff] [--desc] [--split]
             [--where 字段=值 ...] [--path [目录]] [--dump]
 
@@ -101,9 +101,10 @@ def _build_parser():
                             default="rolling",
                             help="12 个月窗口：year=当年 1–12 月；"
                                  "rolling=当月-6 至 当月+5（默认）")
-            sp.add_argument("--cols", nargs=4, required=True, metavar="字段",
-                            help="4 个日期列（开始 最后跟进 下个跟进 关闭），"
-                                 "强制指定，字段填 fields.json 的 name")
+            sp.add_argument("--cols", nargs=3, required=True, metavar="字段",
+                            help="3 个日期列：开始 下个跟进 关闭（字段填 "
+                                 "fields.json 的 name）；「最后跟进」列"
+                                 "自动取最新快照时间，无需指定")
             sp.add_argument("--colors", nargs=4, default=None,
                             metavar="#RRGGBB",
                             help="4 行配色（默认绿/蓝/橙/红，连线用第 1 色）")
@@ -297,7 +298,7 @@ def main(argv=None):
             conds = list(a.where or [])
             conds.append(f"模式{a.mode}")
             if a.split:
-                conds.append("分章")
+                conds.append("split")
             if a.sort:
                 conds.append(f"排序{a.sort}{'降' if a.desc else '升'}")
             conds = _safe("_".join(conds)) if conds else "全量"
@@ -308,7 +309,7 @@ def main(argv=None):
                 return 0
             # 非 dump：md 写文件，终端只打印摘要（用户定 v3.8.1）
             md = tl.render_md(groups, col_labels, months, colors,
-                              mode_label)
+                              mode_label, split=a.split)
             out_dir = os.path.join(BASE_DIR, "db_analysis", "timeline")
             path = _resolve_out(a.path, "-".join(a.cols), ".md",
                                 conds, out_dir, prefix="timeline")
