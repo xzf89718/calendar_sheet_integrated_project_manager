@@ -401,7 +401,7 @@ def test_timeline_seg_missing_endpoint_keeps_blank_row(pkg):
 
 
 def test_timeline_head_tail_labels_earlier_later(pkg):
-    """头/尾标注列文字 = 早于第一个月 / 晚于第 12 个月（带年月）。"""
+    """头/尾标注列文字 = <第一个月 / >第 12 个月（带年月，v3.8.8）。"""
     _mk(pkg, "老单", "2024-03-10", close="2027-06-15")
     with _db(pkg) as c:
         c.execute("UPDATE projects SET status='closed' WHERE id=1")
@@ -413,8 +413,12 @@ def test_timeline_head_tail_labels_earlier_later(pkg):
     head_i = _row_cells(rows[0]).index("头")
     tail_i = _row_cells(rows[0]).index("尾")
     close_row = _row_cells(rows[5])
-    assert close_row[head_i] == "早于26-05"
-    assert close_row[tail_i] == "晚于27-04"
+    assert close_row[head_i] == "<26-05"
+    assert close_row[tail_i] == ">27-04"
+    # v3.8.8：延伸出窗口的边缘月格一律填满 4 个 #（不画残格）
+    first_col = _row_cells(rows[0]).index("26-05")
+    today_cells = _row_cells(rows[2])          # 开始-今日（开始 2024 年）
+    assert _n_hash(today_cells[first_col]) == 4
     assert _n_hash(rows[5]) == 48    # 夹边界铺满 12 个月格
 
 

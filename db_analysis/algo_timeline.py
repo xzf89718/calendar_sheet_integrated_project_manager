@@ -13,8 +13,8 @@ v3.8.4 版式与口径（用户定，6 点）：
   线段行；
 - 前导列名固定：开始 / 下一个跟进 / 关闭（不用 JSON label）；
 - 日差 < 0 时数字标红；
-- 头/尾标注列文字 = 「早于26-05」「晚于27-04」（早于第一个月 /
-  晚于第 12 个月，带具体年月）；
+- 头/尾标注列文字 = 「<26-05」「>27-04」（v3.8.8 用户定：
+  <第一个月 / >第 12 个月，带具体年月）；
 - 基准四列（开始→今日 / 最近跟进 / 下个跟进 / 关闭）的字段、派生
   「最近跟进」列名、绘图模式（line 两日期连线 / spot 单日期画点）、
   配色全部进 fields.json 的 timeline 段（派生列命名 last_snapshot，
@@ -237,7 +237,17 @@ def _seg_cells(start, end, months):
     ei = _cell_index(end, months)
     if si > ei:
         return set()
-    return set(range(si, ei + 1))
+    cells = set(range(si, ei + 1))
+    # v3.8.8（用户定）：延伸出窗口 → 边缘月格一律填满 4 个 #，
+    # 不再按夹边界后的周数画残格（避免看起来像中间断开）
+    lo = (months[0][0], months[0][1])
+    hi = (months[-1][0], months[-1][1])
+    if (int(start[:4]), int(start[5:7])) < lo:
+        cells.update(range(0, WEEKS_PER_MONTH))
+    if (int(end[:4]), int(end[5:7])) > hi:
+        base = (len(months) - 1) * WEEKS_PER_MONTH
+        cells.update(range(base, base + WEEKS_PER_MONTH))
+    return cells
 
 
 def _spot_cells(end, months):
@@ -263,8 +273,8 @@ def _month_cells(cells):
 
 
 def _outside_labels(dates, months):
-    """日期列表 → (头标注, 尾标注)：窗外月份存在时头 = 早于第一个月
-    （带具体年月）、尾 = 晚于第 12 个月（用户定 v3.8.4）。"""
+    """日期列表 → (头标注, 尾标注)：窗外月份存在时头 = <第一个月
+    （带具体年月）、尾 = >第 12 个月（用户定 v3.8.8）。"""
     lo = (months[0][0], months[0][1])
     hi = (months[-1][0], months[-1][1])
     head = tail = False
@@ -278,8 +288,8 @@ def _outside_labels(dates, months):
             tail = True
     first_lab = months[0][2]
     last_lab = months[-1][2]
-    return (f"早于{first_lab}" if head else "",
-            f"晚于{last_lab}" if tail else "")
+    return (f"<{first_lab}" if head else "",
+            f">{last_lab}" if tail else "")
 
 
 def _base_segments(row, today):
@@ -357,7 +367,7 @@ def render_md(rows_groups, tl, adds, add_labels, add_plot, add_colors,
     """markdown 文本（用户定，v3.8.6）：每项目一张表；项目名作表格外
     单独一行标题（加粗放大字体、不带数据）；第一行线段行带 3 日期值/
     额外列值/日差(负标红)/状态；其余线段行只有 # 线 + 头尾标注
-    （早于/晚于）+ 备注；基准段字段/画法/色在 JSON timeline 段；
+    （</>标注）+ 备注；基准段字段/画法/色在 JSON timeline 段；
     --split 时文首给章导航超链接。"""
     t = today or date.today()
     lead = _lead(adds, add_labels, months)
