@@ -2,6 +2,13 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.8.5** --where 同字段多次取并集（修复，用户提出需求，同日）：
+  此前 `--where milestone=Lead --where milestone=Qualified Lead` 后者
+  覆盖前者，多值过滤无法表达。改为同字段重复取值自动并入集合，
+  区间条件仍覆盖。导出四分报表（pipeline_report 模板 + 多值
+  milestone 过滤）依赖此修复。新增测试
+  test_parse_where_same_field_union，258 passed。
+
 - **v3.8.4** timeline 配置化 + CLI 改版（用户定 6 点，同日）：
   1. 项目名单独一行（加粗放大字体、不带数据），不再有项目列；
   2. 前导列名固定：开始 / 下一个跟进 / 关闭；

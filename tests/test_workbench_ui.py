@@ -234,6 +234,14 @@ def test_cli_gui_passthrough_check_config(pkg):
 
 # ---------- 内核单测（conftest patch 链） ----------
 
+def test_parse_where_same_field_union(cfg, seeded):
+    """v3.8.5：同字段多次 --where 取并集（导出四分报表依赖）。"""
+    filters = bc.parse_where(["stage=Lead", "stage=Qualified Lead"])
+    assert filters["stage"] == {"Lead", "Qualified Lead"}
+    filters = bc.parse_where(["stage=Lead"])
+    assert filters["stage"] == {"Lead"}
+
+
 def test_parse_where_bad_field(cfg, seeded):
     with pytest.raises(bc.BenchError):
         bc.parse_where(["nope=1"])
