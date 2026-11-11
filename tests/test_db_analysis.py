@@ -543,6 +543,23 @@ def test_timeline_bad_config_reported(pkg):
     assert "timeline 配置" in r.stderr
 
 
+def test_timeline_html_fit_zoom_output(pkg):
+    """--html 写出 .html 整页（用户定 v3.8.12）：自动适配窗口宽度，
+    右上角 +/-/fit 再缩放；表结构与 md 版一致。"""
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    r = run_ana(pkg, "timeline", "--html")
+    assert r.returncode == 0, r.stderr
+    hits = list(pkg.glob("db_analysis/timeline/timeline_*.html"))
+    assert len(hits) == 1 and not \
+        list(pkg.glob("db_analysis/timeline/timeline_*.md"))
+    text = hits[0].read_text(encoding="utf-8")
+    assert "<table>" in text and 'class="pname"' in text
+    assert 'id="page"' in text and "function fit()" in text
+    assert "26-05" in text and "开始-下一个跟进" in text
+    # md 版不同名产出（--html 只出 html）
+    assert "| 开始 |" not in text
+
+
 def test_timeline_split_chapters_order_and_nav_links(pkg):
     """四章顺序 + 文首章导航超链接（用户定）。"""
     _mk(pkg, "逾期", "2026-09-01", "2026-11-01")

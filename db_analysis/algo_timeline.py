@@ -415,6 +415,77 @@ def render_md(rows_groups, tl, adds, add_labels, add_plot, add_colors,
     return "\n".join(out)
 
 
+_HTML_HEAD = """<!doctype html>
+<html><head><meta charset="utf-8">
+<title>项目时间线图</title>
+<style>
+body{font-family:Microsoft YaHei,sans-serif;margin:10px}
+.pname{font-weight:bold;font-size:22px;margin:14px 0 4px}
+table{border-collapse:collapse;margin-bottom:14px}
+td,th{border:1px solid #999;padding:2px 8px;white-space:pre;
+      font-family:Consolas,Menlo,monospace;text-align:center}
+h2{margin:18px 0 6px}
+a{color:#1565c0}
+#bar{position:fixed;top:6px;right:10px;z-index:9;background:#fff;
+     border:1px solid #aaa;padding:4px 10px;font-size:14px}
+#bar button{font-size:16px;margin:0 2px}
+</style></head><body>
+<div id="bar"><button onclick="zoom(1.25)">+</button>
+<button onclick="zoom(0.8)">-</button>
+<button onclick="fit()">fit</button></div>
+<div id="page">
+"""
+
+_HTML_TAIL = """</div>
+<script>
+var z=1;
+function apply(){document.getElementById('page').style.zoom=z;}
+function zoom(f){z*=f;apply();}
+function fit(){var w=document.documentElement.clientWidth-30;var tw=0;
+document.querySelectorAll('#page table').forEach(function(t){
+tw=Math.max(tw,t.offsetWidth);});
+if(tw>0){z=Math.min(Math.max(w/tw,0.2),4);}apply();}
+window.addEventListener('load',fit);
+</script></body></html>
+"""
+
+
+def render_html(rows_groups, tl, adds, add_labels, add_plot, add_colors,
+                months, mode_label, today=None, split=False):
+    """HTML 整页（v3.8.12 用户定：markdown 宽度不可控，HTML 才能整体
+    缩放）——打开后整页按窗口宽度自动适配（fit），右上角 +/-/fit
+    按钮可再放大缩小。表结构与 markdown 版一致。"""
+    t = today or date.today()
+    lead = _lead(adds, add_labels, months)
+    out = [_HTML_HEAD, f"<h1>项目时间线图（{mode_label}）</h1>"]
+    if split:
+        out.append("<p>" + "  ".join(
+            f'<a href="#{_anchor(n, len(g))}">{n}（{len(g)} 个项目）</a>'
+            for n, g in rows_groups) + "</p>")
+    legend = [f'<font color="{tl["colors"][i]}">■</font>开始-{lab}'
+              for i, (lab, _e) in enumerate(_base_segments(
+                  {"vals": [None] * 4}, t))]
+    legend += [f'<font color="{add_colors[i % len(add_colors)]}">■</font>'
+               + (f"开始-{lab}" if add_plot == "line" else lab)
+               for i, lab in enumerate(add_labels)]
+    out.append("<p>" + "  ".join(legend) + "</p>")
+    for gname, grows in rows_groups:
+        out.append(f'<h2 id="{_anchor(gname, len(grows))}">'
+                   f"{gname}（{len(grows)} 个项目）</h2>")
+        for r in grows:
+            out.append(f'<div class="pname">{r["name"]}</div>')
+            out.append("<table>")
+            out.append("<tr>" + "".join(f"<th>{c}</th>" for c in lead)
+                       + "</tr>")
+            for row in _render_rows(r, tl, adds, add_labels, add_plot,
+                                    add_colors, months, t):
+                out.append("<tr>" + "".join(f"<td>{c}</td>" for c in row)
+                           + "</tr>")
+            out.append("</table>")
+    out.append(_HTML_TAIL)
+    return "\n".join(out)
+
+
 def dump_csv_text(rows_groups, tl, adds, add_labels, add_plot, add_colors,
                   months, today=None):
     """csv 文本（--dump 终端打印用）：与 md 同网格，纯 # 不着色。"""
