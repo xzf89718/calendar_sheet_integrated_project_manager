@@ -338,8 +338,8 @@ def test_timeline_nondump_prints_summary_and_writes_file(pkg):
     text = hits[0].read_text(encoding="utf-8")
     assert "项目时间线图" in text
     # v3.8.4 版式：前导列名固定 开始/下一个跟进/关闭 + 日差 + 头/尾
-    assert "| 开始 | 下一个跟进 | 关闭 | 日差 | 头 | 26-05 |" in text
-    assert " | 尾 | 状态 | 备注 |" in text
+    assert "| 开始 | 下一个跟进 | 关闭 | 日差 | 更早 | 26-05 |" in text
+    assert " | 更晚 | 状态 | 备注 |" in text
 
 
 def test_timeline_title_row_and_fixed_col_names(pkg):
@@ -360,7 +360,7 @@ def test_timeline_title_row_and_fixed_col_names(pkg):
     lead = [c for c in _row_cells(rows[2]) if c and not c.startswith("<font")]
     assert lead[:2] == ["2026-11-01", "2026-11-20"]
     assert lead[2].isdigit() and lead[3] == "跟进中"
-    for i, lab in enumerate(["今日", "最近跟进", "下一个跟进", "关闭"]):
+    for i, lab in enumerate(["最近跟进", "今日", "下一个跟进", "关闭"]):
         assert _row_cells(rows[2 + i])[-1] == f"开始-{lab}"
 
 
@@ -379,7 +379,7 @@ def test_timeline_line_partial_cell_dash_filled(pkg):
     # 开始-下一个跟进（11-01 ~ 11-20，周 1→3）：26-11 格 = ###-
     assert clean(_row_cells(rows[4])[col]) == "###-"
     # 开始-今日（11-01 ~ 11-10，周 1→2）：26-11 格 = ##--
-    assert clean(_row_cells(rows[2])[col]) == "##--"
+    assert clean(_row_cells(rows[2])[col]) == "##--"  # 最近跟进(=今日)
 
 
 def test_timeline_negative_diff_red(pkg):
@@ -403,7 +403,7 @@ def test_timeline_seg_line_fills_weeks_from_start(pkg):
         .read_text(encoding="utf-8")
     rows = _tbl_rows(text, "甲")
     assert _n_hash(rows[4]) == 3     # 开始-下一个跟进：周 1→3
-    assert _n_hash(rows[2]) == 2     # 开始-今日（今天 11-10）：周 1→2
+    assert _n_hash(rows[2]) == 2     # 开始-最近跟进（=今日 11-10）
     assert _n_hash(rows[5]) == 0     # 无关闭 → 空行保留
 
 
@@ -417,7 +417,7 @@ def test_timeline_seg_missing_endpoint_keeps_blank_row(pkg):
     rows = _tbl_rows(text, "无排期")
     assert len(rows) == 6
     assert _n_hash(rows[4]) == 0 and _n_hash(rows[5]) == 0  # 下个跟进/关闭缺
-    assert _n_hash(rows[2]) > 0      # 今日行照画
+    assert _n_hash(rows[2]) > 0      # 最近跟进行照画
 
 
 def test_timeline_head_tail_marks_when_outside(pkg):
@@ -431,14 +431,14 @@ def test_timeline_head_tail_marks_when_outside(pkg):
     text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
         .read_text(encoding="utf-8")
     rows = _tbl_rows(text, "老单")
-    head_i = _row_cells(rows[0]).index("头")
-    tail_i = _row_cells(rows[0]).index("尾")
+    head_i = _row_cells(rows[0]).index("更早")
+    tail_i = _row_cells(rows[0]).index("更晚")
     close_row = _row_cells(rows[5])
     assert _n_hash(close_row[head_i]) == 4   # 头列画满 4 个 #
     assert _n_hash(close_row[tail_i]) == 4   # 尾列画满 4 个 #
     # v3.8.8：延伸出窗口的边缘月格一律填满 4 个 #（不画残格）
     first_col = _row_cells(rows[0]).index("26-05")
-    today_cells = _row_cells(rows[2])          # 开始-今日（开始 2024 年）
+    today_cells = _row_cells(rows[2])          # 开始-最近跟进（开始 2024 年）
     assert _n_hash(today_cells[first_col]) == 4
     assert _n_hash(rows[5]) == 56    # 12 个月格 48 + 头尾各 4（v3.8.10）
 
@@ -457,7 +457,7 @@ def test_timeline_spot_plot_mode(pkg):
         .read_text(encoding="utf-8")
     rows = _tbl_rows(text, "甲")
     assert _n_hash(rows[4]) == 1     # 开始-下一个跟进：单点
-    assert _n_hash(rows[2]) == 1     # 今日点
+    assert _n_hash(rows[2]) == 1     # 最近跟进点
     assert _n_hash(rows[5]) == 0     # 无关闭 → 空行
     # v3.8.9：点模式用 $ 标记，且所在格其余位用 - 填充
     assert "$" in rows[4] and "###" not in rows[4]
@@ -605,7 +605,7 @@ def test_timeline_dump_prints_csv_only(pkg):
     _mk(pkg, "甲", "2026-11-01", "2026-11-20")
     r = run_ana(pkg, "timeline", "--dump")
     assert r.returncode == 0, r.stderr
-    assert "开始,下一个跟进,关闭,日差,头,26-05,26-06" in r.stdout
+    assert "开始,下一个跟进,关闭,日差,更早,26-05,26-06" in r.stdout
     assert "<font" not in r.stdout
     assert not list(pkg.glob("db_analysis/timeline/*.md"))
 
@@ -618,7 +618,7 @@ def test_timeline_mode_year_columns(pkg):
     text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
         .read_text(encoding="utf-8")
     tbl = [l for l in text.splitlines() if l.startswith("| 开始 |")][0]
-    assert "| 头 | 26-01 |" in tbl and "| 26-12 | 尾 |" in tbl
+    assert "| 更早 | 26-01 |" in tbl and "| 26-12 | 更晚 |" in tbl
 
 
 # ---------- timeline 纯逻辑单元测试（不 subprocess） ----------

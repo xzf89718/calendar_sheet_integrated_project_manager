@@ -305,21 +305,22 @@ def _outside_marks(dates, months, ch="#"):
 
 
 def _base_segments(row, today):
-    """基准 4 行线段（顺序固定）：(标签, 终点日期)。
-    起点恒 = vals[0]（开始）；终点依次为 今日 / 最近跟进(派生) /
+    """基准 4 行线段（顺序 v3.8.11 用户定）：(标签, 终点日期)。
+    起点恒 = vals[0]（开始）；终点依次为 最近跟进(派生) / 今日 /
     下一个跟进 / 关闭。"""
-    return [("今日", today.isoformat()),
-            ("最近跟进", row["vals"][1]),
+    return [("最近跟进", row["vals"][1]),
+            ("今日", today.isoformat()),
             ("下一个跟进", row["vals"][2]),
             ("关闭", row["vals"][3])]
 
 
 def _lead(adds, add_labels, months):
     """表头：前导列名固定（用户定：开始/下一个跟进/关闭），额外列用
-    JSON label；然后 日差 / 头 + 12 个月列 + 尾 / 状态 / 备注。"""
+    JSON label；然后 日差 / 更早 + 12 个月列 + 更晚 / 状态 / 备注
+    （v3.8.11：头/尾 更名 更早/更晚）。"""
     return (["开始", "下一个跟进", "关闭"] + add_labels
-            + ["日差", "头"] + [lab for _y, _m, lab in months]
-            + ["尾", "状态", "备注"])
+            + ["日差", "更早"] + [lab for _y, _m, lab in months]
+            + ["更晚", "状态", "备注"])
 
 
 def _anchor(gname, n):
