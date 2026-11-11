@@ -43,7 +43,8 @@ from . import algo_pie                      # noqa: E402
 # 算法表：子命令名 → (内核函数, 一句话说明)。GUI 预留数据源。
 ALGOS = {
     "pie": (algo_pie.cmd_pies, "选定字段取值分布饼图 + 计数（可多字段）"),
-    "timeline": (None, "项目分类时间点可视化（markdown 表格，非甘特图）"),
+    "timeline": (None, "项目分类时间点可视化（HTML 整页，非甘特图；"
+                 "v3.8.13 起只出 HTML）"),
 }
 
 _LASTS = {"1m": 30, "6m": 183, "1y": 365}
@@ -130,16 +131,14 @@ def _build_parser():
             sp.add_argument("--where", action="append", default=None,
                             metavar="字段=值",
                             help="筛选，可多次；同字段并集、异字段交集")
-            sp.add_argument("--html", action="store_true",
-                            help="写出 .html 整页（v3.8.12）：打开后按窗口"
-                                 "宽度自动适配，右上角 +/-/fit 再缩放；"
-                                 "表结构与 markdown 版一致（默认仍出 md）")
             g = sp.add_mutually_exclusive_group()
             g.add_argument("--path", nargs="?", const="__AUTO__",
                            default="__AUTO__", metavar="目录",
-                           help="markdown 写出目录（默认 db_analysis/"
+                           help="HTML 写出目录（默认 db_analysis/"
                                 "timeline/）；只接受目录，自动命名 "
-                                "timeline_<模式>_<筛选>_<排序>_<时间戳>.md")
+                                "timeline_<模式>_<筛选>_<排序>_<时间戳>"
+                                ".html（v3.8.13 起只出 HTML 整页，md 模式"
+                                "已删）")
             g.add_argument("--dump", action="store_true",
                            help="不写出文件：把表格数据以 csv 文本打印到"
                                 "终端（纯 # 不着色，便于复制再分析）")
@@ -333,17 +332,13 @@ def main(argv=None):
                 print(f"\n（口径：{mode_label}；筛选：{conds}；"
                       f"共 {n_proj} 个项目：{chap}）")
                 return 0
-            # 非 dump：md/html 写文件，终端只打印摘要（用户定 v3.8.1）
-            if a.html:
-                text = tl.render_html(groups, tlcfg, adds, add_labels,
-                                      a.add_plot, add_colors, months,
-                                      mode_label, split=a.split)
-                suffix = ".html"
-            else:
-                text = tl.render_md(groups, tlcfg, adds, add_labels,
-                                    a.add_plot, add_colors, months,
-                                    mode_label, split=a.split)
-                suffix = ".md"
+            # 非 dump：HTML 整页写文件，终端只打印摘要（用户定 v3.8.1；
+            # v3.8.13 起只出 HTML，md 模式删除——markdown 表格宽度不可
+            # 控，无法整体缩放适配窗口，浏览体验不可接受）
+            text = tl.render_html(groups, tlcfg, adds, add_labels,
+                                  a.add_plot, add_colors, months,
+                                  mode_label, split=a.split)
+            suffix = ".html"
             out_dir = os.path.join(BASE_DIR, "db_analysis", "timeline")
             path = _resolve_out(a.path, stem, suffix,
                                 conds, out_dir, prefix="timeline")

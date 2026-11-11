@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """时间线算法（v3.8.0 首版；v3.8.1 返修；v3.8.3 用户贴图定版；
 v3.8.4 配置化 + CLI 改版，用户定）：
-项目分类时间点可视化——markdown 每项目一张表。
+项目分类时间点可视化——HTML 整页，每项目一张表（v3.8.13 起只出 HTML；md 模式删除：markdown 表格宽度不可控，无法整体缩放适配窗口，浏览体验不可接受）。
 
 命名定案（2026-11-10 用户定）：**不叫甘特图**。甘特图 = 持续时间条 +
 完成百分比 + 依赖关系；本软件只有离散时间点 + 类别，不做进度
@@ -343,7 +343,7 @@ def _diff_text(r):
 def _render_rows(r, tl, adds, add_labels, add_plot, add_colors,
                  months, t):
     """一个项目的全部表体行（3 日期值/额外列值/日差/状态在第一行
-    线段行上；项目名已移出表格，由 render_md 单独作标题），已按列
+    线段行上；项目名已移出表格，由 render_html 单独作标题），已按列
     展开。返回 [[str...]]（不含表头/分隔）。"""
     from config import CFG
     n_lead = 3 + len(adds)
@@ -377,42 +377,6 @@ def _render_rows(r, tl, adds, add_labels, add_plot, add_colors,
                 note]
         out.append(row)
     return out
-
-
-def render_md(rows_groups, tl, adds, add_labels, add_plot, add_colors,
-              months, mode_label, today=None, split=False):
-    """markdown 文本（用户定，v3.8.6）：每项目一张表；项目名作表格外
-    单独一行标题（加粗放大字体、不带数据）；第一行线段行带 3 日期值/
-    额外列值/日差(负标红)/状态；其余线段行只有 # 线 + 头尾标注
-    （</>标注）+ 备注；基准段字段/画法/色在 JSON timeline 段；
-    --split 时文首给章导航超链接。"""
-    t = today or date.today()
-    lead = _lead(adds, add_labels, months)
-    sep = ["---"] * len(lead)
-    out = [f"# 项目时间线图（{mode_label}）\n"]
-    if split:
-        out.append("  ".join(f"[{n}（{len(g)} 个项目）]({_anchor(n, len(g))})"
-                             for n, g in rows_groups) + "\n")
-    legend = [f'<font color="{tl["colors"][i]}">■</font>开始-{lab}'
-              for i, (lab, _e) in enumerate(_base_segments(
-                  {"vals": [None] * 4}, t))]
-    legend += [f'<font color="{add_colors[i % len(add_colors)]}">■</font>'
-               + (f"开始-{lab}" if add_plot == "line" else lab)
-               for i, lab in enumerate(add_labels)]
-    out.append("  ".join(legend) + "\n")
-    for gname, grows in rows_groups:
-        out.append(f"## {gname}（{len(grows)} 个项目）\n")
-        for r in grows:
-            # v3.8.6（用户定）：项目名移出表格，单独一行加粗放大标题
-            out.append(f'<font size="5"><b>{r["name"]}</b></font>')
-            out.append("")
-            out.append("| " + " | ".join(lead) + " |")
-            out.append("|" + "|".join(sep) + "|")
-            for row in _render_rows(r, tl, adds, add_labels, add_plot,
-                                    add_colors, months, t):
-                out.append("| " + " | ".join(row) + " |")
-            out.append("")
-    return "\n".join(out)
 
 
 _HTML_HEAD = """<!doctype html>
@@ -452,15 +416,15 @@ window.addEventListener('load',fit);
 
 def render_html(rows_groups, tl, adds, add_labels, add_plot, add_colors,
                 months, mode_label, today=None, split=False):
-    """HTML 整页（v3.8.12 用户定：markdown 宽度不可控，HTML 才能整体
-    缩放）——打开后整页按窗口宽度自动适配（fit），右上角 +/-/fit
-    按钮可再放大缩小。表结构与 markdown 版一致。"""
+    """HTML 整页（v3.8.12 用户定；v3.8.13 起为唯一输出）——打开后
+    整页按窗口宽度自动适配（fit），右上角 +/-/fit 按钮可再放大
+    缩小。"""
     t = today or date.today()
     lead = _lead(adds, add_labels, months)
     out = [_HTML_HEAD, f"<h1>项目时间线图（{mode_label}）</h1>"]
     if split:
         out.append("<p>" + "  ".join(
-            f'<a href="#{_anchor(n, len(g))}">{n}（{len(g)} 个项目）</a>'
+            f'<a href="{_anchor(n, len(g))}">{n}（{len(g)} 个项目）</a>'
             for n, g in rows_groups) + "</p>")
     legend = [f'<font color="{tl["colors"][i]}">■</font>开始-{lab}'
               for i, (lab, _e) in enumerate(_base_segments(
@@ -470,7 +434,7 @@ def render_html(rows_groups, tl, adds, add_labels, add_plot, add_colors,
                for i, lab in enumerate(add_labels)]
     out.append("<p>" + "  ".join(legend) + "</p>")
     for gname, grows in rows_groups:
-        out.append(f'<h2 id="{_anchor(gname, len(grows))}">'
+        out.append(f'<h2 id="{_anchor(gname, len(grows)).lstrip("#")}">'
                    f"{gname}（{len(grows)} 个项目）</h2>")
         for r in grows:
             out.append(f'<div class="pname">{r["name"]}</div>')

@@ -11,6 +11,7 @@
 """
 
 from config import CFG
+from db import normalize_date
 
 
 class AnalysisError(Exception):
@@ -48,9 +49,21 @@ def _parse_where(items):
         if name not in ftypes:
             raise AnalysisError(f"不存在的字段：{name}"
                                 f"（可用：{'、'.join(CFG.names)}）")
-        if ftypes[name] == "date" and "~" in raw:
+        if "~" in raw:
+            # v3.8.14：与 workbench_ui 对齐——非日期字段用 ~ 明确报错，
+            # 非法日期/反向区间不再静默落到误导性的空结果
+            if ftypes[name] != "date":
+                raise AnalysisError(f"字段 {name} 不是日期字段，"
+                                    f"不能用 ~ 区间：{item!r}")
             d1, _, d2 = raw.partition("~")
-            ranges.append((name, d1.strip() or None, d2.strip() or None))
+            d1 = normalize_date(d1.strip()) if d1.strip() else None
+            d2 = normalize_date(d2.strip()) if d2.strip() else None
+            if d1 is None and d2 is None:
+                raise AnalysisError(f"区间不是有效日期：{raw!r}（应为 "
+                                    f"起~止，任一端可省略）")
+            if d1 and d2 and d1 > d2:
+                raise AnalysisError(f"区间起点晚于终点：{d1}~{d2}")
+            ranges.append((name, d1, d2))
         else:
             filters.setdefault(name, set()).add(raw.strip())
     return filters, ranges
