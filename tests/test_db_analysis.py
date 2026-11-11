@@ -317,9 +317,11 @@ def _row_cells(line):
 
 
 def _n_hash(line):
-    """去掉 font 标签与颜色码后数 # 个数（月格内 4 字符）。"""
+    """去掉 font 标签与颜色码后数标记个数（# 与 $，月格内 4 字符；
+    v3.8.9 起 spot 模式用 $）。"""
     import re
-    return re.sub(r"</?font[^>]*>|#\w{6}", "", line).count("#")
+    s = re.sub(r"</?font[^>]*>|#\w{6}", "", line)
+    return s.count("#") + s.count("$")
 
 
 def test_timeline_nondump_prints_summary_and_writes_file(pkg):
@@ -360,6 +362,24 @@ def test_timeline_title_row_and_fixed_col_names(pkg):
     assert lead[2].isdigit() and lead[3] == "跟进中"
     for i, lab in enumerate(["今日", "最近跟进", "下一个跟进", "关闭"]):
         assert _row_cells(rows[2 + i])[-1] == f"开始-{lab}"
+
+
+def test_timeline_line_partial_cell_dash_filled(pkg):
+    """v3.8.9（用户定）：连线模式被触月格内，范围外用 - 填充（每格
+    恒 4 字符）；点模式用 $ 标记。"""
+    import re
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    r = run_ana(pkg, "timeline")
+    assert r.returncode == 0, r.stderr
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
+        .read_text(encoding="utf-8")
+    rows = _tbl_rows(text, "甲")
+    col = _row_cells(rows[0]).index("26-11")
+    clean = lambda s: re.sub(r"</?font[^>]*>|#\w{6}", "", s)
+    # 开始-下一个跟进（11-01 ~ 11-20，周 1→3）：26-11 格 = ###-
+    assert clean(_row_cells(rows[4])[col]) == "###-"
+    # 开始-今日（11-01 ~ 11-10，周 1→2）：26-11 格 = ##--
+    assert clean(_row_cells(rows[2])[col]) == "##--"
 
 
 def test_timeline_negative_diff_red(pkg):
@@ -438,6 +458,8 @@ def test_timeline_spot_plot_mode(pkg):
     assert _n_hash(rows[4]) == 1     # 开始-下一个跟进：单点
     assert _n_hash(rows[2]) == 1     # 今日点
     assert _n_hash(rows[5]) == 0     # 无关闭 → 空行
+    # v3.8.9：点模式用 $ 标记，且所在格其余位用 - 填充
+    assert "$" in rows[4] and "###" not in rows[4]
 
 
 def test_timeline_add_col_spot_and_colors(pkg):

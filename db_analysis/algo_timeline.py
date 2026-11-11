@@ -264,12 +264,25 @@ def _plot_cells(mode, start, end, months):
     return _seg_cells(start, end, months)
 
 
-def _month_cells(cells):
-    """绝对周列集合 → 12 个月格文本，每格 4 字符（# 或空格，对应
-    每月 4 周；用户定：月格而不是 48 个编号列）。"""
-    return ["".join("#" if mi * WEEKS_PER_MONTH + wk in cells else " "
-                    for wk in range(WEEKS_PER_MONTH))
-            for mi in range(12)]
+def _month_cells(cells, ch="#", pad="-"):
+    """绝对周列集合 → 12 个月格文本，每格 4 字符（对应每月 4 周；
+    用户定：月格而不是 48 个编号列）。v3.8.9：被线段触到的月格内，
+    范围外一律 pad 填充（保证格长一致、线看起来连续；pad 默认
+    "-"），未被触到的月格仍为空格；ch = 标记字符（spot 模式传
+    "$"）。"""
+    if not cells:
+        return [" " * WEEKS_PER_MONTH] * 12
+    si, ei = min(cells), max(cells)
+    out = []
+    for mi in range(12):
+        lo = mi * WEEKS_PER_MONTH
+        hi = lo + WEEKS_PER_MONTH - 1
+        if hi < si or lo > ei:
+            out.append(" " * WEEKS_PER_MONTH)
+        else:
+            out.append("".join(ch if w in cells else pad
+                               for w in range(lo, hi + 1)))
+    return out
 
 
 def _outside_labels(dates, months):
@@ -354,7 +367,8 @@ def _render_rows(r, tl, adds, add_labels, add_plot, add_colors,
         lead_vals = first_vals if si == 0 else [""] * n_lead
         row = lead_vals + [_diff_text(r) if si == 0 else "", head]
         row += [f'<font color="{color}">{c}</font>' if "#" in c else c
-                for c in _month_cells(cells)]
+                for c in _month_cells(cells, ch="$" if mode == "spot"
+                                      else "#")]
         row += [tail,
                 r["status_val"] if si == 0 and r["status_val"] else "",
                 note]
@@ -435,7 +449,8 @@ def _csv_rows(r, tl, adds, add_labels, add_plot, add_colors, months, t):
         out.append(lead_vals
                    + [str(r["diff"]) if si == 0 and r["diff"] is not None
                       else "", head]
-                   + _month_cells(cells)
+                   + _month_cells(cells, ch="$" if mode == "spot"
+                                  else "#")
                    + [tail,
                       r["status_val"] if si == 0 and r["status_val"] else "",
                       note])
