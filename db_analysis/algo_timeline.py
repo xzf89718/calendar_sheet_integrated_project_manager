@@ -1,51 +1,66 @@
 # -*- coding: utf-8 -*-
-"""时间线算法（v3.8.0 首版；v3.8.1 用户返修重排）：
-项目分类时间点可视化——markdown 每项目一张表。
+"""时间线算法（v3.8.0 首版；v3.8.1 返修；v3.8.3 用户贴图定版；
+v3.8.4 配置化 + CLI 改版，用户定）：
+项目分类时间点可视化——HTML 整页，每项目一张表（v3.8.13 起只出 HTML；md 模式删除：markdown 表格宽度不可控，无法整体缩放适配窗口，浏览体验不可接受）。
 
 命名定案（2026-11-10 用户定）：**不叫甘特图**。甘特图 = 持续时间条 +
 完成百分比 + 依赖关系；本软件只有离散时间点 + 类别，不做进度
 评估——给证据不给结论。
 
-v3.8.1 布局（用户定）：
-- 非 dump 模式终端不打印 md 本体，只打印筛选条件 + 统计 +
-  写出路径（md 恒写出为文件）；--dump 才把 csv 文本打到终端；
-- 每项目一张独立表（表头分开，不再拼成大表）；
-- 4 个日期值 + 状态列在同一行（不再 4 行错开），状态列在最后；
-- 月网格 = 12 个月 × 4 周列；从**开始日期**起逐周画 `#` 连成线——
-  终点：已关闭 → 关闭日期（无关闭 = 单点）；进行中 → 下个跟进，
-  无下个跟进 → 拖到窗口尾；开始日期在窗外则夹到边界起线，窗外
-  日期标注在头/尾列；
-- 头、尾各一个窗外标注列，与 12 个月块之间断开 4 个空列；
-- 4 个日期列由 CLI 强制指定（--cols required），不自动推导。
+v3.8.4 版式与口径（用户定，6 点）：
+- 项目名不是列；v3.8.6 起移出表格，作表格外单独一行标题（加粗
+  放大字体、不带数据）；3 个日期值 / 日差 / 状态在表内第一行
+  线段行；
+- 前导列名固定：开始 / 下一个跟进 / 关闭（不用 JSON label）；
+- 日差 < 0 时数字标红；
+- 头/尾列：延伸出窗口时直接画满 4 个标记字符（v3.8.10 用户定：
+  填 # / spot 填 $，不再填文字标注）；
+- 基准四列（开始→今日 / 最近跟进 / 下个跟进 / 关闭）的字段、派生
+  「最近跟进」列名、绘图模式（line 两日期连线 / spot 单日期画点）、
+  配色全部进 fields.json 的 timeline 段（派生列命名 last_snapshot，
+  不属于 fields 的 name）；--cols / --colors 删除；
+- CLI 增量：--add-col 字段（额外列 + 对应图行）、--add-plot
+  line|spot（额外列的画法）、--add-colors（只给额外列配色）。
 
 铁律：绝不写库（db_analysis 全模块同）。取数当前行口径。
 """
 
+import re
 from datetime import date
 
 from .analysis_core import AnalysisError, _parse_where
 
-# 连线与图例默认配色（绿/蓝/橙/红，CLI 可覆盖；连线用 colors[0]）
-DEFAULT_COLORS = ["#2e7d32", "#1565c0", "#e65100", "#c62828"]
-# 每个月的周列数（用户定：4 个 # 分四周）
+# 4 行基准线段兜底配色（绿/蓝/橙/紫；JSON timeline.colors 优先）
+DEFAULT_COLORS = ["#2e7d32", "#1565c0", "#e65100", "#7b1fa2"]
+# 额外列（--add-col）兜底配色轮盘
+DEFAULT_ADD_COLORS = ["#c62828", "#00695c", "#5d4037", "#455a64"]
+# 每个月的周格数（用户定：4 个 # 分四周）
 WEEKS_PER_MONTH = 4
-# 窗外列与 12 个月块之间断开的空列数（用户定）
-GAP_COLS = 4
+# 日差为负的标红色（用户定）
+DIFF_RED = "#c62828"
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
-def validate_cols(cols):
-    """4 列逐一校验：必须是存在的字段名且为 date 类型。
-    返回 4 个展示名列表（fields.json 的 label）。"""
+def load_tl():
+    """读并校验 CFG.timeline（config.py 已合并 JSON 配置与
+    calendar 法定三类兜底）。返回 dict(start, next, close, last,
+    plot, colors)。配置错误抛 AnalysisError。"""
     from config import CFG
+    tl = dict(CFG.timeline)
     ftypes = {f["name"]: f["type"] for f in CFG.fields}
-    labels = CFG.labels
-    for c in cols:
-        if c not in ftypes:
-            raise AnalysisError(f"--cols 不存在的字段：{c}"
-                                f"（可用：{'、'.join(CFG.names)}）")
-        if ftypes[c] != "date":
-            raise AnalysisError(f"--cols 必须是 date 类型字段：{c}")
-    return [labels.get(c, c) for c in cols]
+    for k in ("start", "next", "close"):
+        f = tl.get(k)
+        if not f or ftypes.get(f) != "date":
+            raise AnalysisError(
+                f"timeline 配置缺少有效的 {k} 日期字段：{f!r}"
+                f"（在 fields.json 的 timeline 段配置）")
+    if tl["plot"] not in ("line", "spot"):
+        raise AnalysisError(
+            f"timeline.plot 只支持 line / spot：{tl['plot']!r}")
+    colors = tl["colors"]
+    if len(colors) < 4 or any(not _HEX.match(c) for c in colors):
+        raise AnalysisError("timeline.colors 需要 4 个 #RRGGBB 颜色")
+    return tl
 
 
 def window_months(mode, today=None):
@@ -94,42 +109,59 @@ def _where_sql(where):
     return wheres, args
 
 
-def collect(db, cols, where=None):
+def collect(db, adds=(), where=None):
     """当前行口径取数：open + closed 全取（--split 时归「已关闭」章）。
-    返回 [dict(id,title,status_val,archived,vals=[4 个日期或 None],
-    sortmap)]；status_val = 快照里 type=status 字段的显示值（md 状态列）。"""
+    基准字段取自 CFG.timeline；vals = [开始, 最近跟进(最新快照,
+    派生), 下一个跟进, 关闭]；「最近跟进」列名 = timeline.last
+    （默认 last_snapshot，不属于 fields 的 name）。
+    adds = --add-col 的额外字段名列表（必须是 date 字段）。
+    返回 [dict(id,title,status_val,archived,vals,adds,sortmap)]。"""
     from config import CFG
+    tl = load_tl()
+    for a in adds:
+        ft = next((f["type"] for f in CFG.fields if f["name"] == a), None)
+        if ft != "date":
+            raise AnalysisError(f"--add-col 必须是 date 类型字段：{a}")
     status_field = next((f["name"] for f in CFG.fields
                          if f["type"] == "status"), None)
-    sel_cols = list(cols)
+    base = [tl["start"], tl["next"], tl["close"]]
+    sel_cols = base + [a for a in adds if a not in base]
     if status_field and status_field not in sel_cols:
         sel_cols.append(status_field)
     extra = sorted({f["name"] for f in CFG.fields} - set(sel_cols))
     sel = ", ".join(f"s.{c}" for c in sel_cols + extra)
     wheres, args = _where_sql(where)
     wh = ("WHERE " + " AND ".join(wheres)) if wheres else ""
-    sql = (f"SELECT p.id, p.title, p.status AS pstatus, {sel} "
-           f"FROM snapshots s JOIN projects p ON p.id = s.project_id "
-           f"AND s.id = p.current_id {wh}")
+    sql = (f"SELECT p.id, p.title, p.status AS pstatus, "
+           f"l.last_at AS last_at, {sel} "
+           f"FROM snapshots s "
+           f"JOIN projects p ON p.id = s.project_id "
+           f"AND s.id = p.current_id "
+           f"LEFT JOIN (SELECT project_id, MAX(snapshot_at) AS last_at "
+           f"FROM snapshots GROUP BY project_id) l "
+           f"ON l.project_id = p.id {wh}")
     rows = []
     for r in db.conn.execute(sql, args).fetchall():
         rows.append({"id": r["id"], "title": r["title"],
                      "status_val": r[status_field] if status_field else "",
                      "archived": r["pstatus"] == "closed",
-                     "vals": [r[c] for c in cols],
+                     "vals": [r[tl["start"]],
+                              r["last_at"][:10] if r["last_at"] else None,
+                              r[tl["next"]], r[tl["close"]]],
+                     "adds": {a: r[a] for a in adds},
                      "sortmap": {c: r[c] for c in sel_cols + extra},
                      "diff": None})
     return rows
 
 
-def enrich(rows, cols, today=None):
-    """计算日差（cols 第三列 − 今天，天）并补项目显示名。
+def enrich(rows, today=None):
+    """计算日差（timeline.next − 今天，天）并补项目显示名。
     归档项目的 diff 恒为 None。today 可注入（测试确定性）。"""
     from config import CFG
     t = today or date.today()
     name_cols = [c for c in CFG.name_fields if c in CFG.names]
     for row in rows:
-        if not row["archived"] and len(cols) >= 3 and row["vals"][2]:
+        if not row["archived"] and row["vals"][2]:
             d0 = date.fromisoformat(row["vals"][2])
             row["diff"] = (d0 - t).days
         name = "-".join(str(row["sortmap"].get(c) or "")
@@ -196,108 +228,269 @@ def _cell_index(dstr, months):
     return hit[0] * WEEKS_PER_MONTH + min(wk, WEEKS_PER_MONTH - 1)
 
 
-def _outside(row, months):
-    """(头月份列表, 尾月份列表)：4 个日期里落在窗口外的，去重排序。"""
-    head, tail = [], []
+def _seg_cells(start, end, months):
+    """line 模式：start→end 的绝对周列集合；任一端缺失 → 空（行保留
+    不画线，用户定）；窗外夹边界；start 在 end 之后 → 空。"""
+    if not start or not end:
+        return set()
+    si = _cell_index(start, months)
+    ei = _cell_index(end, months)
+    if si > ei:
+        return set()
+    cells = set(range(si, ei + 1))
+    # v3.8.8（用户定）：延伸出窗口 → 边缘月格一律填满 4 个 #，
+    # 不再按夹边界后的周数画残格（避免看起来像中间断开）
     lo = (months[0][0], months[0][1])
     hi = (months[-1][0], months[-1][1])
-    for d in row["vals"]:
+    if (int(start[:4]), int(start[5:7])) < lo:
+        cells.update(range(0, WEEKS_PER_MONTH))
+    if (int(end[:4]), int(end[5:7])) > hi:
+        base = (len(months) - 1) * WEEKS_PER_MONTH
+        cells.update(range(base, base + WEEKS_PER_MONTH))
+    return cells
+
+
+def _spot_cells(end, months):
+    """spot 模式：只在 end 日期所在周格画一个点（单 #）；
+    日期缺失 → 空。"""
+    if not end:
+        return set()
+    return {_cell_index(end, months)}
+
+
+def _plot_cells(mode, start, end, months):
+    if mode == "spot":
+        return _spot_cells(end, months)
+    return _seg_cells(start, end, months)
+
+
+def _month_cells(cells, ch="#", pad="-"):
+    """绝对周列集合 → 12 个月格文本，每格 4 字符（对应每月 4 周；
+    用户定：月格而不是 48 个编号列）。v3.8.9：被线段触到的月格内，
+    范围外一律 pad 填充（保证格长一致、线看起来连续；pad 默认
+    "-"），未被触到的月格仍为空格；ch = 标记字符（spot 模式传
+    "$"）。"""
+    if not cells:
+        return [" " * WEEKS_PER_MONTH] * 12
+    si, ei = min(cells), max(cells)
+    out = []
+    for mi in range(12):
+        lo = mi * WEEKS_PER_MONTH
+        hi = lo + WEEKS_PER_MONTH - 1
+        if hi < si or lo > ei:
+            out.append(" " * WEEKS_PER_MONTH)
+        else:
+            out.append("".join(ch if w in cells else pad
+                               for w in range(lo, hi + 1)))
+    return out
+
+
+def _outside_marks(dates, months, ch="#"):
+    """日期列表 → (头标记, 尾标记)：延伸出窗口的，对应列直接画满
+    4 个标记字符（用户定 v3.8.10：头/尾列填 #，不再填文字标注；
+    spot 模式传 "$"），没有窗外延伸则空。"""
+    lo = (months[0][0], months[0][1])
+    hi = (months[-1][0], months[-1][1])
+    head = tail = False
+    for d in dates:
         if not d:
             continue
         ym = (int(d[:4]), int(d[5:7]))
-        tag = f"{ym[0]}-{ym[1]:02d}"
         if ym < lo:
-            head.append(tag)
+            head = True
         elif ym > hi:
-            tail.append(tag)
-    return sorted(set(head)), sorted(set(tail))
+            tail = True
+    mark = ch * WEEKS_PER_MONTH
+    return (mark if head else "", mark if tail else "")
 
 
-def _line_cols(row, months):
-    """连线占的 (月idx, 周idx) 集合 + (头月份, 尾月份)。
-    起点 = cols[0]（开始）；终点：已关闭 → cols[3]（无则单点）；
-    进行中 → cols[2]，无则拖到窗口尾。起点缺失 → 空线。"""
-    start = row["vals"][0]
-    if not start:
-        return set(), _outside(row, months)
-    if row["archived"]:
-        end = row["vals"][3] or start
-    else:
-        end = row["vals"][2]
-    si = _cell_index(start, months)
-    ei = _cell_index(end, months) if end \
-        else len(months) * WEEKS_PER_MONTH - 1
-    cells = set()
-    for c in range(min(si, ei), max(si, ei) + 1):
-        cells.add((c // WEEKS_PER_MONTH, c % WEEKS_PER_MONTH))
-    return cells, _outside(row, months)
+def _base_segments(row, today):
+    """基准 4 行线段（顺序 v3.8.11 用户定）：(标签, 终点日期)。
+    起点恒 = vals[0]（开始）；终点依次为 最近跟进(派生) / 今日 /
+    下一个跟进 / 关闭。"""
+    return [("最近跟进", row["vals"][1]),
+            ("今日", today.isoformat()),
+            ("下一个跟进", row["vals"][2]),
+            ("关闭", row["vals"][3])]
 
 
-def _month_grid_header(months):
-    """12 个月 × 4 周列表头：每月首列挂月份标签，其余空。"""
-    head, sep = [], []
-    for _y, _m, label in months:
-        head += [label, "", "", ""]
-        sep += ["---"] * WEEKS_PER_MONTH
-    return head, sep
+def _lead(adds, add_labels, months):
+    """表头：前导列名固定（用户定：开始/下一个跟进/关闭），额外列用
+    JSON label；然后 日差 / 更早 + 12 个月列 + 更晚 / 状态 / 备注
+    （v3.8.11：头/尾 更名 更早/更晚）。"""
+    return (["开始", "下一个跟进", "关闭"] + add_labels
+            + ["日差", "更早"] + [lab for _y, _m, lab in months]
+            + ["更晚", "状态", "备注"])
 
 
-def _grid_cells(line_cells):
-    """(月,周) 集合 → 12×4 的格子文本列表（# 或空）。"""
-    return ["#" if (mi, wk) in line_cells else ""
-            for mi in range(12) for wk in range(WEEKS_PER_MONTH)]
+def _anchor(gname, n):
+    """章标题 → GitHub 风格 md 锚点（小写、空格转 -、去掉括号）。"""
+    h = f"{gname}（{n} 个项目）"
+    h = re.sub(r"[（）()]", "", h)
+    return "#" + re.sub(r"\s+", "-", h.strip().lower())
 
 
-def _lead_header(col_labels, months):
-    """前导列（项目/日差/4 日期/状态）+ 头列 + 4 空列 + 48 周列 +
-    4 空列 + 尾列（窗外区域与月块两侧各断开 4 列，用户定）。"""
-    head_m, sep_m = _month_grid_header(months)
-    lead = ["项目", "日差"] + col_labels + ["状态", "头"] \
-        + [""] * GAP_COLS + head_m + [""] * GAP_COLS + ["尾"]
-    lead_sep = ["---"] * (6 + 2 + 2 * GAP_COLS) + sep_m
-    return lead, lead_sep
+def _diff_text(r):
+    """日差文本；< 0 标红（用户定 v3.8.4）。"""
+    if r["diff"] is None:
+        return ""
+    txt = str(r["diff"])
+    if r["diff"] < 0:
+        return f'<font color="{DIFF_RED}">{txt}</font>'
+    return txt
 
 
-def _lead_row(r, head_out):
-    return [r["name"],
-            str(r["diff"]) if r["diff"] is not None else "",
-            ] + [v or "" for v in r["vals"]] \
-        + [r["status_val"] or "", head_out]
+def _render_rows(r, tl, adds, add_labels, add_plot, add_colors,
+                 months, t):
+    """一个项目的全部表体行（3 日期值/额外列值/日差/状态在第一行
+    线段行上；项目名已移出表格，由 render_html 单独作标题），已按列
+    展开。返回 [[str...]]（不含表头/分隔）。"""
+    from config import CFG
+    n_lead = 3 + len(adds)
+    # 数据值放第一行线段行的前导列：开始/下一个跟进/关闭 + 额外列
+    out = []
+    first_vals = ([r["vals"][0] or "", r["vals"][2] or "",
+                   r["vals"][3] or ""]
+                  + [r["adds"].get(a) or "" for a in adds])
+    segs = [(f"开始-{lab}", end, tl["plot"], tl["colors"][i])
+            for i, (lab, end) in enumerate(_base_segments(r, t))]
+    for ai, a in enumerate(adds):
+        lab = add_labels[ai]
+        note = f"开始-{lab}" if add_plot == "line" else lab
+        segs.append((note, r["adds"].get(a), add_plot,
+                     add_colors[ai % len(add_colors)]))
+    for si, (note, end, mode, color) in enumerate(segs):
+        start = r["vals"][0] if mode == "line" else None
+        ch = "$" if mode == "spot" else "#"
+        cells = _plot_cells(mode, start, end, months)
+        head, tail = _outside_marks(
+            [start, end] if mode == "line" else [end], months, ch)
+        lead_vals = first_vals if si == 0 else [""] * n_lead
+        row = lead_vals + [_diff_text(r) if si == 0 else "",
+                           f'<font color="{color}">{head}</font>'
+                           if head else ""]
+        row += [f'<font color="{color}">{c}</font>'
+                if ch in c else c
+                for c in _month_cells(cells, ch=ch)]
+        row += [f'<font color="{color}">{tail}</font>' if tail else "",
+                r["status_val"] if si == 0 and r["status_val"] else "",
+                note]
+        out.append(row)
+    return out
 
 
-def render_md(rows_groups, col_labels, months, colors, mode_label):
-    """markdown 文本：每项目一张表；# 连线用 colors[0] 着色。"""
-    lead, lead_sep = _lead_header(col_labels, months)
-    out = [f"# 项目时间线图（{mode_label}）\n"]
-    out.append("  ".join(f'<font color="{colors[i]}">■</font>'
-                         f'{col_labels[i]}' for i in range(4)) + "\n")
+_HTML_HEAD = """<!doctype html>
+<html><head><meta charset="utf-8">
+<title>项目时间线图</title>
+<style>
+body{font-family:Microsoft YaHei,sans-serif;margin:10px}
+.pname{font-weight:bold;font-size:22px;margin:14px 0 4px}
+table{border-collapse:collapse;margin-bottom:14px}
+td,th{border:1px solid #999;padding:2px 8px;white-space:pre;
+      font-family:Consolas,Menlo,monospace;text-align:center}
+h2{margin:18px 0 6px}
+a{color:#1565c0}
+#bar{position:fixed;top:6px;right:10px;z-index:9;background:#fff;
+     border:1px solid #aaa;padding:4px 10px;font-size:14px}
+#bar button{font-size:16px;margin:0 2px}
+</style></head><body>
+<div id="bar"><button onclick="zoom(1.25)">+</button>
+<button onclick="zoom(0.8)">-</button>
+<button onclick="fit()">fit</button></div>
+<div id="page">
+"""
+
+_HTML_TAIL = """</div>
+<script>
+var z=1;
+function apply(){document.getElementById('page').style.zoom=z;}
+function zoom(f){z*=f;apply();}
+function fit(){var w=document.documentElement.clientWidth-30;var tw=0;
+document.querySelectorAll('#page table').forEach(function(t){
+tw=Math.max(tw,t.offsetWidth);});
+if(tw>0){z=Math.min(Math.max(w/tw,0.2),4);}apply();}
+window.addEventListener('load',fit);
+</script></body></html>
+"""
+
+
+def render_html(rows_groups, tl, adds, add_labels, add_plot, add_colors,
+                months, mode_label, today=None, split=False):
+    """HTML 整页（v3.8.12 用户定；v3.8.13 起为唯一输出）——打开后
+    整页按窗口宽度自动适配（fit），右上角 +/-/fit 按钮可再放大
+    缩小。"""
+    t = today or date.today()
+    lead = _lead(adds, add_labels, months)
+    out = [_HTML_HEAD, f"<h1>项目时间线图（{mode_label}）</h1>"]
+    if split:
+        out.append("<p>" + "  ".join(
+            f'<a href="{_anchor(n, len(g))}">{n}（{len(g)} 个项目）</a>'
+            for n, g in rows_groups) + "</p>")
+    legend = [f'<font color="{tl["colors"][i]}">■</font>开始-{lab}'
+              for i, (lab, _e) in enumerate(_base_segments(
+                  {"vals": [None] * 4}, t))]
+    legend += [f'<font color="{add_colors[i % len(add_colors)]}">■</font>'
+               + (f"开始-{lab}" if add_plot == "line" else lab)
+               for i, lab in enumerate(add_labels)]
+    out.append("<p>" + "  ".join(legend) + "</p>")
     for gname, grows in rows_groups:
-        out.append(f"## {gname}（{len(grows)} 个项目）\n")
+        out.append(f'<h2 id="{_anchor(gname, len(grows)).lstrip("#")}">'
+                   f"{gname}（{len(grows)} 个项目）</h2>")
         for r in grows:
-            line_cells, (head_out, tail_out) = _line_cols(r, months)
-            grid = [f'<font color="{colors[0]}">{c}</font>' if c else ""
-                    for c in _grid_cells(line_cells)]
-            row = _lead_row(r, "、".join(head_out)) \
-                + [""] * GAP_COLS + grid + [""] * GAP_COLS \
-                + ["、".join(tail_out)]
-            out.append("### " + r["name"] + "\n")
-            out.append("| " + " | ".join(lead) + " |")
-            out.append("|" + "|".join(lead_sep) + "|")
-            out.append("| " + " | ".join(row) + " |")
-            out.append("")
+            out.append(f'<div class="pname">{r["name"]}</div>')
+            out.append("<table>")
+            out.append("<tr>" + "".join(f"<th>{c}</th>" for c in lead)
+                       + "</tr>")
+            for row in _render_rows(r, tl, adds, add_labels, add_plot,
+                                    add_colors, months, t):
+                out.append("<tr>" + "".join(f"<td>{c}</td>" for c in row)
+                           + "</tr>")
+            out.append("</table>")
+    out.append(_HTML_TAIL)
     return "\n".join(out)
 
 
-def dump_csv_text(rows_groups, col_labels, months):
+def dump_csv_text(rows_groups, tl, adds, add_labels, add_plot, add_colors,
+                  months, today=None):
     """csv 文本（--dump 终端打印用）：与 md 同网格，纯 # 不着色。"""
-    lead, _sep = _lead_header(col_labels, months)
+    t = today or date.today()
+    lead = _lead(adds, add_labels, months)
     out = [",".join(lead)]
     for gname, grows in rows_groups:
         out.append(f"# {gname}（{len(grows)} 个项目）")
         for r in grows:
-            line_cells, (head_out, tail_out) = _line_cols(r, months)
-            row = _lead_row(r, "、".join(head_out)) \
-                + [""] * GAP_COLS + _grid_cells(line_cells) \
-                + [""] * GAP_COLS + ["、".join(tail_out)]
-            out.append(",".join(row))
+            for row in _csv_rows(r, tl, adds, add_labels, add_plot,
+                                 add_colors, months, t):
+                out.append(",".join(row))
     return "\n".join(out)
+
+
+def _csv_rows(r, tl, adds, add_labels, add_plot, add_colors, months, t):
+    """一个项目的 csv 表体行（与 _render_rows 同结构，纯 # 无颜色）。"""
+    n_lead = 3 + len(adds)
+    out = [[r["name"]] + [""] * (n_lead + 1 + 1 + 12 + 3 - 1)]  # 项目名行
+    first_vals = ([r["vals"][0] or "", r["vals"][2] or "",
+                   r["vals"][3] or ""]
+                  + [r["adds"].get(a) or "" for a in adds])
+    segs = [(lab, end, tl["plot"])
+            for lab, end in _base_segments(r, t)]
+    for ai, a in enumerate(adds):
+        lab = add_labels[ai]
+        note = f"开始-{lab}" if add_plot == "line" else lab
+        segs.append((note, r["adds"].get(a), add_plot))
+    for si, (note, end, mode) in enumerate(segs):
+        start = r["vals"][0] if mode == "line" else None
+        cells = _plot_cells(mode, start, end, months)
+        head, tail = _outside_marks(
+            [start, end] if mode == "line" else [end], months,
+            "$" if mode == "spot" else "#")
+        lead_vals = first_vals if si == 0 else [""] * n_lead
+        out.append(lead_vals
+                   + [str(r["diff"]) if si == 0 and r["diff"] is not None
+                      else "", head]
+                   + _month_cells(cells, ch="$" if mode == "spot"
+                                  else "#")
+                   + [tail,
+                      r["status_val"] if si == 0 and r["status_val"] else "",
+                      note])
+    return out

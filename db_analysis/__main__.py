@@ -7,9 +7,13 @@ v3.5.2 默认输出目录 + --dump 改名；v3.8.0 timeline 时间线图）。
             [--from YYYY-MM-DD --to YYYY-MM-DD | --last 1m|6m|1y]
             [--png [路径或目录]] [--dump [路径或目录]]
 
-    python -m db_analysis timeline [--mode year|rolling] [--cols 4个字段]
-            [--colors 4个#RRGGBB] [--sort 字段|diff] [--desc] [--split]
-            [--where 字段=值 ...] [--path [目录]] [--dump]
+    python -m db_analysis timeline [--mode year|rolling]
+            [--add-col 字段 ...] [--add-plot line|spot]
+            [--add-colors #RRGGBB ...] [--sort 字段|diff] [--desc]
+            [--split] [--where 字段=值 ...] [--path [目录]] [--dump]
+
+    基准四列（开始/下一个跟进/关闭/最近跟进）的字段、画法与配色在
+    fields.json 的 timeline 段配置，不走 CLI（v3.8.4）。
 
 字段参数（--field/--where/--date-field）一律填 fields.json
 的英文 name，不用 GUI 显示 label。
@@ -39,7 +43,8 @@ from . import algo_pie                      # noqa: E402
 # 算法表：子命令名 → (内核函数, 一句话说明)。GUI 预留数据源。
 ALGOS = {
     "pie": (algo_pie.cmd_pies, "选定字段取值分布饼图 + 计数（可多字段）"),
-    "timeline": (None, "项目分类时间点可视化（markdown 表格，非甘特图）"),
+    "timeline": (None, "项目分类时间点可视化（HTML 整页，非甘特图；"
+                 "v3.8.13 起只出 HTML）"),
 }
 
 _LASTS = {"1m": 30, "6m": 183, "1y": 365}
@@ -101,12 +106,20 @@ def _build_parser():
                             default="rolling",
                             help="12 个月窗口：year=当年 1–12 月；"
                                  "rolling=当月-6 至 当月+5（默认）")
-            sp.add_argument("--cols", nargs=4, required=True, metavar="字段",
-                            help="4 个日期列（开始 最后跟进 下个跟进 关闭），"
-                                 "强制指定，字段填 fields.json 的 name")
-            sp.add_argument("--colors", nargs=4, default=None,
+            sp.add_argument("--add-col", action="append", default=None,
+                            metavar="字段",
+                            help="额外加一个 date 字段列并画对应图行，可"
+                                 "多次；画法由 --add-plot 定，配色由 "
+                                 "--add-colors 定（基准四列在 fields.json "
+                                 "的 timeline 段配置，不走 CLI）")
+            sp.add_argument("--add-plot", choices=("line", "spot"),
+                            default="line",
+                            help="额外列的画法：line=从开始日期连线到该"
+                                 "日期（默认）；spot=只在该日期画一个点")
+            sp.add_argument("--add-colors", action="append", default=None,
                             metavar="#RRGGBB",
-                            help="4 行配色（默认绿/蓝/橙/红，连线用第 1 色）")
+                            help="额外列配色，可多次，个数须与 --add-col "
+                                 "一致；缺省用内置轮盘")
             sp.add_argument("--sort", default=None, metavar="字段",
                             help="章内排序字段：任意库字段名或 diff（日差）；"
                                  "缺省按 diff 升序，无日差排最后")
@@ -121,9 +134,11 @@ def _build_parser():
             g = sp.add_mutually_exclusive_group()
             g.add_argument("--path", nargs="?", const="__AUTO__",
                            default="__AUTO__", metavar="目录",
-                           help="markdown 写出目录（默认 db_analysis/"
+                           help="HTML 写出目录（默认 db_analysis/"
                                 "timeline/）；只接受目录，自动命名 "
-                                "timeline_<模式>_<筛选>_<排序>_<时间戳>.md")
+                                "timeline_<模式>_<筛选>_<排序>_<时间戳>"
+                                ".html（v3.8.13 起只出 HTML 整页，md 模式"
+                                "已删）")
             g.add_argument("--dump", action="store_true",
                            help="不写出文件：把表格数据以 csv 文本打印到"
                                 "终端（纯 # 不着色，便于复制再分析）")
@@ -269,22 +284,28 @@ def main(argv=None):
                 print(f"数据已导出：{path}")
         if a.algo == "timeline":
             from . import algo_timeline as tl
-            col_labels = tl.validate_cols(a.cols)
+            tlcfg = tl.load_tl()
+            adds = a.add_col or []
             if a.sort and a.sort != "diff" and a.sort not in CFG.names:
                 raise AnalysisError(f"--sort 不存在的字段：{a.sort}"
                                     f"（可用：{'、'.join(CFG.names)}"
                                     f" 或 diff）")
-            colors = a.colors or tl.DEFAULT_COLORS
-            for c in colors:
+            add_colors = a.add_colors or tl.DEFAULT_ADD_COLORS
+            for c in add_colors:
                 if not isinstance(c, str) or not c.startswith("#") \
                         or len(c) != 7:
                     raise AnalysisError(
-                        f"--colors 每项应为 #RRGGBB：{c!r}")
-            rows = tl.collect(db, a.cols, where=a.where)
+                        f"--add-colors 每项应为 #RRGGBB：{c!r}")
+            if a.add_colors and len(a.add_colors) != len(adds):
+                raise AnalysisError(
+                    f"--add-colors 个数（{len(a.add_colors)}）须与 "
+                    f"--add-col 个数（{len(adds)}）一致")
+            add_labels = [CFG.labels.get(x, x) for x in adds]
+            rows = tl.collect(db, adds=adds, where=a.where)
             if not rows:
                 raise AnalysisError(
                     "没有匹配的项目（检查 --where 条件）")
-            tl.enrich(rows, a.cols)
+            tl.enrich(rows)
             groups = tl.split_groups(rows) if a.split \
                 else [("全部项目", rows)]
             for _name, g in groups:
@@ -297,24 +318,33 @@ def main(argv=None):
             conds = list(a.where or [])
             conds.append(f"模式{a.mode}")
             if a.split:
-                conds.append("分章")
+                conds.append("split")
+            if adds:
+                conds.append(f"加列{'-'.join(adds)}")
             if a.sort:
                 conds.append(f"排序{a.sort}{'降' if a.desc else '升'}")
             conds = _safe("_".join(conds)) if conds else "全量"
+            stem = "-".join([tlcfg["start"], tlcfg["next"],
+                             tlcfg["close"]] + adds)
             if a.dump:                  # 终端打印 csv，不写文件
-                print(tl.dump_csv_text(groups, col_labels, months))
+                print(tl.dump_csv_text(groups, tlcfg, adds, add_labels,
+                                       a.add_plot, add_colors, months))
                 print(f"\n（口径：{mode_label}；筛选：{conds}；"
                       f"共 {n_proj} 个项目：{chap}）")
                 return 0
-            # 非 dump：md 写文件，终端只打印摘要（用户定 v3.8.1）
-            md = tl.render_md(groups, col_labels, months, colors,
-                              mode_label)
+            # 非 dump：HTML 整页写文件，终端只打印摘要（用户定 v3.8.1；
+            # v3.8.13 起只出 HTML，md 模式删除——markdown 表格宽度不可
+            # 控，无法整体缩放适配窗口，浏览体验不可接受）
+            text = tl.render_html(groups, tlcfg, adds, add_labels,
+                                  a.add_plot, add_colors, months,
+                                  mode_label, split=a.split)
+            suffix = ".html"
             out_dir = os.path.join(BASE_DIR, "db_analysis", "timeline")
-            path = _resolve_out(a.path, "-".join(a.cols), ".md",
+            path = _resolve_out(a.path, stem, suffix,
                                 conds, out_dir, prefix="timeline")
             _ensure_parent(path)
             with open(path, "w", encoding="utf-8", newline="\n") as f:
-                f.write(md)
+                f.write(text)
             print(f"筛选：{conds}")
             print(f"口径：{mode_label}；共 {n_proj} 个项目：{chap}")
             print(f"文件已写出：{path}")

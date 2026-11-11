@@ -77,7 +77,13 @@ def parse_where(items):
                 continue
             filters[field] = (d1, d2)
         else:
-            filters[field] = {val}
+            # 同字段多次 --where 取并集（v3.8.5，与 db_analysis 一致）；
+            # 与区间混用时后写覆盖
+            cur = filters.get(field)
+            if isinstance(cur, set):
+                cur.add(val)
+            else:
+                filters[field] = {val}
     if errors:
         raise BenchError("\n".join(errors))
     return filters

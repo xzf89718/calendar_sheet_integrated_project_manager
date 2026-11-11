@@ -389,6 +389,20 @@ class Config:
         # 搜索框匹配的字段范围（默认全字段）
         self.search_fields = data.get("search", {}).get(
             "fields", self.names)
+        # timeline 分析模块配置（v3.8.4）：基准日期列 + 派生「最近跟进」
+        # 列名 + 基准绘图模式（line=两日期连线 / spot=单日期画点）+
+        # 基准四行配色。缺省从 calendar_dates 法定三类推导日期列。
+        tl = data.get("timeline") or {}
+        _bound = {k: f for k, f, _l, _c in self.calendar_dates}
+        self.timeline = {
+            "start": tl.get("start") or _bound.get("start"),
+            "next": tl.get("next") or _bound.get("followup"),
+            "close": tl.get("close") or _bound.get("close"),
+            "last": tl.get("last", "last_snapshot"),
+            "plot": tl.get("plot", "line"),
+            "colors": list(tl.get("colors") or
+                           ["#2e7d32", "#1565c0", "#e65100", "#7b1fa2"]),
+        }
         # 周报模式下方表格的列（内置列 + 字段名）
         self.weekly_cols = data.get("weekly_sheet", {}).get(
             "columns", ["snapshot_at", "project", "change_summary"])

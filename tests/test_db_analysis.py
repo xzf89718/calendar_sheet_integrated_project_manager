@@ -288,9 +288,8 @@ def test_pie_multi_png_one_file_per_field(pkg):
 
 
 
-# ---------- v3.8.1 timeline：项目分类时间点可视化（每项目一表） ----------
-
-COLS = ["start_date", "next_followup", "next_followup", "close_date"]
+# ---------- timeline：项目分类时间点可视化（v3.8.3 贴图定版；
+# v3.8.4 配置化：基准列/画法/色进 fields.json 的 timeline 段） ----------
 
 
 def _mk(pkg, customer, start, nxt=None, close=None):
@@ -303,105 +302,283 @@ def _mk(pkg, customer, start, nxt=None, close=None):
     assert run_ui(pkg, *args).returncode == 0
 
 
+def _tbl_rows(text, name):
+    """某项目的表内所有行（含表头）：在 HTML 中定位
+    <div class="pname">name</div> 后的 <table>，逐 <tr> 抽出
+    <th>/<td> 还原成 "| c | c |" 形式（供 _row_cells/_n_hash 用）。"""
+    import re
+    m = re.search(r'<div class="pname">' + re.escape(name) +
+                  r'</div>\s*<table>(.*?)</table>', text, re.S)
+    if not m:
+        raise AssertionError(f"找不到项目表：{name}")
+    out = []
+    for tr in re.findall(r"<tr>(.*?)</tr>", m.group(1), re.S):
+        cells = re.findall(r"<t[dh]>(.*?)</t[dh]>", tr, re.S)
+        out.append("| " + " | ".join(cells) + " |")
+    return out
+
+
+def _row_cells(line):
+    return [c.strip() for c in line.split("|")[1:-1]]
+
+
+def _n_hash(line):
+    """去掉 font 标签与颜色码后数标记个数（# 与 $，月格内 4 字符；
+    v3.8.9 起 spot 模式用 $）。"""
+    import re
+    s = re.sub(r"</?font[^>]*>|#\w{6}", "", line)
+    return s.count("#") + s.count("$")
+
+
 def test_timeline_nondump_prints_summary_and_writes_file(pkg):
-    """非 dump：终端不打印 md 表格本体，只打印筛选/统计/路径；
+    """非 dump：终端不打印 md 本体，只打印筛选/统计/路径；
     md 恒写出为文件（v3.8.1 用户定）。"""
     _mk(pkg, "甲", "2026-11-01", "2026-11-20")
-    r = run_ana(pkg, "timeline", "--cols", *COLS)
+    r = run_ana(pkg, "timeline")
     assert r.returncode == 0, r.stderr
     assert "筛选：" in r.stdout
     assert "文件已写出：" in r.stdout
-    assert "| 项目 |" not in r.stdout            # md 本体不上终端
-    hits = list(pkg.glob("db_analysis/timeline/timeline_*.md"))
+    assert "<table>" not in r.stdout          # html 本体不上终端
+    hits = list(pkg.glob("db_analysis/timeline/timeline_*.html"))
     assert len(hits) == 1
     text = hits[0].read_text(encoding="utf-8")
     assert "项目时间线图" in text
-    assert ("| 项目 | 日差 | 开始日期 | 下一个跟进日期 | 下一个跟进日期"
-            " | 项目关闭日期 | 状态 | 头 |" in text)
+    # 版式：前导列名固定 开始/下一个跟进/关闭 + 日差 + 更早 + 月列
+    assert "<th>开始</th>" in text and "<th>更早</th>" in text
+    assert "<th>更晚</th><th>状态</th><th>备注</th>" in text
 
 
-def test_timeline_each_project_own_table_single_row(pkg):
-    """每项目一张独立表，表头分开；4 个日期 + 状态同一行。"""
+def test_timeline_title_row_and_fixed_col_names(pkg):
+    """v3.8.4（用户定）：项目名不是列，是每个表格的第一行；首行带
+    3 日期值/日差/状态；线段行只有 # 线 + 备注。"""
     _mk(pkg, "甲", "2026-11-01", "2026-11-20")
     _mk(pkg, "乙", "2026-09-15", "2026-11-25")
-    r = run_ana(pkg, "timeline", "--cols", *COLS)
+    r = run_ana(pkg, "timeline")
     assert r.returncode == 0, r.stderr
-    text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
         .read_text(encoding="utf-8")
-    assert text.count("### 甲") == 1 and text.count("### 乙") == 1
-    # 单行：表头一行 + 分隔一行 + 数据一行
-    tbl = text.split("### 甲")[1].split("### ")[0]
-    rows = [l for l in tbl.splitlines() if l.startswith("|")]
-    assert len(rows) == 3
-    # 状态列在最后（尾列之前）；本行含快照 status 字段原值
-    assert "跟进中" in rows[2]
+    # 项目名移出表格，单独一行加粗放大标题（HTML 的 .pname）
+    assert '<div class="pname">甲</div>' in text
+    rows = _tbl_rows(text, "甲")
+    assert len(rows) == 5                # 表头 + 4 线段行
+    lead = [c for c in _row_cells(rows[1]) if c and not c.startswith("<font")]
+    assert lead[:2] == ["2026-11-01", "2026-11-20"]
+    assert lead[2].isdigit() and lead[3] == "跟进中"
+    for i, lab in enumerate(["最近跟进", "今日", "下一个跟进", "关闭"]):
+        assert _row_cells(rows[1 + i])[-1] == f"开始-{lab}"
 
 
-def test_timeline_line_fills_weeks_from_start(pkg):
-    """从开始日期逐周画 # 连成线（不再单月一个点）：开始 11-01、
-    下个跟进 11-20 → 同月内第 1~3 周连续 3 个 #。"""
+def test_timeline_line_partial_cell_dash_filled(pkg):
+    """v3.8.9（用户定）：连线模式被触月格内，范围外用 - 填充（每格
+    恒 4 字符）；点模式用 $ 标记。"""
+    import re
     _mk(pkg, "甲", "2026-11-01", "2026-11-20")
-    r = run_ana(pkg, "timeline", "--cols", *COLS)
+    r = run_ana(pkg, "timeline")
     assert r.returncode == 0, r.stderr
-    text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
         .read_text(encoding="utf-8")
-    row = [l for l in text.splitlines() if l.startswith("| 甲 |")][0]
-    cells = [c.strip() for c in row.split("|")[1:-1]]
-    hashes = [c for c in cells if c.startswith("<font")]
-    assert len(hashes) == 3                    # 11-01 第 1 周 → 11-20 第 3 周
+    rows = _tbl_rows(text, "甲")
+    col = _row_cells(rows[0]).index("26-11")
+    clean = lambda s: re.sub(r"</?font[^>]*>|#\w{6}", "", s)
+    # 开始-下一个跟进（11-01 ~ 11-20，周 1→3）：26-11 格 = ###-
+    assert clean(_row_cells(rows[3])[col]) == "###-"
+    # 开始-最近跟进（11-01 ~ 11-10，周 1→2）：26-11 格 = ##--
+    assert clean(_row_cells(rows[1])[col]) == "##--"
 
 
-def test_timeline_line_unscheduled_runs_to_window_end(pkg):
-    """无下个跟进的进行中项目：连线拖到最后一个月末。"""
+def test_timeline_negative_diff_red(pkg):
+    """日差 < 0 时数字标红（用户定 v3.8.4）。"""
+    _mk(pkg, "逾期", "2026-09-01", "2026-11-01")     # diff < 0
+    r = run_ana(pkg, "timeline")
+    assert r.returncode == 0, r.stderr
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
+        .read_text(encoding="utf-8")
+    import re
+    assert re.search(r'<font color="#c62828">-\d+</font>', text)
+
+
+def test_timeline_seg_line_fills_weeks_from_start(pkg):
+    """line 模式：每行线段从开始日期逐周画 #：开始 11-01、下个跟进
+    11-20 → 11 月格内 3 个 #（第 1~3 周）。"""
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    r = run_ana(pkg, "timeline")
+    assert r.returncode == 0, r.stderr
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
+        .read_text(encoding="utf-8")
+    rows = _tbl_rows(text, "甲")
+    assert _n_hash(rows[3]) == 3     # 开始-下一个跟进：周 1→3
+    assert _n_hash(rows[1]) == 2     # 开始-最近跟进（=今日 11-10）
+    assert _n_hash(rows[4]) == 0     # 无关闭 → 空行保留
+
+
+def test_timeline_seg_missing_endpoint_keeps_blank_row(pkg):
+    """两端任缺 → 该行不画线但保留位置（用户定）。"""
     _mk(pkg, "无排期", "2026-08-01")
-    r = run_ana(pkg, "timeline", "--cols", *COLS)
+    r = run_ana(pkg, "timeline")
     assert r.returncode == 0, r.stderr
-    text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
         .read_text(encoding="utf-8")
-    row = [l for l in text.splitlines()
-           if l.startswith("| 无排期 |")][0]
-    cells = [c.strip() for c in row.split("|")[1:-1]]
-    n_hash = sum(1 for c in cells if c.startswith("<font"))
-    assert n_hash == 36                        # 8 月（窗口第 4 个月）起到尾
+    rows = _tbl_rows(text, "无排期")
+    assert len(rows) == 5
+    assert _n_hash(rows[3]) == 0 and _n_hash(rows[4]) == 0  # 下个跟进/关闭缺
+    assert _n_hash(rows[1]) > 0      # 最近跟进行照画
 
 
-def test_timeline_archived_line_stops_at_close(pkg):
-    """已关闭：连线到关闭日期为止（关闭月之后不再有线）。"""
-    _mk(pkg, "已成单", "2026-09-01", close="2026-10-15")
-    with _db(pkg) as c:
-        c.execute("UPDATE projects SET status='closed' WHERE id=1")
-    r = run_ana(pkg, "timeline", "--cols", *COLS, "--split")
-    assert r.returncode == 0, r.stderr
-    text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
-        .read_text(encoding="utf-8")
-    arch = text.split("## 已关闭")[1]
-    row = [l for l in arch.splitlines() if l.startswith("|")][2]
-    cells = [c.strip() for c in row.split("|")[1:-1]]
-    n_hash = sum(1 for c in cells if c.startswith("<font"))
-    assert 4 <= n_hash <= 7                    # 9 月初 ~ 10 月中，跨月停
-
-
-def test_timeline_outside_head_tail_columns(pkg):
-    """窗口外的日期标注在头/尾列；与 12 个月块之间断开 4 个空列。"""
+def test_timeline_head_tail_marks_when_outside(pkg):
+    """头/尾列 = 延伸出窗口时画满 4 个标记（v3.8.10 用户定：填 #，
+    不再填文字标注）。"""
     _mk(pkg, "老单", "2024-03-10", close="2027-06-15")
     with _db(pkg) as c:
         c.execute("UPDATE projects SET status='closed' WHERE id=1")
-    r = run_ana(pkg, "timeline", "--cols", *COLS)
+    r = run_ana(pkg, "timeline")
     assert r.returncode == 0, r.stderr
-    text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
         .read_text(encoding="utf-8")
-    row = [l for l in text.splitlines() if l.startswith("| 老单 |")][0]
-    cells = [c.strip() for c in row.split("|")[1:-1]]
-    assert "2024-03" in cells[7]               # 头列（7 = 项目/日差/4/状态/头）
-    assert "2027-06" in cells[-1]              # 尾列
-    assert cells[8:12] == ["", "", "", ""]     # 断开的 4 个空列
-    assert cells[-5:-1] == ["", "", "", ""]
-    line = [c for c in cells[12:-1] if c.startswith("<font")]
-    assert len(line) == 48                     # 窗外起线 → 夹满全窗
+    rows = _tbl_rows(text, "老单")
+    head_i = _row_cells(rows[0]).index("更早")
+    tail_i = _row_cells(rows[0]).index("更晚")
+    close_row = _row_cells(rows[4])
+    assert _n_hash(close_row[head_i]) == 4   # 更早列画满 4 个 #
+    assert _n_hash(close_row[tail_i]) == 4   # 更晚列画满 4 个 #
+    # v3.8.8：延伸出窗口的边缘月格一律填满 4 个 #（不画残格）
+    first_col = _row_cells(rows[0]).index("26-05")
+    seg_cells = _row_cells(rows[1])            # 开始-最近跟进（开始 2024 年）
+    assert _n_hash(seg_cells[first_col]) == 4
+    assert _n_hash(rows[4]) == 56    # 12 个月格 48 + 更早更晚各 4
 
 
-def test_timeline_split_chapters_order(pkg):
-    """四章顺序：逾期未跟进 → 待跟进 → 未排跟进 → 已关闭。"""
+def test_timeline_spot_plot_mode(pkg):
+    """JSON timeline.plot=spot：每行只在终点日期画一个点。"""
+    import json as _json
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    p = pkg / "fields.json"
+    d = _json.loads(p.read_text(encoding="utf-8"))
+    d["timeline"]["plot"] = "spot"
+    p.write_text(_json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    r = run_ana(pkg, "timeline")
+    assert r.returncode == 0, r.stderr
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
+        .read_text(encoding="utf-8")
+    rows = _tbl_rows(text, "甲")
+    assert _n_hash(rows[3]) == 1     # 开始-下一个跟进：单点
+    assert _n_hash(rows[1]) == 1     # 最近跟进点
+    assert _n_hash(rows[4]) == 0     # 无关闭 → 空行
+    # v3.8.9：点模式用 $ 标记，且所在格其余位用 - 填充
+    assert "$" in rows[3] and "###" not in rows[3]
+
+
+def test_timeline_add_col_spot_and_colors(pkg):
+    """--add-col 加列 + --add-plot spot 画点 + --add-colors 配色。"""
+    import json as _json
+    _mk(pkg, "甲", "2026-08-01", "2026-11-20")
+    p = pkg / "fields.json"
+    d = _json.loads(p.read_text(encoding="utf-8"))
+    d["fields"].append({"name": "accept_date", "label": "验收日期",
+                        "type": "date"})
+    p.write_text(_json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    r = run_ana(pkg, "timeline", "--add-col", "accept_date",
+                "--add-plot", "spot", "--add-colors", "#123456")
+    assert r.returncode == 0, r.stderr
+    hits = list(pkg.glob("db_analysis/timeline/timeline_*.html"))
+    text = hits[0].read_text(encoding="utf-8")
+    rows = _tbl_rows(text, "甲")
+    assert "验收日期" in _row_cells(rows[0])
+    title = _row_cells(rows[1])      # 第一行线段行带数据值
+    assert title[3] == ""            # 未填验收日期 → 空
+    # 额外列图行 = 4 行基准之后
+    add_row = rows[5]
+    assert _row_cells(add_row)[-1] == "验收日期"
+    assert _n_hash(add_row) == 0
+    # 文件名嵌基准 + add-col 字段名
+    assert any("accept_date" in h.name for h in hits)
+
+
+def test_timeline_add_col_line_draws(pkg):
+    """--add-col 默认 line 画法：从开始日期连线到该列日期。"""
+    import json as _json
+    _mk(pkg, "甲", "2026-08-01", "2026-11-20")
+    r0 = run_ui(pkg, "follow", "1", "--set", "accept_date=2026-09-10")
+    # 库表还没有该列，先补进配置再跟进
+    p = pkg / "fields.json"
+    d = _json.loads(p.read_text(encoding="utf-8"))
+    d["fields"].append({"name": "accept_date", "label": "验收日期",
+                        "type": "date"})
+    p.write_text(_json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    r0 = run_ui(pkg, "follow", "1", "--set", "accept_date=2026-09-10")
+    assert r0.returncode == 0, r0.stderr
+    r = run_ana(pkg, "timeline", "--add-col", "accept_date")
+    assert r.returncode == 0, r.stderr
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
+        .read_text(encoding="utf-8")
+    add_row = _tbl_rows(text, "甲")[5]
+    assert _row_cells(add_row)[-1] == "开始-验收日期"
+    assert _n_hash(add_row) == 6     # 8 月初 ~ 9 月中，跨月
+    assert "#c62828" in add_row      # 缺省 add 配色轮盘第 1 色
+
+
+def test_timeline_add_colors_validated(pkg):
+    _mk(pkg, "甲", "2026-11-01")
+    r = run_ana(pkg, "timeline", "--add-col", "close_date",
+                "--add-colors", "red")
+    assert r.returncode == 1
+    assert "#RRGGBB" in r.stderr
+    r = run_ana(pkg, "timeline", "--add-col", "close_date",
+                "--add-col", "start_date", "--add-colors", "#111111")
+    assert r.returncode == 1
+    assert "一致" in r.stderr
+
+
+def test_timeline_bad_config_reported(pkg):
+    """timeline 配置错误（字段不是 date）要报可读错误。"""
+    import json as _json
+    _mk(pkg, "甲", "2026-11-01")
+    p = pkg / "fields.json"
+    d = _json.loads(p.read_text(encoding="utf-8"))
+    d["timeline"]["start"] = "customer"
+    p.write_text(_json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    r = run_ana(pkg, "timeline")
+    assert r.returncode == 1
+    assert "timeline 配置" in r.stderr
+
+
+def test_where_range_validation_errors(pkg):
+    """v3.8.14：--where 区间校验与 workbench_ui 对齐——非日期字段用
+    ~、非法日期、反向区间都明确报错，不再静默落到空结果。"""
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    for algo_args in (["pie", "--field", "customer"], ["timeline"]):
+        r = run_ana(pkg, *algo_args, "--where",
+                    "customer=2026-01-01~2026-12-31")
+        assert r.returncode == 1 and "不是日期字段" in r.stderr
+        r = run_ana(pkg, *algo_args, "--where", "start_date=abc~def")
+        assert r.returncode == 1 and "有效日期" in r.stderr
+        r = run_ana(pkg, *algo_args, "--where",
+                    "start_date=2026-12-31~2026-01-01")
+        assert r.returncode == 1 and "起点晚于终点" in r.stderr
+    # 合法区间不受影响
+    r = run_ana(pkg, "timeline", "--where",
+                "start_date=2026-01-01~2026-12-31")
+    assert r.returncode == 0, r.stderr
+
+
+def test_timeline_html_fit_zoom_output(pkg):
+    """默认写出 .html 整页（用户定 v3.8.12/3.8.13；md 模式已删）：
+    自动适配窗口宽度，右上角 +/-/fit 再缩放。"""
+    _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    r = run_ana(pkg, "timeline")
+    assert r.returncode == 0, r.stderr
+    hits = list(pkg.glob("db_analysis/timeline/timeline_*.html"))
+    assert len(hits) == 1 and not list(pkg.glob(
+        "db_analysis/timeline/timeline_*.md"))
+    text = hits[0].read_text(encoding="utf-8")
+    assert "<table>" in text and 'class="pname"' in text
+    assert 'id="page"' in text and "function fit()" in text
+    assert "26-05" in text and "开始-下一个跟进" in text
+    # v3.8.13：不再产出 markdown 管道表
+    assert "| 开始 |" not in text
+
+
+def test_timeline_split_chapters_order_and_nav_links(pkg):
+    """四章顺序 + 文首章导航超链接（用户定）。"""
     _mk(pkg, "逾期", "2026-09-01", "2026-11-01")
     _mk(pkg, "正常", "2026-11-01", "2026-11-25")
     _mk(pkg, "无排期", "2026-08-01")
@@ -409,91 +586,74 @@ def test_timeline_split_chapters_order(pkg):
     with _db(pkg) as c:
         c.execute("UPDATE projects SET status='closed' "
                   "WHERE id=(SELECT MAX(id) FROM projects)")
-    r = run_ana(pkg, "timeline", "--cols", *COLS, "--split")
+    r = run_ana(pkg, "timeline", "--split")
     assert r.returncode == 0, r.stderr
-    text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
         .read_text(encoding="utf-8")
-    i1 = text.index("## 逾期未跟进")
-    i2 = text.index("## 待跟进")
-    i3 = text.index("## 未排跟进")
-    i4 = text.index("## 已关闭")
+    for chap in ("逾期未跟进", "待跟进", "未排跟进", "已关闭"):
+        assert f'<a href="#{chap}1-个项目">{chap}（1 个项目）</a>' in text
+        assert f'<h2 id="{chap}1-个项目">' in text
+    i1 = text.index('<h2 id="逾期未跟进')
+    i2 = text.index('<h2 id="待跟进')
+    i3 = text.index('<h2 id="未排跟进')
+    i4 = text.index('<h2 id="已关闭')
     assert i1 < i2 < i3 < i4
-    assert "## 全部项目" not in text
 
 
 def test_timeline_where_sort_and_desc(pkg):
     _mk(pkg, "甲", "2026-11-01", "2026-11-12")   # diff +2
     _mk(pkg, "乙", "2026-11-01", "2026-11-30")   # diff +20
-    r = run_ana(pkg, "timeline", "--cols", *COLS,
-                "--where", "customer=乙")
+    r = run_ana(pkg, "timeline", "--where", "customer=乙")
     assert r.returncode == 0, r.stderr
     assert "customer=乙" in r.stdout
     assert "共 1 个项目" in r.stdout
-    r2 = run_ana(pkg, "timeline", "--cols", *COLS,
-                 "--sort", "diff", "--desc")
-    hits = sorted(pkg.glob("db_analysis/timeline/timeline_*.md"),
+    r2 = run_ana(pkg, "timeline", "--sort", "diff", "--desc")
+    hits = sorted(pkg.glob("db_analysis/timeline/timeline_*.html"),
                   key=lambda p: p.stat().st_mtime)
     text = hits[-1].read_text(encoding="utf-8")
-    assert text.index("### 乙") < text.index("### 甲")
+    assert text.index('<div class="pname">乙</div>') \
+        < text.index('<div class="pname">甲</div>')
 
 
 def test_timeline_path_explicit_dir_and_refuses_file(pkg):
     _mk(pkg, "甲", "2026-11-01", "2026-11-20")
     outdir = pkg / "outdir"
     outdir.mkdir()
-    r = run_ana(pkg, "timeline", "--cols", *COLS, "--path", str(outdir))
+    r = run_ana(pkg, "timeline", "--path", str(outdir))
     assert r.returncode == 0, r.stderr
     assert str(outdir) in r.stdout
-    assert len(list(outdir.glob("timeline_*.md"))) == 1
-    r = run_ana(pkg, "timeline", "--cols", *COLS,
-                "--path", str(outdir / "x.md"))
+    assert len(list(outdir.glob("timeline_*.html"))) == 1
+    r = run_ana(pkg, "timeline", "--path", str(outdir / "x.html"))
     assert r.returncode == 1
     assert "只支持目录" in r.stderr
     # v3.8.2：不存在的显式目录自动创建
     ndir = pkg / "newdir"
-    r = run_ana(pkg, "timeline", "--cols", *COLS, "--path", str(ndir))
+    r = run_ana(pkg, "timeline", "--path", str(ndir))
     assert r.returncode == 0, r.stderr
-    assert ndir.is_dir() and list(ndir.glob("timeline_*.md"))
-    # 文件名嵌字段名（v3.8.2：stem 用字段名而非中文 label）
-    assert list(ndir.glob("timeline_start_date-*.md"))
+    assert ndir.is_dir() and list(ndir.glob("timeline_*.html"))
+    # 文件名嵌基准字段名
+    assert list(ndir.glob("timeline_start_date-*.html"))
 
 
 def test_timeline_dump_prints_csv_only(pkg):
     """--dump：终端只出 csv 文本（无文件写出）。"""
     _mk(pkg, "甲", "2026-11-01", "2026-11-20")
-    r = run_ana(pkg, "timeline", "--cols", *COLS, "--dump")
+    r = run_ana(pkg, "timeline", "--dump")
     assert r.returncode == 0, r.stderr
-    assert ("项目,日差,开始日期,下一个跟进日期,下一个跟进日期,"
-            "项目关闭日期" in r.stdout)
+    assert "开始,下一个跟进,关闭,日差,更早,26-05,26-06" in r.stdout
     assert "<font" not in r.stdout
-    assert not list(pkg.glob("db_analysis/timeline/*.md"))
-
-
-def test_timeline_cols_required_and_validated(pkg):
-    _mk(pkg, "甲", "2026-11-01")
-    r = run_ana(pkg, "timeline")               # 缺 --cols → 参数错误
-    assert r.returncode == 2
-    r = run_ana(pkg, "timeline", "--cols", "customer", "x", "y", "z")
-    assert r.returncode == 1
-    assert "--cols 必须是 date 类型字段" in r.stderr
-
-
-def test_timeline_colors_validated(pkg):
-    _mk(pkg, "甲", "2026-11-01")
-    r = run_ana(pkg, "timeline", "--cols", *COLS, "--colors",
-                "red", "#111111", "#222222", "#333333")
-    assert r.returncode == 1
-    assert "#RRGGBB" in r.stderr
+    assert not list(pkg.glob("db_analysis/timeline/*.html"))
 
 
 def test_timeline_mode_year_columns(pkg):
+    """year 模式：月列换成当年 1~12 月。"""
     _mk(pkg, "甲", "2026-11-01", "2026-11-20")
-    r = run_ana(pkg, "timeline", "--cols", *COLS, "--mode", "year")
+    r = run_ana(pkg, "timeline", "--mode", "year")
     assert r.returncode == 0, r.stderr
-    text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
+    text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
         .read_text(encoding="utf-8")
-    tbl = [l for l in text.splitlines() if l.startswith("| 项目 |")][0]
-    assert "26-01" in tbl and "26-12" in tbl and "27-04" not in tbl
+    assert "<th>更早</th><th>26-01</th>" in text
+    assert "<th>26-12</th><th>更晚</th>" in text
 
 
 # ---------- timeline 纯逻辑单元测试（不 subprocess） ----------
