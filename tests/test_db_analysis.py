@@ -420,8 +420,9 @@ def test_timeline_seg_missing_endpoint_keeps_blank_row(pkg):
     assert _n_hash(rows[2]) > 0      # 今日行照画
 
 
-def test_timeline_head_tail_labels_earlier_later(pkg):
-    """头/尾标注列文字 = <第一个月 / >第 12 个月（带年月，v3.8.8）。"""
+def test_timeline_head_tail_marks_when_outside(pkg):
+    """头/尾列 = 延伸出窗口时画满 4 个标记（v3.8.10 用户定：填 #，
+    不再填文字标注）。"""
     _mk(pkg, "老单", "2024-03-10", close="2027-06-15")
     with _db(pkg) as c:
         c.execute("UPDATE projects SET status='closed' WHERE id=1")
@@ -433,13 +434,13 @@ def test_timeline_head_tail_labels_earlier_later(pkg):
     head_i = _row_cells(rows[0]).index("头")
     tail_i = _row_cells(rows[0]).index("尾")
     close_row = _row_cells(rows[5])
-    assert close_row[head_i] == "<26-05"
-    assert close_row[tail_i] == ">27-04"
+    assert _n_hash(close_row[head_i]) == 4   # 头列画满 4 个 #
+    assert _n_hash(close_row[tail_i]) == 4   # 尾列画满 4 个 #
     # v3.8.8：延伸出窗口的边缘月格一律填满 4 个 #（不画残格）
     first_col = _row_cells(rows[0]).index("26-05")
     today_cells = _row_cells(rows[2])          # 开始-今日（开始 2024 年）
     assert _n_hash(today_cells[first_col]) == 4
-    assert _n_hash(rows[5]) == 48    # 夹边界铺满 12 个月格
+    assert _n_hash(rows[5]) == 56    # 12 个月格 48 + 头尾各 4（v3.8.10）
 
 
 def test_timeline_spot_plot_mode(pkg):

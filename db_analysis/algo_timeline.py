@@ -13,8 +13,8 @@ v3.8.4 版式与口径（用户定，6 点）：
   线段行；
 - 前导列名固定：开始 / 下一个跟进 / 关闭（不用 JSON label）；
 - 日差 < 0 时数字标红；
-- 头/尾标注列文字 = 「<26-05」「>27-04」（v3.8.8 用户定：
-  <第一个月 / >第 12 个月，带具体年月）；
+- 头/尾列：延伸出窗口时直接画满 4 个标记字符（v3.8.10 用户定：
+  填 # / spot 填 $，不再填文字标注）；
 - 基准四列（开始→今日 / 最近跟进 / 下个跟进 / 关闭）的字段、派生
   「最近跟进」列名、绘图模式（line 两日期连线 / spot 单日期画点）、
   配色全部进 fields.json 的 timeline 段（派生列命名 last_snapshot，
@@ -285,9 +285,10 @@ def _month_cells(cells, ch="#", pad="-"):
     return out
 
 
-def _outside_labels(dates, months):
-    """日期列表 → (头标注, 尾标注)：窗外月份存在时头 = <第一个月
-    （带具体年月）、尾 = >第 12 个月（用户定 v3.8.8）。"""
+def _outside_marks(dates, months, ch="#"):
+    """日期列表 → (头标记, 尾标记)：延伸出窗口的，对应列直接画满
+    4 个标记字符（用户定 v3.8.10：头/尾列填 #，不再填文字标注；
+    spot 模式传 "$"），没有窗外延伸则空。"""
     lo = (months[0][0], months[0][1])
     hi = (months[-1][0], months[-1][1])
     head = tail = False
@@ -299,10 +300,8 @@ def _outside_labels(dates, months):
             head = True
         elif ym > hi:
             tail = True
-    first_lab = months[0][2]
-    last_lab = months[-1][2]
-    return (f"<{first_lab}" if head else "",
-            f">{last_lab}" if tail else "")
+    mark = ch * WEEKS_PER_MONTH
+    return (mark if head else "", mark if tail else "")
 
 
 def _base_segments(row, today):
@@ -361,15 +360,18 @@ def _render_rows(r, tl, adds, add_labels, add_plot, add_colors,
                      add_colors[ai % len(add_colors)]))
     for si, (note, end, mode, color) in enumerate(segs):
         start = r["vals"][0] if mode == "line" else None
+        ch = "$" if mode == "spot" else "#"
         cells = _plot_cells(mode, start, end, months)
-        head, tail = _outside_labels(
-            [start, end] if mode == "line" else [end], months)
+        head, tail = _outside_marks(
+            [start, end] if mode == "line" else [end], months, ch)
         lead_vals = first_vals if si == 0 else [""] * n_lead
-        row = lead_vals + [_diff_text(r) if si == 0 else "", head]
-        row += [f'<font color="{color}">{c}</font>' if "#" in c else c
-                for c in _month_cells(cells, ch="$" if mode == "spot"
-                                      else "#")]
-        row += [tail,
+        row = lead_vals + [_diff_text(r) if si == 0 else "",
+                           f'<font color="{color}">{head}</font>'
+                           if head else ""]
+        row += [f'<font color="{color}">{c}</font>'
+                if ch in c else c
+                for c in _month_cells(cells, ch=ch)]
+        row += [f'<font color="{color}">{tail}</font>' if tail else "",
                 r["status_val"] if si == 0 and r["status_val"] else "",
                 note]
         out.append(row)
@@ -443,8 +445,9 @@ def _csv_rows(r, tl, adds, add_labels, add_plot, add_colors, months, t):
     for si, (note, end, mode) in enumerate(segs):
         start = r["vals"][0] if mode == "line" else None
         cells = _plot_cells(mode, start, end, months)
-        head, tail = _outside_labels(
-            [start, end] if mode == "line" else [end], months)
+        head, tail = _outside_marks(
+            [start, end] if mode == "line" else [end], months,
+            "$" if mode == "spot" else "#")
         lead_vals = first_vals if si == 0 else [""] * n_lead
         out.append(lead_vals
                    + [str(r["diff"]) if si == 0 and r["diff"] is not None
