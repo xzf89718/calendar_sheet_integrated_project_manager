@@ -308,7 +308,7 @@ def _tbl_rows(text, name):
     lines = text.splitlines()
     for i, l in enumerate(lines):
         if f"<b>{name}</b>" in l and not l.startswith("|"):
-            return [x for x in lines[i + 1:i + 7] if x.startswith("|")]
+            return [x for x in lines[i + 1:i + 8] if x.startswith("|")]
     raise AssertionError(f"找不到项目行：{name}")
 
 
@@ -458,7 +458,7 @@ def test_timeline_add_col_spot_and_colors(pkg):
     lines = text.splitlines()
     i = next(k for k, l in enumerate(lines)
              if "<b>甲</b>" in l and not l.startswith("|"))
-    add_row = lines[i + 7]
+    add_row = lines[i + 8]
     assert _row_cells(add_row)[-1] == "验收日期"
     assert _n_hash(add_row) == 0
     # 文件名嵌基准 + add-col 字段名
@@ -485,7 +485,7 @@ def test_timeline_add_col_line_draws(pkg):
     lines = text.splitlines()
     i = next(k for k, l in enumerate(lines)
              if "<b>甲</b>" in l and not l.startswith("|"))
-    add_row = lines[i + 7]
+    add_row = lines[i + 8]
     assert _row_cells(add_row)[-1] == "开始-验收日期"
     assert _n_hash(add_row) == 6     # 8 月初 ~ 9 月中，跨月
     assert "#c62828" in add_row      # 缺省 add 配色轮盘第 1 色

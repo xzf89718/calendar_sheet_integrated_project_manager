@@ -345,7 +345,7 @@ def _render_rows(r, tl, adds, add_labels, add_plot, add_colors,
         row = lead_vals + [_diff_text(r) if si == 0 else "", head]
         row += [f'<font color="{color}">{c}</font>' if "#" in c else c
                 for c in _month_cells(cells)]
-        row += [tail, "",
+        row += [tail,
                 r["status_val"] if si == 0 and r["status_val"] else "",
                 note]
         out.append(row)
@@ -378,6 +378,7 @@ def render_md(rows_groups, tl, adds, add_labels, add_plot, add_colors,
         for r in grows:
             # v3.8.6（用户定）：项目名移出表格，单独一行加粗放大标题
             out.append(f'<font size="5"><b>{r["name"]}</b></font>')
+            out.append("")
             out.append("| " + " | ".join(lead) + " |")
             out.append("|" + "|".join(sep) + "|")
             for row in _render_rows(r, tl, adds, add_labels, add_plot,
@@ -405,7 +406,7 @@ def dump_csv_text(rows_groups, tl, adds, add_labels, add_plot, add_colors,
 def _csv_rows(r, tl, adds, add_labels, add_plot, add_colors, months, t):
     """一个项目的 csv 表体行（与 _render_rows 同结构，纯 # 无颜色）。"""
     n_lead = 3 + len(adds)
-    out = [[r["name"]] + [""] * (n_lead + 1 + 12 + 3 - 1)]   # 项目名行
+    out = [[r["name"]] + [""] * (n_lead + 1 + 1 + 12 + 3 - 1)]  # 项目名行
     first_vals = ([r["vals"][0] or "", r["vals"][2] or "",
                    r["vals"][3] or ""]
                   + [r["adds"].get(a) or "" for a in adds])
@@ -425,7 +426,7 @@ def _csv_rows(r, tl, adds, add_labels, add_plot, add_colors, months, t):
                    + [str(r["diff"]) if si == 0 and r["diff"] is not None
                       else "", head]
                    + _month_cells(cells)
-                   + [tail, "",
+                   + [tail,
                       r["status_val"] if si == 0 and r["status_val"] else "",
                       note])
     return out
