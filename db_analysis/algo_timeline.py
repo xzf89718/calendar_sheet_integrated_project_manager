@@ -8,8 +8,9 @@ v3.8.4 配置化 + CLI 改版，用户定）：
 评估——给证据不给结论。
 
 v3.8.4 版式与口径（用户定，6 点）：
-- 项目名不是列，是**每个表格的第一行**（首格 = 项目名，同行带
-  3 个日期值 / 日差 / 状态）；
+- 项目名不是列；v3.8.6 起移出表格，作表格外单独一行标题（加粗
+  放大字体、不带数据）；3 个日期值 / 日差 / 状态在表内第一行
+  线段行；
 - 前导列名固定：开始 / 下一个跟进 / 关闭（不用 JSON label）；
 - 日差 < 0 时数字标红；
 - 头/尾标注列文字 = 「早于26-05」「晚于27-04」（早于第一个月 /
@@ -318,19 +319,13 @@ def _diff_text(r):
 
 def _render_rows(r, tl, adds, add_labels, add_plot, add_colors,
                  months, t):
-    """一个项目的全部表体行（首行 = 项目名行：单独一行、加粗放大、
-    不带数据；3 日期值/额外列值/日差/状态在第一行线段行上），已按列
+    """一个项目的全部表体行（3 日期值/额外列值/日差/状态在第一行
+    线段行上；项目名已移出表格，由 render_md 单独作标题），已按列
     展开。返回 [[str...]]（不含表头/分隔）。"""
     from config import CFG
     n_lead = 3 + len(adds)
-    n_cols = n_lead + 1 + 12 + 3            # 前导 + 日差 + 月格 + 头尾状态备注
-    name_row = [f'<font size="5"><b>{r["name"]}</b></font>'] \
-        + [""] * (n_cols - 1)
-    title = ([""] * n_lead
-             + [_diff_text(r), ""] + [""] * 12 + ["",
-                                                  r["status_val"] or "", ""])
     # 数据值放第一行线段行的前导列：开始/下一个跟进/关闭 + 额外列
-    out = [name_row]
+    out = []
     first_vals = ([r["vals"][0] or "", r["vals"][2] or "",
                    r["vals"][3] or ""]
                   + [r["adds"].get(a) or "" for a in adds])
@@ -359,8 +354,8 @@ def _render_rows(r, tl, adds, add_labels, add_plot, add_colors,
 
 def render_md(rows_groups, tl, adds, add_labels, add_plot, add_colors,
               months, mode_label, today=None, split=False):
-    """markdown 文本（用户定，v3.8.4）：每项目一张表；第一行 = 项目名
-    （单独一行、加粗放大字体、不带数据）；第一行线段行带 3 日期值/
+    """markdown 文本（用户定，v3.8.6）：每项目一张表；项目名作表格外
+    单独一行标题（加粗放大字体、不带数据）；第一行线段行带 3 日期值/
     额外列值/日差(负标红)/状态；其余线段行只有 # 线 + 头尾标注
     （早于/晚于）+ 备注；基准段字段/画法/色在 JSON timeline 段；
     --split 时文首给章导航超链接。"""
@@ -381,6 +376,8 @@ def render_md(rows_groups, tl, adds, add_labels, add_plot, add_colors,
     for gname, grows in rows_groups:
         out.append(f"## {gname}（{len(grows)} 个项目）\n")
         for r in grows:
+            # v3.8.6（用户定）：项目名移出表格，单独一行加粗放大标题
+            out.append(f'<font size="5"><b>{r["name"]}</b></font>')
             out.append("| " + " | ".join(lead) + " |")
             out.append("|" + "|".join(sep) + "|")
             for row in _render_rows(r, tl, adds, add_labels, add_plot,

@@ -303,12 +303,12 @@ def _mk(pkg, customer, start, nxt=None, close=None):
 
 
 def _tbl_rows(text, name):
-    """某项目的表内所有行（含表头/分隔）：定位首格 = name 的项目行，
-    连同其上两行表头/分隔 + 其后 4 行线段行。"""
+    """某项目的表内所有行（含表头/分隔）：定位表格外单独成行的
+    项目名标题（v3.8.6），取其后的表头/分隔 + 4 行线段行。"""
     lines = text.splitlines()
     for i, l in enumerate(lines):
-        if f"<b>{name}</b>" in l:
-            return [x for x in lines[i - 2:i + 5] if x.startswith("|")]
+        if f"<b>{name}</b>" in l and not l.startswith("|"):
+            return [x for x in lines[i + 1:i + 7] if x.startswith("|")]
     raise AssertionError(f"找不到项目行：{name}")
 
 
@@ -350,14 +350,16 @@ def test_timeline_title_row_and_fixed_col_names(pkg):
     text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
         .read_text(encoding="utf-8")
     assert not any(l.startswith("### ") for l in text.splitlines())
+    # v3.8.6（用户定）：项目名移出表格，单独一行加粗放大标题
+    name_line = next(l for l in text.splitlines() if "<b>甲</b>" in l)
+    assert not name_line.startswith("|") and "size=" in name_line
     rows = _tbl_rows(text, "甲")
-    assert len(rows) == 7                # 表头 + 分隔 + 项目名行 + 4 线段行
-    assert f"<b>甲</b>" in rows[2] and "size=" in rows[2]   # 单独加粗放大行
-    lead = [c for c in _row_cells(rows[3]) if c and not c.startswith("<font")]
+    assert len(rows) == 6                # 表头 + 分隔 + 4 线段行
+    lead = [c for c in _row_cells(rows[2]) if c and not c.startswith("<font")]
     assert lead[:2] == ["2026-11-01", "2026-11-20"]
     assert lead[2].isdigit() and lead[3] == "跟进中"
     for i, lab in enumerate(["今日", "最近跟进", "下一个跟进", "关闭"]):
-        assert _row_cells(rows[3 + i])[-1] == f"开始-{lab}"
+        assert _row_cells(rows[2 + i])[-1] == f"开始-{lab}"
 
 
 def test_timeline_negative_diff_red(pkg):
@@ -380,9 +382,9 @@ def test_timeline_seg_line_fills_weeks_from_start(pkg):
     text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
         .read_text(encoding="utf-8")
     rows = _tbl_rows(text, "甲")
-    assert _n_hash(rows[5]) == 3     # 开始-下一个跟进：周 1→3
-    assert _n_hash(rows[3]) == 2     # 开始-今日（今天 11-10）：周 1→2
-    assert _n_hash(rows[6]) == 0     # 无关闭 → 空行保留
+    assert _n_hash(rows[4]) == 3     # 开始-下一个跟进：周 1→3
+    assert _n_hash(rows[2]) == 2     # 开始-今日（今天 11-10）：周 1→2
+    assert _n_hash(rows[5]) == 0     # 无关闭 → 空行保留
 
 
 def test_timeline_seg_missing_endpoint_keeps_blank_row(pkg):
@@ -393,9 +395,9 @@ def test_timeline_seg_missing_endpoint_keeps_blank_row(pkg):
     text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
         .read_text(encoding="utf-8")
     rows = _tbl_rows(text, "无排期")
-    assert len(rows) == 7
-    assert _n_hash(rows[5]) == 0 and _n_hash(rows[6]) == 0  # 下个跟进/关闭缺
-    assert _n_hash(rows[3]) > 0      # 今日行照画
+    assert len(rows) == 6
+    assert _n_hash(rows[4]) == 0 and _n_hash(rows[5]) == 0  # 下个跟进/关闭缺
+    assert _n_hash(rows[2]) > 0      # 今日行照画
 
 
 def test_timeline_head_tail_labels_earlier_later(pkg):
@@ -410,10 +412,10 @@ def test_timeline_head_tail_labels_earlier_later(pkg):
     rows = _tbl_rows(text, "老单")
     head_i = _row_cells(rows[0]).index("头")
     tail_i = _row_cells(rows[0]).index("尾")
-    close_row = _row_cells(rows[6])
+    close_row = _row_cells(rows[5])
     assert close_row[head_i] == "早于26-05"
     assert close_row[tail_i] == "晚于27-04"
-    assert _n_hash(rows[6]) == 48    # 夹边界铺满 12 个月格
+    assert _n_hash(rows[5]) == 48    # 夹边界铺满 12 个月格
 
 
 def test_timeline_spot_plot_mode(pkg):
@@ -429,9 +431,9 @@ def test_timeline_spot_plot_mode(pkg):
     text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
         .read_text(encoding="utf-8")
     rows = _tbl_rows(text, "甲")
-    assert _n_hash(rows[5]) == 1     # 开始-下一个跟进：单点
-    assert _n_hash(rows[3]) == 1     # 今日点
-    assert _n_hash(rows[6]) == 0     # 无关闭 → 空行
+    assert _n_hash(rows[4]) == 1     # 开始-下一个跟进：单点
+    assert _n_hash(rows[2]) == 1     # 今日点
+    assert _n_hash(rows[5]) == 0     # 无关闭 → 空行
 
 
 def test_timeline_add_col_spot_and_colors(pkg):
@@ -450,12 +452,13 @@ def test_timeline_add_col_spot_and_colors(pkg):
     text = hits[0].read_text(encoding="utf-8")
     rows = _tbl_rows(text, "甲")
     assert "验收日期" in _row_cells(rows[0])
-    title = _row_cells(rows[3])      # 第一行线段行带数据值
+    title = _row_cells(rows[2])      # 第一行线段行带数据值
     assert title[3] == ""            # 未填验收日期 → 空
-    # 额外列图行 = 项目行后第 5 行（4 行基准之后）
+    # 额外列图行 = 项目名标题后第 7 行（表头/分隔 + 4 行基准之后）
     lines = text.splitlines()
-    i = next(k for k, l in enumerate(lines) if "<b>甲</b>" in l)
-    add_row = lines[i + 5]
+    i = next(k for k, l in enumerate(lines)
+             if "<b>甲</b>" in l and not l.startswith("|"))
+    add_row = lines[i + 7]
     assert _row_cells(add_row)[-1] == "验收日期"
     assert _n_hash(add_row) == 0
     # 文件名嵌基准 + add-col 字段名
@@ -480,8 +483,9 @@ def test_timeline_add_col_line_draws(pkg):
     text = list(pkg.glob("db_analysis/timeline/timeline_*.md"))[0] \
         .read_text(encoding="utf-8")
     lines = text.splitlines()
-    i = next(k for k, l in enumerate(lines) if "<b>甲</b>" in l)
-    add_row = lines[i + 5]
+    i = next(k for k, l in enumerate(lines)
+             if "<b>甲</b>" in l and not l.startswith("|"))
+    add_row = lines[i + 7]
     assert _row_cells(add_row)[-1] == "开始-验收日期"
     assert _n_hash(add_row) == 6     # 8 月初 ~ 9 月中，跨月
     assert "#c62828" in add_row      # 缺省 add 配色轮盘第 1 色
