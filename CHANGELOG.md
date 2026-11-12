@@ -2,6 +2,23 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.9.0** 导入导出统一（用户定，2026-11-12）：workbench_ui
+  的 export / weekly / import 接口仿照 db_analysis——输出只接受
+  目录（缺省 `exports/`，显式目录自动创建，带扩展名的路径按
+  "想指定文件名"拒绝），文件名自动命名
+  `export_<模板>_<筛选摘要>_<排序段>_<时间戳>` /
+  `weekly_<跟进段>_<计划段>_<时间戳>`，同一批筛选/排序的产出
+  文件名可溯。默认导出 Excel，`--csv` 出 CSV（utf-8-sig + 纯 LF；
+  weekly 的 CSV = 单文件两段：本周跟进 / 下周计划）；导入默认按
+  Excel(xlsx) 解析，`--csv` 按 CSV 解析，格式与扩展名不符明确
+  报错。v3.4.0 的"按输出文件扩展名定格式"机制随之废除。
+  GUI 的导入/导出/周报三个对话框增加格式下拉（Excel/CSV），
+  默认值取自 fields.json 新增 `ui.io` 段三键
+  （import_format / export_format / weekly_format，均可缺省 =
+  excel，校验器拦截非法值），用户切换后回写该段；CLI 不走此
+  配置。新增 exporter.export_weekly_csv、config.save_ui_io。
+  276 passed。
+
 - **v3.8.15** 图标测试跨平台修复（2026-11-12，Windows Python 3.14
   实测发现）：test_tty_icon_script_path 原假设 bash+ANSI，Windows
   实际走 show_icon.ps1（[Console] 颜色），ANSI 断言限定非 Windows；

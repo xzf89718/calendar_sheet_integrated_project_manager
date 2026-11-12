@@ -164,7 +164,8 @@ def cmd_follow(a):
 def cmd_import(a):
     db = bc.open_db()
     try:
-        created, skipped, unmapped = bc.cmd_import(db, a.file, a.template)
+        created, skipped, unmapped = bc.cmd_import(db, a.file, a.template,
+                                                   csv=a.csv)
         print(f"导入完成：新建 {created} 条，跳过 {skipped} 条")
         if unmapped:
             print(f"未识别列：{'、'.join(unmapped)}")
@@ -175,10 +176,11 @@ def cmd_import(a):
 def cmd_export(a):
     db = bc.open_db()
     try:
-        n = bc.cmd_export(db, a.out, template=a.template, closed=a.closed,
-                          search=a.search, where=a.where,
-                          sort=a.sort, desc=a.desc)
-        print(f"已导出 {n} 条到 {os.path.abspath(a.out)}")
+        n, path = bc.cmd_export(db, a.out, template=a.template,
+                                closed=a.closed, search=a.search,
+                                where=a.where, sort=a.sort, desc=a.desc,
+                                csv=a.csv)
+        print(f"已导出 {n} 条到 {path}")
         print("注意：导出为全量匹配行，不受 --limit/--offset 影响")
     finally:
         db.close()
@@ -187,10 +189,10 @@ def cmd_export(a):
 def cmd_weekly(a):
     db = bc.open_db()
     try:
-        nf, np_ = bc.cmd_weekly(db, a.out, d1=a.date_from, d2=a.date_to,
-                                p1=a.plan_from, p2=a.plan_to)
-        print(f"已导出到 {os.path.abspath(a.out)}"
-              f"：本周跟进 {nf} 条，下周计划 {np_} 条")
+        nf, np_, path = bc.cmd_weekly(db, a.out, d1=a.date_from,
+                                      d2=a.date_to, p1=a.plan_from,
+                                      p2=a.plan_to, csv=a.csv)
+        print(f"已导出到 {path}：本周跟进 {nf} 条，下周计划 {np_} 条")
     finally:
         db.close()
 
@@ -292,17 +294,27 @@ def build_parser():
                     metavar="字段=值", help="修改的字段，可多次；未传字段保持现值")
     sp.add_argument("--note", default=None, help="本次跟进记录")
 
-    sp = sub.add_parser("import", help="表格导入")
-    sp.add_argument("file", help="xlsx / csv 文件路径")
+    sp = sub.add_parser("import", help="表格导入（默认 Excel，--csv 导 CSV）")
+    sp.add_argument("file", help="表格文件路径（默认 .xlsx；--csv 时 .csv）")
     sp.add_argument("--template", default=None, help="模板名")
+    sp.add_argument("--csv", action="store_true",
+                    help="按 CSV(utf-8-sig) 解析；缺省按 Excel(xlsx)")
 
     sp = sub.add_parser("export", help="批量导出（全量匹配行）")
-    sp.add_argument("out", help="输出文件路径（xlsx / csv，按扩展名）")
+    sp.add_argument("out", nargs="?", default=None,
+                    help="输出目录（缺省 exports/；只接受目录，文件名"
+                         "自动命名，含筛选/排序条件；--csv 出 CSV）")
     sp.add_argument("--template", default=None, help="模板名")
+    sp.add_argument("--csv", action="store_true",
+                    help="输出 CSV(utf-8-sig)；缺省输出 Excel(xlsx)")
     _add_filter_args(sp)
 
     sp = sub.add_parser("weekly", help="周报导出（本周跟进 + 下周计划）")
-    sp.add_argument("out", help="输出文件路径")
+    sp.add_argument("out", nargs="?", default=None,
+                    help="输出目录（缺省 exports/；只接受目录，文件名"
+                         "自动命名；--csv 出单文件两段 CSV）")
+    sp.add_argument("--csv", action="store_true",
+                    help="输出 CSV(utf-8-sig)；缺省输出 Excel(xlsx)")
     sp.add_argument("--date-from", dest="date_from", default=None,
                     metavar="YYYY-MM-DD", help="跟进段起点（缺省本周一）")
     sp.add_argument("--date-to", dest="date_to", default=None,

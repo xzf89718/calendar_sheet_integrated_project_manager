@@ -5,3 +5,4 @@ __pycache__
 db_analysis/pie/
 db_analysis/timeline/
 bin/
+exports/

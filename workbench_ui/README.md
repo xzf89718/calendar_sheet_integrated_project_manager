@@ -13,11 +13,19 @@ python -m workbench_ui list [--closed] [--search 词]... \
 python -m workbench_ui show <id> [--hist N]   # 查看项目（含历史快照）
 python -m workbench_ui new --set 字段=值... [--note 文本]
 python -m workbench_ui follow <id> --set 字段=值... [--note 文本]
-python -m workbench_ui import <文件> [--template 名]
-python -m workbench_ui export <out.xlsx|out.csv> [同 list 的筛选参数]
-python -m workbench_ui weekly <out.xlsx> [--date-from .. --date-to ..]
+python -m workbench_ui import <文件> [--template 名] [--csv]
+                    # 默认按 Excel(xlsx) 解析；--csv 按 CSV 解析，
+                    # 格式与扩展名不符直接报错
+python -m workbench_ui export [目录] [--csv] [--template 名] \
+        [同 list 的筛选参数]
+                    # v3.9.0：只接受目录（缺省 exports/），文件名自动
+                    # 命名 export_<模板>_<筛选摘要>_<排序段>_<时间戳>
+                    # .xlsx|csv；默认 Excel，--csv 出 CSV
+python -m workbench_ui weekly [目录] [--csv] [--date-from .. --date-to ..]
                                            [--plan-from .. --plan-to ..]
-                                           # 日期缺省 = 本周一~日/下周一~日
+                    # 日期缺省 = 本周一~日/下周一~日；目录规则同 export，
+                    # 命名 weekly_<跟进段>_<计划段>_<时间戳>；
+                    # --csv = 单文件两段（本周跟进/下周计划）
 python -m workbench_ui backup          # 库备份（与 GUI 按钮同一内核）
 python -m workbench_ui notify          # 今日项目事项，只打印到终端
 python -m workbench_ui cal <年> [月] [日]   # 日历时间节点，只读打印
@@ -32,9 +40,16 @@ python -m workbench_ui --show-icon                      # CLI 单独播放品牌
 - `new` / `follow` 的值校验与 GUI 完全同源（同一套
   `validate_*` / `check_date_bounds`）；`follow` 未传的字段保持
   现值，`--note` 写入跟进记录字段。
-- `export` 导出全量匹配行（不受 `--limit` 影响），按扩展名分派：
-  `.xlsx` 走模板引擎，`.csv` 同列结构写文本（`utf-8-sig` 编码 + 纯
-  LF，Excel 双击中文不乱码，与导入端读取方式对称），其余扩展名报错。
+- `export` / `weekly` 导出全量匹配行（不受 `--limit` 影响），
+  输出只接受目录（v3.9.0 起，接口仿 db_analysis）：带扩展名的路径
+  按"想指定文件名"拒绝，文件名一律自动命名（模板名 + 筛选摘要 +
+  排序段 + 时间戳），同一批筛选/排序的产出文件名可溯。`.csv` 同列
+  结构写文本（`utf-8-sig` 编码 + 纯 LF，Excel 双击中文不乱码，与
+  导入端读取方式对称）。v3.4.0 的"按输出文件扩展名定格式"已废除。
+- GUI 的导入/导出/周报三个对话框有格式下拉（Excel/CSV），默认值
+  取自 fields.json `ui.io` 段的 `import_format` / `export_format` /
+  `weekly_format`（均可缺省 = excel，可选 excel/csv），选择后回写
+  该段。CLI 不走此配置（CLI 用 `--csv` 开关）。
 - `notify` 按设计**只打印到终端**，不走系统通知（防止被脚本滥用
   塞爆通知栏）。
 - `cal` 只读：打印某年/月/日的时间节点清单（含项目 id），供

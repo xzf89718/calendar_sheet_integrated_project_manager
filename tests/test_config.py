@@ -4,6 +4,8 @@
 每个用例 = 一类坏配置 -> 期望的错误消息。校验器是纯函数，
 不读文件不抛异常，这里直接喂 dict。
 """
+import json
+
 import pytest
 
 from config import validate_config_data
@@ -247,3 +249,41 @@ def test_calendar_limit_out_of_range_or_bad_type(bad):
     d2.setdefault("ui", {})["calendar"] = {"max_per_day": bad,
                                            "max_per_day_view": 5}
     assert any("max_per_day" in e for e in validate_config_data(d2))
+
+
+# ---- v3.9.0：ui.io 导入导出格式配置 ----
+
+def test_ui_io_valid_values():
+    d = _base()
+    d.setdefault("ui", {})["io"] = {"import_format": "csv",
+                                    "export_format": "excel",
+                                    "weekly_format": "csv"}
+    assert validate_config_data(d) == []
+
+
+@pytest.mark.parametrize("bad", ["xlsx", "CSV", "", True, 1])
+def test_ui_io_invalid_value_rejected(bad):
+    d = _base()
+    d.setdefault("ui", {})["io"] = {"export_format": bad}
+    assert any("ui.io.export_format" in e for e in validate_config_data(d))
+
+
+def test_io_format_default_excel(cfg):
+    assert cfg.io_format("export_format") == "excel"
+    assert cfg.io_format("weekly_format") == "excel"
+    assert cfg.io_format("import_format") == "excel"
+
+
+def test_save_ui_io_roundtrip(tmp_path, cfg, monkeypatch):
+    """回写只动 ui.io 指定键，其余段原样保留；内存 CFG 同步。"""
+    import config
+    p = tmp_path / "fields.json"
+    p.write_text(json.dumps(_base(), ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(config, "_CFG_PATH", str(p))
+    config.save_ui_io(export_format="csv")
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data["ui"]["io"]["export_format"] == "csv"
+    assert data["fields"] == _base()["fields"]      # 其余原样
+    assert config.CFG.io_format("export_format") == "csv"
+    with pytest.raises(ValueError):
+        config.save_ui_io(export_format="xlsx")

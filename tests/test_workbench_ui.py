@@ -113,14 +113,28 @@ def test_cli_csv_format(pkg):
     assert "厂家A" in r.stdout
 
 
+def test_cli_export_default_dir_xlsx(pkg):
+    """v3.9.0：export 裸参数 → exports/ 内自动命名 xlsx。"""
+    run_ui(pkg, "new", "--set", "customer=厂家A")
+    r = run_ui(pkg, "export")
+    assert r.returncode == 0
+    outs = list((pkg / "exports").glob("export_*.xlsx"))
+    assert len(outs) == 1
+    assert "已导出 1 条" in r.stdout
+    assert str(outs[0]) in r.stdout          # stdout 打印实际路径
+
+
 def test_cli_export_csv(pkg):
-    """v3.4.0：export 支持 .csv（utf-8-sig BOM + 纯 LF，Excel 双击中文正常）。"""
+    """v3.9.0：export --csv → exports/ 内自动命名 csv
+    （utf-8-sig BOM + 纯 LF，Excel 双击中文正常）。"""
     run_ui(pkg, "new", "--set", "customer=厂家A")
     run_ui(pkg, "new", "--set", "customer=厂家B")
-    r = run_ui(pkg, "export", "out.csv")
+    r = run_ui(pkg, "export", "--csv")
     assert r.returncode == 0
     assert "已导出 2 条" in r.stdout
-    data = (pkg / "out.csv").read_bytes()
+    outs = list((pkg / "exports").glob("export_*.csv"))
+    assert len(outs) == 1
+    data = outs[0].read_bytes()
     assert data.startswith(b"\xef\xbb\xbf")     # utf-8-sig BOM
     assert b"\r\n" not in data                    # lineterminator="\n"
     text = data.decode("utf-8-sig")
@@ -128,14 +142,53 @@ def test_cli_export_csv(pkg):
     assert len([ln for ln in text.splitlines() if ln.strip()]) == 3  # 表头+2行
 
 
+def test_cli_export_filename_embeds_filter_sort(pkg):
+    """v3.9.0：自动命名嵌筛选摘要 + 排序段（仿 db_analysis）。"""
+    run_ui(pkg, "new", "--set", "customer=厂家A")
+    r = run_ui(pkg, "export", "--closed", "--sort", "customer",
+               "--desc", "--search", "厂家")
+    assert r.returncode == 0
+    outs = list((pkg / "exports").glob("export_*.xlsx"))
+    assert len(outs) == 1
+    name = outs[0].name
+    assert "搜索=厂家" in name and "含归档" in name
+    assert "sort-customer_desc" in name
+
+
+def test_cli_export_explicit_dir(pkg):
+    """v3.9.0：显式目录 → 该目录内自动命名，目录不存在自动创建。"""
+    run_ui(pkg, "new", "--set", "customer=厂家A")
+    r = run_ui(pkg, "export", str(pkg / "myout"))
+    assert r.returncode == 0
+    outs = list((pkg / "myout").glob("export_*.xlsx"))
+    assert len(outs) == 1
+
+
+def test_cli_export_rejects_file_path(pkg):
+    """v3.9.0：带扩展名的路径（想指定文件名）明确拒绝。"""
+    run_ui(pkg, "new", "--set", "customer=厂家A")
+    r = run_ui(pkg, "export", "out.xlsx")
+    assert r.returncode == 1
+    assert "只支持目录" in r.stderr
+    r = run_ui(pkg, "export", "out.txt")
+    assert r.returncode == 1
+    assert "只支持目录" in r.stderr
+
+
 def test_cli_export_csv_roundtrip(pkg):
-    """v3.4.0 对称性验收：export csv → 清库 → import 回库，数据不丢。"""
+    """v3.9.0 对称性验收：export --csv → 清库 → import --csv 回库，数据不丢。"""
     run_ui(pkg, "new", "--set", "customer=厂家A", "--note", "立项")
     run_ui(pkg, "new", "--set", "customer=厂家B")
-    assert run_ui(pkg, "export", "out.csv").returncode == 0
+    assert run_ui(pkg, "export", "--csv").returncode == 0
+    csvs = list((pkg / "exports").glob("export_*.csv"))
+    assert len(csvs) == 1
     for f in pkg.glob("*.db"):
         f.unlink()
-    r = run_ui(pkg, "import", "out.csv")
+    # 不带 --csv 默认按 Excel 解析 csv → 明确报错
+    r = run_ui(pkg, "import", str(csvs[0]))
+    assert r.returncode == 1
+    assert "CSV 请加 --csv" in r.stderr
+    r = run_ui(pkg, "import", str(csvs[0]), "--csv")
     assert r.returncode == 0
     assert "新建 2 条" in r.stdout
     r = run_ui(pkg, "list", "--format", "csv")
@@ -143,18 +196,22 @@ def test_cli_export_csv_roundtrip(pkg):
     assert "立项" in r.stdout
 
 
-def test_cli_export_bad_extension_exit_1(pkg):
-    """v3.4.0：非 xlsx/csv 扩展名明确报错（旧文案只提 xlsx 已废弃）。"""
-    r = run_ui(pkg, "export", "out.txt")
+def test_cli_import_csv_flag_mismatch(pkg):
+    """v3.9.0：--csv 配 xlsx / 缺 --csv 配 csv，双双明确报错。"""
+    run_ui(pkg, "new", "--set", "customer=厂家A")
+    r = run_ui(pkg, "export")          # 产 xlsx
+    assert r.returncode == 0
+    xlsx = list((pkg / "exports").glob("export_*.xlsx"))[0]
+    r = run_ui(pkg, "import", str(xlsx), "--csv")
     assert r.returncode == 1
-    assert ".xlsx / .csv" in r.stderr
+    assert "别加 --csv" in r.stderr
 
 
 def test_cli_export_and_backup(pkg):
     run_ui(pkg, "new", "--set", "customer=厂家A")
-    r = run_ui(pkg, "export", "out.xlsx")
+    r = run_ui(pkg, "export")
     assert r.returncode == 0
-    assert os.path.exists(pkg / "out.xlsx")
+    assert list((pkg / "exports").glob("export_*.xlsx"))
     assert "已导出 1 条" in r.stdout
 
     r = run_ui(pkg, "backup")
@@ -165,12 +222,29 @@ def test_cli_export_and_backup(pkg):
 
 
 def test_cli_weekly(pkg):
+    """v3.9.0：weekly 裸参数 → exports/ 内自动命名 xlsx。"""
     run_ui(pkg, "new", "--set", "customer=厂家A")
     run_ui(pkg, "follow", "1", "--note", "本周跟进")
-    r = run_ui(pkg, "weekly", "周报.xlsx")
+    r = run_ui(pkg, "weekly")
     assert r.returncode == 0
-    assert os.path.exists(pkg / "周报.xlsx")
+    outs = list((pkg / "exports").glob("weekly_*.xlsx"))
+    assert len(outs) == 1
     assert "本周跟进" in r.stdout
+
+
+def test_cli_weekly_csv(pkg):
+    """v3.9.0：weekly --csv → 单文件两段 CSV（本周跟进/下周计划）。"""
+    run_ui(pkg, "new", "--set", "customer=厂家A")
+    run_ui(pkg, "follow", "1", "--note", "本周跟进")
+    r = run_ui(pkg, "weekly", "--csv", "--date-from", "2026-01-05",
+               "--date-to", "2026-01-11", "--plan-from", "2026-01-12",
+               "--plan-to", "2026-01-18")
+    assert r.returncode == 0
+    outs = list((pkg / "exports").glob("weekly_2026-01-05~2026-01-11*.csv"))
+    assert len(outs) == 1
+    text = outs[0].read_bytes().decode("utf-8-sig")
+    assert "本周跟进" in text and "下周计划" in text
+    assert "本周跟进内容" in text or "本周跟进" in text.splitlines()[0]
 
 
 def test_cli_cal_readonly(pkg):

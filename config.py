@@ -216,6 +216,16 @@ def validate_config_data(data):
     if isinstance(ui, dict) and "show_icon" in ui:
         if not isinstance(ui["show_icon"], bool):
             errs.append("ui.show_icon 必须是 true/false")
+    # ui.io：导入导出格式配置（v3.9.0，可缺省 = 全部 excel）。
+    # 三键 import_format / export_format / weekly_format，GUI 下拉
+    # 默认值取自这里，选择后回写；CLI 不受此配置影响（CLI 用 --csv）
+    if isinstance(ui, dict) and isinstance(ui.get("io"), dict):
+        for key in ("import_format", "export_format", "weekly_format"):
+            if key in ui["io"] \
+                    and ui["io"][key] not in ("excel", "csv"):
+                errs.append(
+                    f"ui.io.{key} 必须是 excel/csv 之一："
+                    f"{ui['io'][key]!r}")
     return errs
 
 
@@ -256,6 +266,9 @@ class Config:
             "calendar_labels",
             {"start": "开始", "followup": "跟进", "close": "关闭"})
         self.editor_ui = self.ui.get("editor", {})
+        # 导入导出格式（v3.9.0）：ui.io 段，缺省 excel；GUI 下拉默认值
+        # 与回写目标；CLI 不走这里（CLI 用 --csv 开关）
+        self.io_ui = self.ui.get("io", {})
         # 字段级列宽提示（px）， fit_columns 会以此为基准再按内容伸缩
         self.field_width = {f["name"]: f.get("width")
                             for f in self.fields if f.get("width")}
@@ -468,4 +481,31 @@ class Config:
             })
 
 
+    def io_format(self, key):
+        """ui.io.<key> 的合法化取值：只认 excel/csv，其余按 excel。"""
+        return "csv" if self.io_ui.get(key) == "csv" else "excel"
+
+
 CFG = Config()
+
+
+def save_ui_io(**kv):
+    """ui.io 段回写（v3.9.0）：把 GUI 导入导出格式选择持久化进
+    fields.json。只改 ui.io 里的指定键，其余内容原样保留；
+    写后立即同步内存中的 CFG（下次读取无需重启）。
+    注意：运行时改配置与 config.py 头部"运行期不变"的默认纪律相反，
+    这是 ui.io 的专用例外（v3.9.0 用户定：GUI 格式选择回写）。"""
+    with open(_CFG_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+    io = data.setdefault("ui", {}).setdefault("io", {})
+    for k, v in kv.items():
+        if v not in ("excel", "csv"):
+            raise ValueError(f"ui.io 只接受 excel/csv：{k}={v!r}")
+        io[k] = v
+    tmp = _CFG_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, _CFG_PATH)
+    ui = CFG.ui.setdefault("io", {})
+    ui.update(kv)
+    CFG.io_ui = ui

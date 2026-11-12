@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.8.15
+# 日历表格聚合项目跟进工作台 v3.9.0
 
 <img src="icon/pm_workbench_icon.png" width="300" alt="日历表格聚合项目跟进工作台图标：日历·表格·分析">
 
@@ -184,7 +184,8 @@ Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关�
 python -m workbench_ui list                 # 项目列表
 python -m workbench_ui new --set 客户=XX --set 金额=50
 python -m workbench_ui follow 3 --set 概率=80 --note 已报价
-python -m workbench_ui export out.xlsx      # 导出筛出项
+python -m workbench_ui export               # 导出筛出项到 exports/（自动命名）
+                                            # --csv 出 CSV；import/weekly 同理
 python -m workbench_ui backup               # 一键备份
 ```
 

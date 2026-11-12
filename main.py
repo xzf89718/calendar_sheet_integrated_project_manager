@@ -14,10 +14,11 @@ from tkinter import ttk, messagebox, filedialog, simpledialog
 try:
     from db import Database, SNAPSHOT_FIELDS
     from editor import LABELS
-    from config import BASE_DIR, CFG
+    from config import BASE_DIR, CFG, save_ui_io
     from calendar_gui import CalendarWidget
     from editor import SnapshotEditor
     from reader import ProjectReader
+    from workbench_ui import bench_core as _bc
 except ValueError as _cfg_err:
     # fields.json 损坏：Config() 在 import 时抛 ValueError（错误清单
     # 全文在 _CFG_ERR）。GUI 路径据此干净退出；--check-config 路径
@@ -390,15 +391,23 @@ class MainApp(tk.Tk):
         tpl = self._pick_template("选择导入模板")
         if tpl is None:
             return
-        path = filedialog.askopenfilename(
-            parent=self,
-            filetypes=[("Excel 或 CSV", "*.xlsx *.csv"), ("所有文件", "*.*")])
+        # v3.9.0：先选格式（默认取 ui.io.import_format，缺省 excel），
+        # 再按格式过滤文件选择框；选择回写 ui.io
+        IoFormatDialog(self, "导入格式", CFG.io_format("import_format"),
+                       need_dir=False, default_dir="",
+                       on_ok=lambda fmt, _d: self._do_import(tpl, fmt))
+
+    def _do_import(self, tpl, fmt):
+        fts = [("CSV", "*.csv"), ("Excel", "*.xlsx")] if fmt == "csv" \
+            else [("Excel", "*.xlsx"), ("CSV", "*.csv")]
+        path = filedialog.askopenfilename(parent=self, filetypes=fts)
         if not path:
             return
         try:
             from importer import import_file
             created, skipped, unmapped = import_file(self.db, path,
-                                                     template=tpl)
+                                                     template=tpl, fmt=fmt)
+            save_ui_io(import_format=fmt)
         except Exception as e:                      # noqa: BLE001
             messagebox.showerror("导入失败", str(e), parent=self)
             return
@@ -413,24 +422,48 @@ class MainApp(tk.Tk):
 
     def _export(self):
         """导出当前筛选/排序后的行（列表里看到的 = 导出的）。
-        先选模板，列序 = 模板定义。"""
+        先选模板，列序 = 模板定义。
+        v3.9.0：目录 + 自动命名（仿 db_analysis），格式下拉默认取
+        ui.io.export_format（缺省 excel），选择回写 ui.io。"""
         tpl = self._pick_template("选择导出模板")
         if tpl is None:
             return
+        default_dir = os.path.join(BASE_DIR, "exports")
+        IoFormatDialog(self, "导出格式", CFG.io_format("export_format"),
+                       need_dir=True, default_dir=default_dir,
+                       on_ok=lambda fmt, d: self._do_export(tpl, fmt, d))
+
+    def _io_cond_summary(self):
+        """当前 GUI 筛选/搜索/归档状态 → 文件名摘要段（仿 bench_core）。"""
+        parts = []
+        for c, v in self.col_filters.items():
+            if v is None:
+                continue
+            val = ",".join(sorted(str(x) for x in v)) \
+                if isinstance(v, (set, list, tuple)) else str(v)
+            parts.append(f"{c}={val}")
+        kw = self.search_var.get().strip()
+        if kw:
+            parts.append(f"搜索={kw}")
+        if self.show_closed:
+            parts.append("含归档")
+        return _bc._safe("_".join(parts)) if parts else "全量"
+
+    def _do_export(self, tpl, fmt, directory):
         from exporter import export_csv, export_with_template
         rows = self._all_rows()          # 全量匹配，不受渲染截断影响
-        path = filedialog.asksaveasfilename(
-            parent=self, defaultextension=".xlsx",
-            initialfile=f"{tpl['name']}表格.xlsx",
-            filetypes=[("Excel 或 CSV", "*.xlsx *.csv"),
-                       ("Excel", "*.xlsx"), ("CSV", "*.csv")])
-        if not path:
-            return
         try:
-            if path.lower().endswith(".csv"):
-                n = export_csv(rows, path, tpl)
+            dest = _bc._resolve_out_dir(directory)
+            path = _bc._export_path(dest,
+                                    f"export_{_bc._safe(tpl['name'])}",
+                                    self._io_cond_summary(),
+                                    self.sort_col, self.sort_reverse,
+                                    ".csv" if fmt == "csv" else ".xlsx")
+            if fmt == "csv":
+                n = export_csv(rows, str(path), tpl)
             else:
-                n = export_with_template(rows, path, tpl)
+                n = export_with_template(rows, str(path), tpl)
+            save_ui_io(export_format=fmt)
         except Exception as e:                      # noqa: BLE001
             messagebox.showerror("导出失败", str(e), parent=self)
             return
@@ -557,12 +590,15 @@ class MainApp(tk.Tk):
                 ("项目", "__name__", None),
                 ("跟进记录", "followup_note", None),
                 ("改动说明", "change_summary", None)]}
-        path = filedialog.asksaveasfilename(
-            parent=self, defaultextension=".xlsx",
-            initialfile=f"周报_{d1}~{d2}.xlsx",
-            filetypes=[("Excel", "*.xlsx")])
-        if not path:
-            return
+        # v3.9.0：目录 + 自动命名；格式下拉默认取 ui.io.weekly_format
+        default_dir = os.path.join(BASE_DIR, "exports")
+        IoFormatDialog(self, "周报导出格式",
+                       CFG.io_format("weekly_format"),
+                       need_dir=True, default_dir=default_dir,
+                       on_ok=lambda fmt, d: self._do_export_weekly2(
+                           tpl, d1, d2, p1, p2, fmt, d))
+
+    def _do_export_weekly2(self, tpl, d1, d2, p1, p2, fmt, directory):
         try:
             rows_f = self.db.snapshots_between(d1, d2)
             rows_p = self.db.weekly_plan(p1, p2, self.show_closed)
@@ -571,8 +607,18 @@ class MainApp(tk.Tk):
                 rows_f = [r for r in rows_f
                           if r["project_id"] in self.fav_ids]
                 rows_p = [r for r in rows_p if r["id"] in self.fav_ids]
-            from exporter import export_weekly
-            nf, np_ = export_weekly(rows_f, rows_p, tpl, path)
+            dest = _bc._resolve_out_dir(directory)
+            path = _bc._export_path(dest,
+                                    f"weekly_{d1}~{d2}_{p1}~{p2}",
+                                    "", None, False,
+                                    ".csv" if fmt == "csv" else ".xlsx")
+            if fmt == "csv":
+                from exporter import export_weekly_csv
+                nf, np_ = export_weekly_csv(rows_f, rows_p, tpl, str(path))
+            else:
+                from exporter import export_weekly
+                nf, np_ = export_weekly(rows_f, rows_p, tpl, str(path))
+            save_ui_io(weekly_format=fmt)
         except Exception as e:                      # noqa: BLE001
             messagebox.showerror("导出失败", str(e), parent=self)
             return
@@ -1151,6 +1197,80 @@ class WeeklyReportDialog(tk.Toplevel):
                 return
         self.on_ok(self.d1.get().strip(), self.d2.get().strip(),
                    self.p1.get().strip(), self.p2.get().strip())
+        self.destroy()
+
+
+class IoFormatDialog(tk.Toplevel):
+    """导入导出格式 + 输出目录弹窗（v3.9.0）。
+
+    格式下拉默认值取自 fields.json 的 ui.io 段（缺省 excel），
+    确定后由调用方回写（save_ui_io）。导出/周报 need_dir=True 选
+    输出目录；导入 need_dir=False 只选格式。
+    result = (fmt, directory) 或 None；fmt 为 "excel"/"csv"。"""
+    _FMT_LABELS = (("excel", "Excel (.xlsx)"), ("csv", "CSV (utf-8-sig)"))
+
+    def __init__(self, master, title, default_fmt, need_dir, default_dir,
+                 on_ok):
+        super().__init__(master)
+        self.on_ok = on_ok
+        self.need_dir = need_dir
+        self.result = None
+        self.title(title)
+        self.transient(master)
+        frm = tk.Frame(self, padx=16, pady=14)
+        frm.pack(fill="both", expand=True)
+        r1 = tk.Frame(frm)
+        r1.pack(fill="x", pady=4)
+        tk.Label(r1, text="文件格式：").pack(side="left")
+        self.fmt_var = tk.StringVar(
+            value=dict(self._FMT_LABELS).get(default_fmt, "excel"))
+        om = tk.OptionMenu(r1, self.fmt_var,
+                           *[lab for _k, lab in self._FMT_LABELS])
+        om.pack(side="left", padx=4)
+        self.dir_var = None
+        if need_dir:
+            r2 = tk.Frame(frm)
+            r2.pack(fill="x", pady=4)
+            tk.Label(r2, text="输出目录：").pack(side="left")
+            self.dir_var = tk.StringVar(value=default_dir)
+            tk.Entry(r2, textvariable=self.dir_var, width=36).pack(
+                side="left", padx=4)
+            tk.Button(r2, text="浏览…", command=self._browse).pack(side="left")
+        btns = tk.Frame(frm)
+        btns.pack(fill="x", pady=(12, 0))
+        tk.Button(btns, text="确定", width=8,
+                  command=self._ok).pack(side="right", padx=4)
+        tk.Button(btns, text="取消", width=8,
+                  command=self.destroy).pack(side="right")
+        self.update_idletasks()
+        w, h = self.winfo_reqwidth(), self.winfo_reqheight()
+        self.geometry(f"+{(self.winfo_screenwidth() - w) // 2}"
+                      f"+{(self.winfo_screenheight() - h) // 2}")
+        self.grab_set()
+        self.lift()
+
+    def _browse(self):
+        d = filedialog.askdirectory(parent=self,
+                                    initialdir=self.dir_var.get() or None)
+        if d:
+            self.dir_var.set(d)
+
+    def _ok(self):
+        fmt = "csv" if self.fmt_var.get().startswith("CSV") else "excel"
+        directory = ""
+        if self.need_dir:
+            directory = self.dir_var.get().strip()
+            if not directory:
+                messagebox.showwarning("提示", "请选择输出目录", parent=self)
+                return
+            if (os.path.isfile(directory)
+                    or (not os.path.isdir(directory)
+                        and os.path.splitext(directory)[1])):
+                messagebox.showwarning(
+                    "提示", "输出只支持目录（文件名自动命名）", parent=self)
+                return
+        self.result = (fmt, directory)
+        self.on_ok(fmt, directory)
         self.destroy()
 
 
