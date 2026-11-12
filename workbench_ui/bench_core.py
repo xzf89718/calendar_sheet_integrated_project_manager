@@ -401,7 +401,12 @@ def _safe_ident(s):
 
 
 def backup_database(db, db_path):
-    """SQLite 在线备份。返回备份文件路径。异常原样抛（调用方处理）。"""
+    """SQLite 在线备份 + fields.json 同事件备份（v3.10.0 用户定）。
+
+    返回 (库备份路径, fields.json 备份路径或 None)。fields.json
+    缺失时不报错——库备份照常完成，stderr 提示并返回 None。"""
+    import shutil
+    import sys
     cfg = _cfg()
     dest = Path(cfg.backup.get("path", "backups")).expanduser()
     if not dest.is_absolute():
@@ -415,7 +420,19 @@ def backup_database(db, db_path):
         db.conn.backup(tgt)                   # 官方在线备份，一致性快照
     finally:
         tgt.close()
-    return str(target)
+    # v3.10.0：同一备份事件内追加复制 fields.json，与库备份同前缀
+    # 同时戳，肉眼可配对。源路径取 config 的 _CFG_PATH（含冻结模式
+    # 向上找一级的规则），不自己重算。
+    json_target = None
+    src = Path(getattr(_config, "_CFG_PATH",
+                       Path(_config.BASE_DIR) / "fields.json"))
+    if src.is_file():
+        json_target = dest / f"{ts}-{ident}-fields.json"
+        shutil.copy2(str(src), str(json_target))
+    else:
+        print(f"提示：未找到 fields.json（{src}），本次仅备份数据库",
+              file=sys.stderr)
+    return str(target), (str(json_target) if json_target else None)
 
 
 def today_notify_text(db):

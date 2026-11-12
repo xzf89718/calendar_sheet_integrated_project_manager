@@ -354,11 +354,14 @@ class MainApp(tk.Tk):
         # 备份纯逻辑在 workbench_ui.bench_core（v3.3.0，GUI/CLI 共用一份）
         try:
             from workbench_ui.bench_core import backup_database
-            target = backup_database(self.db, self.db_path)
+            target, json_target = backup_database(self.db, self.db_path)
         except Exception as e:                    # noqa: BLE001
             messagebox.showerror("备份失败", str(e), parent=self)
             return
-        messagebox.showinfo("备份完成", f"已备份到：\n{target}", parent=self)
+        msg = f"已备份到：\n{target}"
+        if json_target:
+            msg += f"\n\nfields.json 已一并备份：\n{json_target}"
+        messagebox.showinfo("备份完成", msg, parent=self)
 
     def _setup_fonts(self):
         """默认字体与控件尺寸（fields.json 的 ui.font 可配置）。"""

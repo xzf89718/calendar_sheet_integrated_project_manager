@@ -200,8 +200,10 @@ def cmd_weekly(a):
 def cmd_backup(a):
     db = bc.open_db()
     try:
-        target = bc.backup_database(db, db.db_path)
+        target, json_target = bc.backup_database(db, db.db_path)
         print(f"备份完成：{target}")
+        if json_target:
+            print(f"配置已一并备份：{json_target}")
     finally:
         db.close()
 

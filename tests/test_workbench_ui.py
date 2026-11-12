@@ -219,6 +219,10 @@ def test_cli_export_and_backup(pkg):
     assert "备份完成" in r.stdout
     backups = list((pkg / "backups").glob("*.db"))
     assert len(backups) == 1
+    # v3.10.0：fields.json 同事件一并备份（同前缀）
+    jsons = list((pkg / "backups").glob("*-fields.json"))
+    assert len(jsons) == 1
+    assert "配置已一并备份" in r.stdout
 
 
 def test_cli_weekly(pkg):
@@ -398,11 +402,34 @@ def test_cmd_cal(cfg, seeded, monkeypatch):
 
 def test_backup_database(cfg, dbs, monkeypatch, tmp_path):
     _patch_cfg(monkeypatch, cfg)
+    # 备份目录指到 tmp（不污染源码树 backups/）
+    monkeypatch.setattr(cfg, "backup",
+                        {"path": str(tmp_path / "b"), "identifier": "备"})
     db = dbs
     db.create_project(customer="甲")
-    target = bc.backup_database(db, db.db_path)
+    target, json_target = bc.backup_database(db, db.db_path)
     assert os.path.exists(target)
     from db import Database
     d2 = Database(target)
     assert len(d2.list_projects()) == 1
     d2.close()
+    # v3.10.0：fields.json 同事件一并备份（同前缀同时戳）
+    assert json_target and os.path.exists(json_target)
+    prefix = os.path.basename(target).rsplit("-", 1)[0]
+    assert os.path.basename(json_target).startswith(prefix)
+    assert json_target.endswith("-fields.json")
+
+
+def test_backup_database_no_fieldsjson(cfg, dbs, monkeypatch, tmp_path):
+    """v3.10.0：fields.json 缺失 → 库备份照常，json 路径为 None。"""
+    import config
+    _patch_cfg(monkeypatch, cfg)
+    monkeypatch.setattr(cfg, "backup",
+                        {"path": str(tmp_path / "b"), "identifier": "备"})
+    monkeypatch.setattr(config, "_CFG_PATH",
+                        str(tmp_path / "no-such-fields.json"))
+    db = dbs
+    db.create_project(customer="甲")
+    target, json_target = bc.backup_database(db, db.db_path)
+    assert os.path.exists(target)
+    assert json_target is None
