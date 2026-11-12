@@ -2,6 +2,12 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.8.15** 图标测试跨平台修复（2026-11-12，Windows Python 3.14
+  实测发现）：test_tty_icon_script_path 原假设 bash+ANSI，Windows
+  实际走 show_icon.ps1（[Console] 颜色），ANSI 断言限定非 Windows；
+  test_check_config_tty_icon_under_pty 依赖 pty/termios，Windows
+  importorskip 跳过。功能代码无改动。261 passed。
+
 - **v3.8.14** db_analysis --where 区间校验对齐 workbench_ui（修复，
   2026-11-12 实测发现）：此前 pie/timeline 侧非日期字段误用 `~`
   被静默当单值过滤、非法日期（abc~def）与反向区间（起晚于止）均
