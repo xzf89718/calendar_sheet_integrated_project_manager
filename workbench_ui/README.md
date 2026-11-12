@@ -26,7 +26,7 @@ python -m workbench_ui weekly [目录] [--csv] [--date-from .. --date-to ..]
                     # 日期缺省 = 本周一~日/下周一~日；目录规则同 export，
                     # 命名 weekly_<跟进段>_<计划段>_<时间戳>；
                     # --csv = 单文件两段（本周跟进/下周计划）
-python -m workbench_ui backup          # 库备份（与 GUI 按钮同一内核）
+python -m workbench_ui backup          # 库备份 + fields.json 一并备份（v3.10.0，与 GUI 按钮同一内核）
 python -m workbench_ui notify          # 今日项目事项，只打印到终端
 python -m workbench_ui cal <年> [月] [日]   # 日历时间节点，只读打印
 python -m workbench_ui fav list|new|rename|delete|add|remove ...

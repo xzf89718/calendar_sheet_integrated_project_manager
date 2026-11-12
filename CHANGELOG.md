@@ -2,6 +2,13 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.10.0** 备份含 fields.json（用户定，2026-11-12，小补丁）：
+  `backup_database` 同一备份事件内追加复制 fields.json 到
+  backups 目录，与库备份同前缀同时戳（
+  `<时间戳>-<识别符>-fields.json`，肉眼可配对）；fields.json
+  缺失时库备份照常完成、stderr 提示，不报错。CLI/GUI 备份
+  提示同步显示两份路径。277 passed。
+
 - **v3.9.1** GUI 导入导出交互修订（用户定，2026-11-12）：废除
   v3.9.0 的"格式下拉 + 回写 fields.json"设计——GUI 格式**只按**
   `ui.io` 三键配置来（要改格式改 fields.json，等 db_config
