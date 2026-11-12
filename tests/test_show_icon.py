@@ -86,7 +86,9 @@ def test_tty_icon_script_path():
     assert "日历表格聚合项目跟进工作台" in r.stdout
     for ch in ("#", "&", "$"):
         assert ch in r.stdout
-    assert "\x1b[92m" in r.stdout         # sh 脚本 ANSI（绿 bright）
+    if os.name != "nt":
+        assert "\x1b[92m" in r.stdout     # sh 脚本 ANSI（绿 bright）
+    # Windows 走 show_icon.ps1（[Console] 颜色，不经 ANSI）
 
 
 def test_tty_icon_missing_file_errors():
@@ -219,7 +221,7 @@ def test_workbench_ui_all_subcommands_expose_icon_flags():
 def test_check_config_tty_icon_under_pty():
     """main.py --check-config --show-icon：pty 下图标先播（行流、
     不停顿），随后立即输出校验结果。"""
-    import pty
+    pty = pytest.importorskip("pty")   # Windows 无 pty/termios，跳过
     import select
     master, slave = pty.openpty()
     try:
