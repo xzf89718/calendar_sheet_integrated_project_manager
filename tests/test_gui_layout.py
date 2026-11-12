@@ -191,21 +191,70 @@ def test_reader_banner_pinned_to_top(app):
         r.destroy()
 
 
-def test_gui_export_csv_dispatch(app, tmp_path, monkeypatch):
-    """v3.4.0：导出按最终文件名后缀分派——.csv 走 export_csv（utf-8-sig）。"""
+def _export_with_dir(app, monkeypatch, tmp_path):
+    """v3.9.1：GUI 导出 = 选输出文件夹（askdirectory），格式只按
+    ui.io.export_format 配置来，不回写。"""
     import main
-    out = tmp_path / "out.csv"
-    monkeypatch.setattr(main.filedialog, "asksaveasfilename",
-                        lambda **kw: str(out))
+    monkeypatch.setattr(main.filedialog, "askdirectory",
+                        lambda **kw: str(tmp_path))
     monkeypatch.setattr(main.messagebox, "showinfo", lambda *a, **k: None)
     monkeypatch.setattr(main.messagebox, "showerror", lambda *a, **k: None)
     monkeypatch.setattr(app, "_pick_template",
                         lambda *_a, **_k: {"name": "全选", "columns": [
                             ("客户", "customer", None)]})
     app._export()
-    data = out.read_bytes()
+
+
+def test_gui_export_csv_per_config(app, tmp_path, monkeypatch):
+    """ui.io.export_format=csv → GUI 导出 csv（utf-8-sig），自动命名。"""
+    import main
+    main.CFG.io_ui["export_format"] = "csv"
+    try:
+        _export_with_dir(app, monkeypatch, tmp_path)
+    finally:
+        main.CFG.io_ui.pop("export_format", None)
+    outs = list(tmp_path.glob("*.csv"))
+    assert len(outs) == 1
+    assert outs[0].name.startswith("export_全选_")   # 自动命名含模板名
+    data = outs[0].read_bytes()
     assert data.startswith(b"\xef\xbb\xbf")
     assert "客户X".encode("utf-8") in data   # seeded 项目1 的客户
+
+
+def test_gui_export_default_excel(app, tmp_path, monkeypatch):
+    """ui.io 缺省 → GUI 导出 xlsx。"""
+    _export_with_dir(app, monkeypatch, tmp_path)
+    outs = list(tmp_path.glob("*.xlsx"))
+    assert len(outs) == 1
+
+
+def test_gui_export_no_writeback(app, tmp_path, monkeypatch):
+    """v3.9.1（用户定）：GUI 导出不回写 fields.json——配置内存态不变，
+    且 main 模块里不存在 save_ui_io（回写机制已整体移除）。"""
+    import config
+    import main
+    before = main.CFG.io_ui.copy()
+    _export_with_dir(app, monkeypatch, tmp_path)
+    assert main.CFG.io_ui == before
+    assert not hasattr(config, "save_ui_io")
+
+
+def test_gui_export_rejects_file_path(app, tmp_path, monkeypatch):
+    """GUI 导出目录传带扩展名的路径 → 拒绝并弹错误框。"""
+    import main
+    bad = str(tmp_path / "out.xlsx")
+    monkeypatch.setattr(main.filedialog, "askdirectory",
+                        lambda **kw: bad)
+    errors = []
+    monkeypatch.setattr(main.messagebox, "showerror",
+                        lambda *a, **k: errors.append(a))
+    monkeypatch.setattr(main.messagebox, "showinfo", lambda *a, **k: None)
+    monkeypatch.setattr(app, "_pick_template",
+                        lambda *_a, **_k: {"name": "全选", "columns": [
+                            ("客户", "customer", None)]})
+    app._export()
+    assert errors, "应弹导出失败错误框"
+    assert "只支持目录" in errors[0][1]
 
 
 def test_import_export_button_labels(app):

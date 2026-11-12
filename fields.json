@@ -272,7 +272,10 @@
     },
     "render_limit": 600,
     "_show_icon说明": "品牌闪屏开关（v3.7.1）：启动主界面前屏幕中央显示图标 3 秒；缺省 false。命令行 --show-icon / --no-show-icon 覆盖此值。",
-    "show_icon": false
+    "show_icon": false,
+    "io": {
+      "export_format": "csv"
+    }
   },
   "_法定四类说明": "法定四类（start / followup / close / append）必须有、不可增删、key 不可改，只能配置 label、color、show_calendar（在日历显示与否）。前三类各绑定一个 date 类型字段；append 无字段。",
   "_周报模式说明": "append 这一条 = 周报模式在日历上的标记（追加记录，无字段）。仅 label 与 color 可改，不能删除。",

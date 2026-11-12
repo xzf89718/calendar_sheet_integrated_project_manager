@@ -55,11 +55,20 @@ def _cell_to_field(field, val):
     return s
 
 
-def import_file(db, path, template=None, changed_by="导入"):
+def import_file(db, path, template=None, changed_by="导入", fmt=None):
     """导入入口。template 为 config.CFG.templates 中的一项（可选）：
     指定后按该模板的列清单匹配表头，不在库里的列自动忽略。
+    fmt（v3.9.0）："csv" / "excel" 强制按该格式解析（与扩展名不符
+    直接报错）；None = 按扩展名自动识别（旧行为）。
     返回 (成功数, 跳过的行号列表, 未识别的表头列表)。"""
-    if path.lower().endswith(".csv"):
+    lower = path.lower()
+    if fmt == "csv" and not lower.endswith(".csv"):
+        raise ValueError("--csv 只接受 .csv 文件："
+                         + path + "（默认按 Excel 导入，别加 --csv）")
+    if fmt == "excel" and not lower.endswith((".xlsx", ".xlsm")):
+        raise ValueError("默认按 Excel(xlsx) 导入，该文件不是 .xlsx："
+                         + path + "（CSV 请加 --csv）")
+    if (fmt or ("csv" if lower.endswith(".csv") else "excel")) == "csv":
         with open(path, newline="", encoding="utf-8-sig") as f:
             rows = [r for r in csv.reader(f) if any(x.strip() for x in r)]
     else:

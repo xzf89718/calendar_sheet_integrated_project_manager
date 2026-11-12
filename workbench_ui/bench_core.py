@@ -259,37 +259,94 @@ def _find_template(name, for_weekly=False):
     raise BenchError(f"模板不存在：{name}")
 
 
-def cmd_import(db, path, template=None):
+def cmd_import(db, path, template=None, csv=False):
+    """表格导入。默认按 Excel(xlsx) 解析；--csv 按 CSV(utf-8-sig) 解析。"""
     tpl = _find_template(template)
     if not os.path.exists(path):
         raise BenchError(f"文件不存在：{path}")
+    fmt = "csv" if csv else "excel"
     try:
-        created, skipped, unmapped = _importer.import_file(db, path,
-                                                           template=tpl)
+        created, skipped, unmapped = _importer.import_file(
+            db, path, template=tpl, fmt=fmt)
     except Exception as e:                    # noqa: BLE001
         raise BenchError(f"导入失败：{e}")
     return created, skipped, unmapped
 
 
-def cmd_export(db, out_path, template=None, closed=False, search=None,
-               where=None, sort=None, desc=False):
-    """导出全量匹配行（与 GUI 导出同语义，不受 limit 影响）。"""
-    lower = str(out_path).lower()
-    if not (lower.endswith(".xlsx") or lower.endswith(".csv")):
-        raise BenchError("导出只支持 .xlsx / .csv（按扩展名）")
+# ---------- 导出路径自动命名（v3.9.0：接口仿照 db_analysis） ----------
+
+def _safe(s):
+    """文件名安全化（与 main.py / db_analysis 同一规则）。"""
+    for ch in '<>:"/\\|?*':
+        s = s.replace(ch, "_")
+    return s.strip(" .") or "x"
+
+
+def _resolve_out_dir(base, cmd="export"):
+    """输出目录裁定（仿 db_analysis v3.5.2 规则）：
+    裸参数(None) → fields.json 同目录 exports/；显式目录 → 自动创建；
+    带扩展名的路径按"想指定文件名"拒绝（文件名一律自动命名）。"""
+    if base is None:
+        dest = Path(_config.BASE_DIR) / "exports"
+    else:
+        base = str(base)
+        if os.path.isfile(base) or (not os.path.isdir(base)
+                                    and os.path.splitext(base)[1]):
+            raise BenchError(
+                f"输出只支持目录（文件名自动命名）：{base}\n"
+                f"用法：{cmd} [目录] [--csv]；缺省目录 = exports/")
+        dest = Path(base)
+    dest.mkdir(parents=True, exist_ok=True)
+    return dest
+
+
+def _cond_summary(closed=False, search=None, where=None):
+    """筛选条件 → 文件名摘要段（v3.9.0：仿 db_analysis _cond_summary）。"""
+    parts = list(where or [])
+    if search:
+        kw = ",".join(search) if isinstance(search, (list, tuple)) \
+            else str(search)
+        parts.append(f"搜索={kw}")
+    if closed:
+        parts.append("含归档")
+    return _safe("_".join(parts)) if parts else "全量"
+
+
+def _sort_seg(sort, desc=False):
+    """排序条件 → 文件名段；无排序返回空串。"""
+    if not sort:
+        return ""
+    return _safe("sort-" + sort + ("_desc" if desc else ""))
+
+
+def _export_path(dest, stem, conds, sort, desc, ext):
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    segs = [s for s in (stem, conds, _sort_seg(sort, desc), ts) if s]
+    return dest / ("_".join(segs) + ext)
+
+
+def cmd_export(db, out_dir, template=None, closed=False, search=None,
+               where=None, sort=None, desc=False, csv=False):
+    """导出全量匹配行（与 GUI 导出同语义，不受 limit 影响）。
+    v3.9.0：out_dir 只接受目录，文件名自动命名
+    export_<模板>_<筛选摘要>_<排序段>_<时间戳>.xlsx|csv；默认 Excel，
+    --csv 出 CSV。"""
+    dest = _resolve_out_dir(out_dir)
     rows, _ = cmd_list(db, closed=closed, search=search, where=where,
                        sort=sort, desc=desc, limit=None)
     tpl = _find_template(template)
     if tpl is None:
         raise BenchError("没有可用模板（fields.json 的 templates 段）")
+    path = _export_path(dest, f"export_{_safe(tpl['name'])}", _cond_summary(
+        closed, search, where), sort, desc, ".csv" if csv else ".xlsx")
     try:
-        if lower.endswith(".csv"):
-            n = _exporter.export_csv(rows, out_path, tpl)
+        if csv:
+            n = _exporter.export_csv(rows, str(path), tpl)
         else:
-            n = _exporter.export_with_template(rows, out_path, tpl)
+            n = _exporter.export_with_template(rows, str(path), tpl)
     except Exception as e:                    # noqa: BLE001
         raise BenchError(f"导出失败：{e}")
-    return n
+    return n, str(path)
 
 
 def _default_week_bounds():
@@ -300,10 +357,12 @@ def _default_week_bounds():
         d(mon + timedelta(days=7)), d(mon + timedelta(days=13))
 
 
-def cmd_weekly(db, out_path, d1=None, d2=None, p1=None, p2=None):
-    """周报导出：本周跟进 + 下周计划。日期缺省 = 本周一~日/下周一~日。"""
-    if not str(out_path).lower().endswith(".xlsx"):
-        raise BenchError("周报导出只支持 .xlsx")
+def cmd_weekly(db, out_dir, d1=None, d2=None, p1=None, p2=None, csv=False):
+    """周报导出：本周跟进 + 下周计划。日期缺省 = 本周一~日/下周一~日。
+    v3.9.0：out_dir 只接受目录，文件名自动命名
+    weekly_<跟进段>_<计划段>_<时间戳>.xlsx|csv；默认 Excel，--csv 出
+    CSV（单文件两段：本周跟进 / 下周计划，与 xlsx 两工作表对应）。"""
+    dest = _resolve_out_dir(out_dir, cmd="weekly")
     dd1, dd2, pp1, pp2 = _default_week_bounds()
     d1, d2, p1, p2 = d1 or dd1, d2 or dd2, p1 or pp1, p2 or pp2
     for label, v in (("from", d1), ("to", d2),
@@ -318,11 +377,18 @@ def cmd_weekly(db, out_path, d1=None, d2=None, p1=None, p2=None):
             ("改动说明", "change_summary", None)]}
     rows_f = db.snapshots_between(d1, d2)
     rows_p = db.weekly_plan(p1, p2, include_closed=False)
+    path = _export_path(dest, f"weekly_{d1}~{d2}_{p1}~{p2}",
+                        "", None, False, ".csv" if csv else ".xlsx")
     try:
-        nf, np_ = _exporter.export_weekly(rows_f, rows_p, tpl, out_path)
+        if csv:
+            nf, np_ = _exporter.export_weekly_csv(rows_f, rows_p, tpl,
+                                                  str(path))
+        else:
+            nf, np_ = _exporter.export_weekly(rows_f, rows_p, tpl,
+                                              str(path))
     except Exception as e:                    # noqa: BLE001
         raise BenchError(f"导出失败：{e}")
-    return nf, np_
+    return nf, np_, str(path)
 
 
 # ---------- backup / notify ----------

@@ -216,6 +216,16 @@ def validate_config_data(data):
     if isinstance(ui, dict) and "show_icon" in ui:
         if not isinstance(ui["show_icon"], bool):
             errs.append("ui.show_icon 必须是 true/false")
+    # ui.io：导入导出格式配置（v3.9.0，可缺省 = 全部 excel）。
+    # 三键 import_format / export_format / weekly_format，GUI 下拉
+    # 默认值取自这里，选择后回写；CLI 不受此配置影响（CLI 用 --csv）
+    if isinstance(ui, dict) and isinstance(ui.get("io"), dict):
+        for key in ("import_format", "export_format", "weekly_format"):
+            if key in ui["io"] \
+                    and ui["io"][key] not in ("excel", "csv"):
+                errs.append(
+                    f"ui.io.{key} 必须是 excel/csv 之一："
+                    f"{ui['io'][key]!r}")
     return errs
 
 
@@ -256,6 +266,9 @@ class Config:
             "calendar_labels",
             {"start": "开始", "followup": "跟进", "close": "关闭"})
         self.editor_ui = self.ui.get("editor", {})
+        # 导入导出格式（v3.9.0）：ui.io 段，缺省 excel；GUI 下拉默认值
+        # 与回写目标；CLI 不走这里（CLI 用 --csv 开关）
+        self.io_ui = self.ui.get("io", {})
         # 字段级列宽提示（px）， fit_columns 会以此为基准再按内容伸缩
         self.field_width = {f["name"]: f.get("width")
                             for f in self.fields if f.get("width")}
@@ -466,6 +479,11 @@ class Config:
                 # 导入时的固定赋值：{"字段名": "值"}，模板里没有这些列
                 "defaults": t.get("defaults", {}),
             })
+
+
+    def io_format(self, key):
+        """ui.io.<key> 的合法化取值：只认 excel/csv，其余按 excel。"""
+        return "csv" if self.io_ui.get(key) == "csv" else "excel"
 
 
 CFG = Config()

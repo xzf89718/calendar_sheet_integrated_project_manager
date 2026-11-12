@@ -100,3 +100,25 @@ def export_weekly(rows_follow, rows_plan, template, path):
                     template["columns"]])
     wb.save(path)
     return len(rows_follow), len(rows_plan)
+
+
+def export_weekly_csv(rows_follow, rows_plan, template, path):
+    """周报 CSV（v3.9.0）：与 export_weekly 同内容的单文件两段形态——
+    段标题行「本周跟进」、表头、数据，空行，段标题行「下周计划」、
+    表头、数据。utf-8-sig + 纯 LF。返回 (跟进行数, 计划行数)。"""
+    import csv
+    heads = [label for label, _f, _c in template["columns"]]
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow(["本周跟进"])
+        w.writerow(heads)
+        for s in rows_follow:
+            w.writerow(["" if (v := _weekly_cell(s, fld)) is None else v
+                        for _l, fld, _c in template["columns"]])
+        w.writerow([])
+        w.writerow(["下周计划"])
+        w.writerow(heads)
+        for p in rows_plan:
+            w.writerow(["" if (v := _weekly_plan_cell(p, fld)) is None else v
+                        for _l, fld, _c in template["columns"]])
+    return len(rows_follow), len(rows_plan)
