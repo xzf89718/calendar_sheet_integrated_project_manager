@@ -305,7 +305,7 @@
 | `render_limit` | 600 | **每页渲染行数**（翻页式；30万条与600条翻页同速） |
 | `default_view` | 无（=aggregate） | 启动视图缺省：`aggregate`（聚合）/ `calendar`（仅日历）/ `table`（仅表格）；被 `--view` 覆盖（v3.2.0） |
 | `show_icon` | false | 品牌闪屏：启动主界面前屏幕中央显示图标 3 秒（512px 无边框透明底）；被 `--show-icon` / `--no-show-icon` 覆盖（v3.7.1） |
-| `io.import_format / export_format / weekly_format` | excel | GUI 导入/导出/周报对话框的格式下拉默认值：`excel` / `csv` 之一；用户在对话框里切换后回写此段（v3.9.0）。CLI 不走此配置，用 `--csv` 开关 |
+| `io.import_format / export_format / weekly_format` | excel | GUI 导入/导出/周报的格式只按此配置：`excel` / `csv` 之一；不回写，要改格式改这里（v3.9.0 引入，v3.9.1 定案不回写）。CLI 不走此配置，用 `--csv` 开关 |
 
 ### 10.17 `recycle_bin` —— 回收站（v3.1.0，可缺省 = 关闭）
 

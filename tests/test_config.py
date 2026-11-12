@@ -272,18 +272,3 @@ def test_io_format_default_excel(cfg):
     assert cfg.io_format("export_format") == "excel"
     assert cfg.io_format("weekly_format") == "excel"
     assert cfg.io_format("import_format") == "excel"
-
-
-def test_save_ui_io_roundtrip(tmp_path, cfg, monkeypatch):
-    """回写只动 ui.io 指定键，其余段原样保留；内存 CFG 同步。"""
-    import config
-    p = tmp_path / "fields.json"
-    p.write_text(json.dumps(_base(), ensure_ascii=False), encoding="utf-8")
-    monkeypatch.setattr(config, "_CFG_PATH", str(p))
-    config.save_ui_io(export_format="csv")
-    data = json.loads(p.read_text(encoding="utf-8"))
-    assert data["ui"]["io"]["export_format"] == "csv"
-    assert data["fields"] == _base()["fields"]      # 其余原样
-    assert config.CFG.io_format("export_format") == "csv"
-    with pytest.raises(ValueError):
-        config.save_ui_io(export_format="xlsx")

@@ -46,10 +46,12 @@ python -m workbench_ui --show-icon                      # CLI 单独播放品牌
   排序段 + 时间戳），同一批筛选/排序的产出文件名可溯。`.csv` 同列
   结构写文本（`utf-8-sig` 编码 + 纯 LF，Excel 双击中文不乱码，与
   导入端读取方式对称）。v3.4.0 的"按输出文件扩展名定格式"已废除。
-- GUI 的导入/导出/周报三个对话框有格式下拉（Excel/CSV），默认值
-  取自 fields.json `ui.io` 段的 `import_format` / `export_format` /
-  `weekly_format`（均可缺省 = excel，可选 excel/csv），选择后回写
-  该段。CLI 不走此配置（CLI 用 `--csv` 开关）。
+- GUI 的导入/导出/周报格式**只按** fields.json `ui.io` 段的
+  `import_format` / `export_format` / `weekly_format` 配置来（均可
+  缺省 = excel，可选 excel/csv，校验器拦截非法值；要改格式就改
+  fields.json，v3.9.1 起不再从 GUI 回写）。GUI 导出/周报只弹
+  **输出文件夹**选择框（默认 exports/）；导入按配置格式过滤文件框。
+  CLI 不走此配置（CLI 用 `--csv` 开关）。
 - `notify` 按设计**只打印到终端**，不走系统通知（防止被脚本滥用
   塞爆通知栏）。
 - `cal` 只读：打印某年/月/日的时间节点清单（含项目 id），供

@@ -2,6 +2,14 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.9.1** GUI 导入导出交互修订（用户定，2026-11-12）：废除
+  v3.9.0 的"格式下拉 + 回写 fields.json"设计——GUI 格式**只按**
+  `ui.io` 三键配置来（要改格式改 fields.json，等 db_config
+  配置器提供工具化入口），**不再回写**（`save_ui_io` 与
+  `IoFormatDialog` 整体删除）；GUI 导出/周报的交互简化为
+  **只选输出文件夹**（原生目录对话框，默认 exports/），导入
+  按 `import_format` 过滤文件框。CLI 行为不变。276 passed。
+
 - **v3.9.0** 导入导出统一（用户定，2026-11-12）：workbench_ui
   的 export / weekly / import 接口仿照 db_analysis——输出只接受
   目录（缺省 `exports/`，显式目录自动创建，带扩展名的路径按
