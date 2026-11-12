@@ -29,6 +29,35 @@ FLOAT_FIELDS = set(CFG.float_fields)
 # 与 GUI 共用同一份实现，此处仅从 db 导入（见文件头）。
 
 
+def _text_wheel(e, txt):
+    """滚轮滚多行框内部并吞掉事件，外层表单不再跟着滚。"""
+    txt.yview_scroll(int(-e.delta / 120), "units")
+    return "break"
+
+
+def _no_wheel(e):
+    """任何滚轮一律吞掉（下拉的滚轮换条目禁用）。"""
+    return "break"
+
+
+def _combo_no_wheel(w):
+    """Combobox 滚轮防线：本体 + 弹出的下拉列表都绑 break。"""
+    w.bind("<MouseWheel>", _no_wheel)
+    # 弹出窗（ttk 内部 .!popdown 之类）首次点开才创建，届时补绑
+    def _guard_popdown(_e=None):
+        # post 发生在我们这条绑定之后，推迟到 idle 再取弹出窗
+        def _bind():
+            try:
+                pop = w.tk.call("ttk::combobox::PopdownWindow", w)
+                # 弹出窗是 Tcl 侧建的，Python 侧没注册，走纯 Tcl 绑定
+                w.tk.call("bind", pop + ".f.l", "<MouseWheel>", "break")
+            except tk.TclError:
+                pass
+        w.after_idle(_bind)
+    w.bind("<ButtonPress-1>", _guard_popdown, add="+")
+    w.bind("<Key-space>", _guard_popdown, add="+")
+
+
 class SnapshotEditor(tk.Toplevel):
     """project_id 为 None 表示新建项目（项目名自动生成：厂家-客户-产品）。
 
@@ -91,6 +120,11 @@ class SnapshotEditor(tk.Toplevel):
                 txt.configure(yscrollcommand=sb.set)
                 txt.pack(side="left", fill="both", expand=True)
                 sb.pack(side="right", fill="y")
+                # 滚轮只滚框内（v3.11.0）：框与专属滚动条都吞事件
+                txt.bind("<MouseWheel>",
+                         lambda e, t=txt: _text_wheel(e, t))
+                sb.bind("<MouseWheel>",
+                        lambda e, t=txt: _text_wheel(e, t))
                 if val:
                     txt.insert("1.0", val)
                 self.texts[f] = txt
@@ -104,6 +138,7 @@ class SnapshotEditor(tk.Toplevel):
                 w = ttk.Combobox(frm, textvariable=v,
                                  values=COMBO_FIELDS[f],
                                  width=49)
+                _combo_no_wheel(w)     # 滚轮禁改条目（v3.11.0）
             else:
                 v = tk.StringVar(value=val)
                 self.vars[f] = v
