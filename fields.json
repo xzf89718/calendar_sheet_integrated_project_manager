@@ -257,7 +257,7 @@
   },
   "calendar": {
    "max_per_day": 1,
-   "max_per_day_view": 5
+   "max_per_day_view": 4
   },
   "calendar_labels": {
    "start": "开始",
