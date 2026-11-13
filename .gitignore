@@ -7,3 +7,5 @@ db_analysis/timeline/
 bin/
 exports/
 backups/
+build/
+dist/
