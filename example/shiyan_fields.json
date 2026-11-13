@@ -1,388 +1,414 @@
 {
-  "product_name": "实验记录本",
-  "db_name": "shiyan.db",
-  "_说明": "实验记录本形态：替代纸质记录本/Excel，按日期记录实验、条件留痕可复现。用法：复制本文件为包根目录的 fields.json，重启即切换形态。",
-  "name_fields": [
-    "experiment"
-  ],
-  "_name_fields说明": "项目名 = 实验名称（单字段直取）。",
-  "fields": [
-    {
-      "name": "start_date",
-      "label": "实验日期",
-      "type": "date"
-    },
-    {
-      "name": "experiment",
-      "label": "实验名称",
-      "type": "text"
-    },
-    {
-      "name": "operator",
-      "label": "记录人",
-      "type": "text"
-    },
-    {
-      "name": "stage",
-      "label": "实验阶段",
-      "type": "choice",
-      "choices": [
-        "预实验",
-        "正式实验",
-        "复现验证",
-        "补充实验"
-      ],
-      "default": "预实验"
-    },
-    {
-      "name": "brief",
-      "label": "实验目的",
-      "type": "text"
-    },
-    {
-      "name": "conditions",
-      "label": "条件参数",
-      "type": "text",
-      "multiline": true,
-      "height": 5,
-      "max_lines": 4
-    },
-    {
-      "name": "followup_note",
-      "label": "实验记录与现象",
-      "type": "text",
-      "multiline": true,
-      "height": 10,
-      "max_lines": 6
-    },
-    {
-      "name": "result",
-      "label": "结果与结论",
-      "type": "text",
-      "multiline": true,
-      "height": 5,
-      "max_lines": 4
-    },
-    {
-      "name": "deviation",
-      "label": "异常与偏差",
-      "type": "text",
-      "multiline": true,
-      "height": 4,
-      "max_lines": 4
-    },
-    {
-      "name": "status",
-      "label": "状态",
-      "type": "status",
-      "choices": [
-        "进行中",
-        "实验成功",
-        "实验失败"
-      ],
-      "default": "进行中",
-      "_说明": "特殊字段：实验成功/实验失败 = 归档（列表和日历消失，可在'显示已关闭'找回，历史保留）。失败时填'失败原因'。"
-    },
-    {
-      "name": "priority",
-      "label": "优先级(1-5)",
-      "type": "int",
-      "default": 3
-    },
-    {
-      "name": "next_followup",
-      "label": "下次实验日期",
-      "type": "date"
-    },
-    {
-      "name": "close_date",
-      "label": "结束日期",
-      "type": "date"
-    },
-    {
-      "name": "fail_reason",
-      "label": "失败原因",
-      "type": "text",
-      "multiline": true,
-      "height": 4
-    }
-  ],
-  "status_closed": [
+ "product_name": "实验记录本",
+ "db_name": "shiyan.db",
+ "_说明": "实验记录本形态：替代纸质记录本/Excel，按日期记录实验、条件留痕可复现。用法：复制本文件为包根目录的 fields.json，重启即切换形态。",
+ "name_fields": [
+  "experiment"
+ ],
+ "_name_fields说明": "项目名 = 实验名称（单字段直取）。",
+ "fields": [
+  {
+   "name": "start_date",
+   "label": "实验日期",
+   "type": "date"
+  },
+  {
+   "name": "experiment",
+   "label": "实验名称",
+   "type": "text"
+  },
+  {
+   "name": "operator",
+   "label": "记录人",
+   "type": "text"
+  },
+  {
+   "name": "stage",
+   "label": "实验阶段",
+   "type": "choice",
+   "choices": [
+    "预实验",
+    "正式实验",
+    "复现验证",
+    "补充实验"
+   ],
+   "default": "预实验"
+  },
+  {
+   "name": "brief",
+   "label": "实验目的",
+   "type": "text"
+  },
+  {
+   "name": "conditions",
+   "label": "条件参数",
+   "type": "text",
+   "multiline": true,
+   "height": 5,
+   "max_lines": 4
+  },
+  {
+   "name": "followup_note",
+   "label": "实验记录与现象",
+   "type": "text",
+   "multiline": true,
+   "height": 10,
+   "max_lines": 6
+  },
+  {
+   "name": "result",
+   "label": "结果与结论",
+   "type": "text",
+   "multiline": true,
+   "height": 5,
+   "max_lines": 4
+  },
+  {
+   "name": "deviation",
+   "label": "异常与偏差",
+   "type": "text",
+   "multiline": true,
+   "height": 4,
+   "max_lines": 4
+  },
+  {
+   "name": "status",
+   "label": "状态",
+   "type": "status",
+   "choices": [
+    "进行中",
     "实验成功",
     "实验失败"
-  ],
-  "_status_closed说明": "实验成功/实验失败 归档。失败不是污点——记录本里最值钱的内容之一。",
-  "default_sort": {
-    "column": "start_date",
-    "desc": true
+   ],
+   "default": "进行中",
+   "_说明": "特殊字段：实验成功/实验失败 = 归档（列表和日历消失，可在'显示已关闭'找回，历史保留）。失败时填'失败原因'。"
   },
-  "backup": {
-    "_说明": "数据库备份。path=备份目录（相对程序目录）；identifier=文件名识别符。",
-    "path": "backups",
-    "identifier": "实验备份"
+  {
+   "name": "priority",
+   "label": "优先级(1-5)",
+   "type": "int",
+   "default": 3
   },
-  "search": {
-    "_说明": "搜索范围。",
-    "fields": [
-      "experiment",
-      "operator",
-      "brief",
-      "conditions",
-      "followup_note",
-      "result",
-      "deviation",
-      "stage",
-      "status",
-      "fail_reason"
-    ]
+  {
+   "name": "next_followup",
+   "label": "下次实验日期",
+   "type": "date"
   },
-  "import_default_status": "进行中",
-  "weekly_sheet": {
-    "_说明": "周报模式下方表格的列。",
-    "columns": [
-      "snapshot_at",
-      "project",
-      "stage",
-      "operator",
-      "next_followup",
-      "change_summary"
-    ]
+  {
+   "name": "close_date",
+   "label": "结束日期",
+   "type": "date"
   },
-  "templates": [
-    {
-      "name": "通用",
-      "columns": "all"
-    },
-    {
-      "_周报说明": "kind=weekly 导出专用（只读视图）。",
-      "name": "实验周报",
-      "kind": "weekly",
-      "columns": [
-        {
-          "date": "snapshot_at",
-          "label": "日期"
-        },
-        {
-          "name": true,
-          "label": "实验名称"
-        },
-        {
-          "field": "stage",
-          "label": "实验阶段"
-        },
-        {
-          "field": "status",
-          "label": "状态"
-        },
-        {
-          "field": "operator",
-          "label": "记录人"
-        },
-        {
-          "field": "next_followup",
-          "label": "下次实验日期"
-        },
-        {
-          "field": "followup_note",
-          "label": "实验记录与现象"
-        },
-        {
-          "field": "change_summary",
-          "label": "改动说明"
-        }
-      ]
-    },
-    {
-      "name": "实验条件表",
-      "_说明": "只导出条件参数，横向对比两次实验用。",
-      "columns": [
-        {
-          "field": "start_date",
-          "label": "实验日期"
-        },
-        {
-          "field": "experiment",
-          "label": "实验名称"
-        },
-        {
-          "field": "conditions",
-          "label": "条件参数"
-        },
-        {
-          "field": "result",
-          "label": "结果与结论"
-        }
-      ]
-    }
-  ],
-  "display_mainsheet": [
-    {
-      "name": "id",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "start_date",
-      "alias": "",
-      "on": true,
-      "filter": "range"
-    },
-    {
-      "name": "experiment",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "operator",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "stage",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "brief",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "conditions",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "followup_note",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "result",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "deviation",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "status",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "priority",
-      "alias": "",
-      "on": true
-    },
-    {
-      "name": "next_followup",
-      "alias": "",
-      "on": true,
-      "filter": "range"
-    },
-    {
-      "name": "close_date",
-      "alias": "",
-      "on": true,
-      "filter": "range"
-    },
-    {
-      "name": "fail_reason",
-      "alias": "",
-      "on": true
-    }
-  ],
-  "calendar_mode": "filtered",
-  "split": {
-    "_说明": "db_split 输出文件名配方。",
-    "components": [
-      "field",
-      "key",
-      "time"
-    ],
-    "prefix": ""
-  },
-  "ui": {
-    "window": {
-      "width": 1480,
-      "height": 860,
-      "margin_x": 80,
-      "margin_y": 120
-    },
-    "font": {
-      "default": 12,
-      "tree_rowheight": 38,
-      "heading_size": 13
-    },
-    "columns": {
-      "min_width": 70,
-      "max_width": 360
-    },
-    "calendar": {
-      "max_per_day": 1
-    },
-    "calendar_labels": {
-      "start": "实验",
-      "followup": "待做",
-      "close": "结束"
-    },
-    "editor": {
-      "width": 840,
-      "height": 940,
-      "entry_width": 52,
-      "text_width": 50
-    },
-    "render_limit": 600
-  },
-  "_法定四类说明": "法定四类（start / followup / close / append）必须有、不可增删、key 不可改，只能配置 label、color、show_calendar（在日历显示与否）。前三类各绑定一个 date 类型字段；append 无字段。",
-  "_周报模式说明": "append 这一条 = 周报模式在日历上的标记（追加记录，无字段）。仅 label 与 color 可改，不能删除。",
-  "_calendar_dates说明": "日历日期类别（全配置化）：法定四类见上两条说明；自定义日期类别在数组末尾往后加，格式 {\"key\": \"唯一名\", \"field\": \"fields 里的 date 字段\", \"label\": \"显示名\", \"color\": \"#RRGGBB\", \"show_calendar\": true/false}。show_calendar=false 则该类日期不上日历；表格显隐与列顺序由 display_mainsheet 段管。",
-  "calendar_dates": [
-    {
-      "key": "start",
-      "field": "start_date",
-      "label": "实验",
-      "color": "#2e7d32",
-      "show_calendar": true
-    },
-    {
-      "key": "followup",
-      "field": "next_followup",
-      "label": "待做",
-      "color": "#1565c0",
-      "show_calendar": true
-    },
-    {
-      "key": "close",
-      "field": "close_date",
-      "label": "结束",
-      "color": "#c62828",
-      "show_calendar": true
-    },
-    {
-      "key": "append",
-      "label": "追加",
-      "color": "#6a1b9a",
-      "show_calendar": true
-    }
-  ],
-  "date_check": {
-    "_说明": "保存跟进时的日期范围检查器（v2.6.0）。enabled=true 开启；fields=要检查的日期字段清单（必须是 fields 里的 date 类型字段，建议用法定三日期之外的其他日期）。被检日期落在 开始日期~关闭日期 之外时弹框阻止保存；开始或关闭为空则该侧不检。要检查别的日期，在 fields 数组里加字段名。",
-    "enabled": true,
-    "fields": [
-      "next_followup"
-    ]
-  },
-  "favorites": {
-    "_说明": "收藏夹功能（v2.7.0）：enabled=总开关（false 则按钮不出现、db 也不建表）；label=按钮/面板显示名。收藏夹数据存在 db 文件里（collections/collection_items 两张表，旧库打开自动补建），按库独立，存的是项目 id 引用（纯索引，项目数据只有一份）。进入收藏夹模式后，主表格和日历只显示夹内项目；周报模式全面联动（表格/日历/周报导出只含夹内项目），跟进表导出不受影响；重启软件自动退出模式。",
-    "enabled": true,
-    "label": "收藏夹"
-  },
-  "_recycle_bin_说明": "回收站（v3.1.0）：enabled=false（默认）删除=物理删除；true 删除=进回收站，可用 db_recycled.py（命令行/GUI）查看、恢复、彻底删除",
-  "recycle_bin": {
-    "enabled": true
+  {
+   "name": "fail_reason",
+   "label": "失败原因",
+   "type": "text",
+   "multiline": true,
+   "height": 4
   }
+ ],
+ "status_closed": [
+  "实验成功",
+  "实验失败"
+ ],
+ "_status_closed说明": "实验成功/实验失败 归档。失败不是污点——记录本里最值钱的内容之一。",
+ "default_sort": {
+  "column": "start_date",
+  "desc": true
+ },
+ "_default_sort说明": "跟进表打开时的默认排序。column=字段名（或id），desc=true倒序。读取不到或列名有误时自动退路为 id 倒序，不报错。",
+ "backup": {
+  "_说明": "数据库备份。path=备份目录（相对程序目录）；identifier=文件名识别符。",
+  "path": "backups",
+  "identifier": "实验备份"
+ },
+ "search": {
+  "_说明": "搜索范围。",
+  "fields": [
+   "experiment",
+   "operator",
+   "brief",
+   "conditions",
+   "followup_note",
+   "result",
+   "deviation",
+   "stage",
+   "status",
+   "fail_reason"
+  ]
+ },
+ "import_default_status": "进行中",
+ "_import_default_status说明": "导入时如果状态为空，一律填这个值。",
+ "weekly_sheet": {
+  "_说明": "周报模式下方表格的列。",
+  "columns": [
+   "snapshot_at",
+   "project",
+   "stage",
+   "operator",
+   "next_followup",
+   "change_summary"
+  ]
+ },
+ "timeline": {
+  "start": "start_date",
+  "next": "next_followup",
+  "close": "close_date",
+  "last": "last_snapshot",
+  "plot": "line",
+  "colors": [
+   "#2e7d32",
+   "#1565c0",
+   "#e65100",
+   "#7b1fa2"
+  ]
+ },
+ "_timeline说明": "timeline 分析模块配置：start/next/close = 基准日期列（fields 的 name）；last = 派生「最近跟进」列名（取最新快照日期，不属于 fields 的 name）；plot = 基准画法 line(两日期连线)/spot(单日期画点)；colors = 基准四行配色（今日/最近跟进/下一个跟进/关闭）。缺省从 calendar_dates 法定三类推导日期列。",
+ "templates": [
+  {
+   "name": "通用",
+   "columns": "all"
+  },
+  {
+   "_周报说明": "kind=weekly 导出专用（只读视图）。",
+   "name": "实验周报",
+   "kind": "weekly",
+   "columns": [
+    {
+     "date": "snapshot_at",
+     "label": "日期"
+    },
+    {
+     "name": true,
+     "label": "实验名称"
+    },
+    {
+     "field": "stage",
+     "label": "实验阶段"
+    },
+    {
+     "field": "status",
+     "label": "状态"
+    },
+    {
+     "field": "operator",
+     "label": "记录人"
+    },
+    {
+     "field": "next_followup",
+     "label": "下次实验日期"
+    },
+    {
+     "field": "followup_note",
+     "label": "实验记录与现象"
+    },
+    {
+     "field": "change_summary",
+     "label": "改动说明"
+    }
+   ]
+  },
+  {
+   "name": "实验条件表",
+   "_说明": "只导出条件参数，横向对比两次实验用。",
+   "columns": [
+    {
+     "field": "start_date",
+     "label": "实验日期"
+    },
+    {
+     "field": "experiment",
+     "label": "实验名称"
+    },
+    {
+     "field": "conditions",
+     "label": "条件参数"
+    },
+    {
+     "field": "result",
+     "label": "结果与结论"
+    }
+   ]
+  }
+ ],
+ "_templates说明": "导入/导出模板。field=数据库字段（表头用其 label）；label+const=不在库里的列，导出填 const 字符串、导入时忽略；defaults=导入时给字段的固定赋值；columns=all 表示全量字段；kind=weekly 为周报导出专用。加模板=往数组加一段。",
+ "display_mainsheet": [
+  {
+   "name": "id",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "start_date",
+   "alias": "",
+   "on": true,
+   "filter": "range"
+  },
+  {
+   "name": "experiment",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "operator",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "stage",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "brief",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "conditions",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "followup_note",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "result",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "deviation",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "status",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "priority",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "next_followup",
+   "alias": "",
+   "on": true,
+   "filter": "range"
+  },
+  {
+   "name": "close_date",
+   "alias": "",
+   "on": true,
+   "filter": "range"
+  },
+  {
+   "name": "fail_reason",
+   "alias": "",
+   "on": true
+  }
+ ],
+ "_display_mainsheet说明": "主界面显示配置。每项：name=字段原名（id 也可配，可关可改名），alias=列表表头别名（空=用字段默认显示名），on=true/false=是否显示，filter=该列筛选类型 list(勾选清单,默认)/range(从~到区间,适合日期)。数组顺序即列顺序。没写进这里的新字段自动补到末尾。数据/导出永远全量，这里只管看什么。",
+ "calendar_mode": "filtered",
+ "_calendar_mode说明": "日历渲染模式：all=当月全部；filtered=跟随表格筛选（默认，日历与表格聚合联动的核心体验）。",
+ "split": {
+  "_说明": "db_split 输出文件名配方。",
+  "components": [
+   "field",
+   "key",
+   "time"
+  ],
+  "prefix": ""
+ },
+ "ui": {
+  "window": {
+   "width": 1480,
+   "height": 860,
+   "margin_x": 80,
+   "margin_y": 120
+  },
+  "font": {
+   "default": 12,
+   "tree_rowheight": 38,
+   "heading_size": 13
+  },
+  "columns": {
+   "min_width": 70,
+   "max_width": 360
+  },
+  "calendar": {
+   "max_per_day": 1
+  },
+  "calendar_labels": {
+   "start": "实验",
+   "followup": "待做",
+   "close": "结束"
+  },
+  "io": {
+   "import_format": "excel",
+   "export_format": "excel",
+   "weekly_format": "excel"
+  },
+  "_show_icon说明": "品牌闪屏开关（v3.7.1）：启动主界面前屏幕中央显示图标 3 秒；缺省 false。命令行 --show-icon / --no-show-icon 覆盖此值。",
+  "show_icon": true,
+  "editor": {
+   "width": 840,
+   "height": 940,
+   "entry_width": 52,
+   "text_width": 50
+  },
+  "render_limit": 600
+ },
+ "_法定四类说明": "法定四类（start / followup / close / append）必须有、不可增删、key 不可改，只能配置 label、color、show_calendar（在日历显示与否）。前三类各绑定一个 date 类型字段；append 无字段。",
+ "_周报模式说明": "append 这一条 = 周报模式在日历上的标记（追加记录，无字段）。仅 label 与 color 可改，不能删除。",
+ "_calendar_dates说明": "日历日期类别（全配置化）：法定四类见上两条说明；自定义日期类别在数组末尾往后加，格式 {\"key\": \"唯一名\", \"field\": \"fields 里的 date 字段\", \"label\": \"显示名\", \"color\": \"#RRGGBB\", \"show_calendar\": true/false}。show_calendar=false 则该类日期不上日历；表格显隐与列顺序由 display_mainsheet 段管。",
+ "calendar_dates": [
+  {
+   "key": "start",
+   "field": "start_date",
+   "label": "实验",
+   "color": "#2e7d32",
+   "show_calendar": true
+  },
+  {
+   "key": "followup",
+   "field": "next_followup",
+   "label": "待做",
+   "color": "#1565c0",
+   "show_calendar": true
+  },
+  {
+   "key": "close",
+   "field": "close_date",
+   "label": "结束",
+   "color": "#c62828",
+   "show_calendar": true
+  },
+  {
+   "key": "append",
+   "label": "追加",
+   "color": "#6a1b9a",
+   "show_calendar": true
+  }
+ ],
+ "date_check": {
+  "_说明": "保存跟进时的日期范围检查器（v2.6.0）。enabled=true 开启；fields=要检查的日期字段清单（必须是 fields 里的 date 类型字段，建议用法定三日期之外的其他日期）。被检日期落在 开始日期~关闭日期 之外时弹框阻止保存；开始或关闭为空则该侧不检。要检查别的日期，在 fields 数组里加字段名。",
+  "enabled": true,
+  "fields": [
+   "next_followup"
+  ]
+ },
+ "favorites": {
+  "_说明": "收藏夹功能（v2.7.0）：enabled=总开关（false 则按钮不出现、db 也不建表）；label=按钮/面板显示名。收藏夹数据存在 db 文件里（collections/collection_items 两张表，旧库打开自动补建），按库独立，存的是项目 id 引用（纯索引，项目数据只有一份）。进入收藏夹模式后，主表格和日历只显示夹内项目；周报模式全面联动（表格/日历/周报导出只含夹内项目），跟进表导出不受影响；重启软件自动退出模式。",
+  "enabled": true,
+  "label": "收藏夹"
+ },
+ "_recycle_bin_说明": "回收站（v3.1.0）：enabled=false（默认）删除=物理删除；true 删除=进回收站，可用 db_recycled.py（命令行/GUI）查看、恢复、彻底删除",
+ "recycle_bin": {
+  "enabled": true
+ }
 }

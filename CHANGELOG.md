@@ -2,6 +2,16 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.12.2** example 配置补齐新功能 + 根模板 io 修正（用户定，
+  2026-11-13，小补丁）：① example/qiuzhi_fields.json、
+  example/shiyan_fields.json 补齐 v3.7.1 以来的新配置段——timeline
+  段（时间线基准列，两示例的法定三类日期与根模板一致，直接移植）、
+  ui.io 三键、ui.show_icon（示例里置 true，新功能全启动；收藏夹/
+  回收站/日期检查器两示例本已开启）、qiuzhi 补 display_mainsheet
+  与 split 段、缺失的各 _说明文档段全部补齐；② 修正根 fields.json
+  的 ui.io 残留给 dev 测试值（export_format=csv 单键）——归位为
+  三键全 excel 设计缺省。三个 JSON 均通过 Config 校验。281 passed。
+
 - **v3.12.0** 本地一键分析脚本入包（用户定，2026-11-12）：
   `scripts/runmyanalysis.py` + `scripts/myanalysis/`（common /
   export_all / weekly / pie / timeline）——四张任务清单（导出 /
