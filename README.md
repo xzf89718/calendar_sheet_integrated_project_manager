@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.11.0
+# 日历表格聚合项目跟进工作台 v3.12.0
 
 <img src="icon/pm_workbench_icon.png" width="300" alt="日历表格聚合项目跟进工作台图标：日历·表格·分析">
 
@@ -190,6 +190,11 @@ python -m workbench_ui backup               # 一键备份
 ```
 
 完整命令集与规则见 [workbench_ui/README.md](workbench_ui/README.md)。
+
+**本地一键分析（v3.12.0）**：`python scripts/runmyanalysis.py`——
+四张任务清单（导出/周报/饼图/时间线），每行一个任务，参数（模板、
+筛选、排序、日期窗）全在行上，支持 @today/@today-1m 日期令牌。
+改 `scripts/runmyanalysis.py` 的参数区即可，用法见其文件头注释。
 
 **快捷命令（可选）**：跑一次 `setup.ps1`（Windows PowerShell：
 `powershell -ExecutionPolicy Bypass -File setup.ps`）或
