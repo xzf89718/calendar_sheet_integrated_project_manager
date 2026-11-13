@@ -2,6 +2,18 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.12.0** 本地一键分析脚本入包（用户定，2026-11-12）：
+  `scripts/runmyanalysis.py` + `scripts/myanalysis/`（common /
+  export_all / weekly / pie / timeline）——四张任务清单（导出 /
+  周报 / 饼图 / 时间线），每行一个任务、行首 on 开关，CLI 接口
+  （模板、--where、--closed、--sort/--desc、日期窗、--top、
+  --split、追加列）全开放到行上；全部经 `python -m ...` 子进程调
+  CLI，不 import 项目内部；where 日期值支持 @today/@today-30d/
+  @today-1m 令牌（日历月钳制）；子进程统一 PYTHONIOENCODING=utf-8；
+  周报清洗"无历史变动"退出码 1 视为数据状态不中止流水线；
+  matplotlib 缺失时饼图自动降级只出计数 CSV；预置行用通用占位
+  （厂家A），无业务信息。281 passed。
+
 - **v3.11.0** 编辑器滚轮体验（用户定，2026-11-12）：① 多行文本框
   （跟进记录等）上滚轮只滚框内，外层表单画布不再跟着滚——框与
   其专属滚动条都吞掉 `<MouseWheel>`（此前 `canvas.bind_all` 全局
