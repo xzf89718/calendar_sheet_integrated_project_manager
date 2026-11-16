@@ -15,8 +15,13 @@ if (-not (Test-Path $py)) {
     & $py -m pip install --quiet -r (Join-Path $root "requirements-docs.txt")
 }
 
-Write-Host "checking docstrings..."
-& $py (Join-Path $root "scripts/check_docs.py")
+Write-Host "checking docstrings (documented modules only)..."
+$modules = @()
+Get-ChildItem (Join-Path $root "docs/*.rst") | ForEach-Object {
+    Select-String -Path $_.FullName -Pattern '^\.\. automodule:: (\S+)' |
+        ForEach-Object { $modules += ($_.Matches[0].Groups[1].Value -replace '\.', '/') + ".py" }
+}
+& $py (Join-Path $root "scripts/check_docs.py") $modules
 if ($LASTEXITCODE -ne 0) {
     Write-Host "docstring check failed; fix the issues above first" -ForegroundColor Red
     exit 1

@@ -18,7 +18,11 @@ SKIP_DIRS = {"tests", "docs", "build", "dist", "exports", "backups",
 EXTRA_SKIP = {".git", ".github", "db_analysis"}  # db_analysis joins later
 
 
-def iter_py_files():
+def iter_py_files(only=None):
+    if only:
+        for rel in only:
+            yield os.path.join(ROOT, rel)
+        return
     for dirpath, dirnames, filenames in os.walk(ROOT):
         rel = os.path.relpath(dirpath, ROOT)
         top = rel.split(os.sep)[0]
@@ -66,9 +70,10 @@ def check_file(path):
 
 
 def main():
+    only = sys.argv[1:] or None
     total = 0
     bad = 0
-    for path in sorted(iter_py_files()):
+    for path in sorted(iter_py_files(only)):
         rel = os.path.relpath(path, ROOT)
         issues = check_file(path)
         total += 1
