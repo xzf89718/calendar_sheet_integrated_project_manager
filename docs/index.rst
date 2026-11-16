@@ -18,6 +18,9 @@ pm_workbench API 参考
    editor
    notifier
    reader
+   exporter
+   importer
+   show_icon
 
 索引
 ====

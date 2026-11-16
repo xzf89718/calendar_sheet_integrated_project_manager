@@ -22,7 +22,18 @@ ALIASES = CFG.header_map
 
 
 def _cell_to_field(field, val):
-    """单元格值 -> 字段值。空/None -> None；日期 -> YYYY-MM-DD 或 None。"""
+    """单元格值 -> 字段值：空/None -> None；日期 -> YYYY-MM-DD 或 None。
+
+    Excel 日期列里的数字按序列号解释（1899-12-30 起的天数）；无法识别
+    的日期/整数/实数一律留空（日历自动跳过）。
+
+    :param field: 字段名（决定按哪类规则清洗）
+    :type field: str
+    :param val: 原始单元格值（openpyxl 或 csv 的产物）
+    :type val: object
+    :return: 清洗后的字段值；空值统一为 None
+    :rtype: object 或 None
+    """
     if val is None:
         return None
     if isinstance(val, datetime):
@@ -56,11 +67,29 @@ def _cell_to_field(field, val):
 
 
 def import_file(db, path, template=None, changed_by="导入", fmt=None):
-    """导入入口。template 为 config.CFG.templates 中的一项（可选）：
-    指定后按该模板的列清单匹配表头，不在库里的列自动忽略。
-    fmt（v3.9.0）："csv" / "excel" 强制按该格式解析（与扩展名不符
-    直接报错）；None = 按扩展名自动识别（旧行为）。
-    返回 (成功数, 跳过的行号列表, 未识别的表头列表)。"""
+    """导入入口：每一行 = 一个项目（项目名自动生成），空单元格存 NULL。
+
+    template 为 config.CFG.templates 中的一项（可选）：按该模板列清单匹配
+    表头，模板表头与字段标准名都认，不在库里的 const 列自动忽略。
+    fmt（v3.9.0）："csv" / "excel" 强制按该格式解析（与扩展名不符直接报错）；
+    None = 按扩展名自动识别。补空优先级：字段 default < 模板 defaults <
+    行里已有的值永不被覆盖；状态为空时用 import_default_status 兜底。
+
+    :param db: 数据库连接
+    :type db: db.Database
+    :param path: 导入文件路径（.csv / .xlsx / .xlsm）
+    :type path: str
+    :param template: 导入模板（config.CFG.templates 的一项）；None = 按
+        fields.json 的显示名/字段名通用匹配
+    :type template: dict 或 None
+    :param changed_by: 快照的 changed_by 标记
+    :type changed_by: str
+    :param fmt: 强制格式 "csv" / "excel"；None = 按扩展名自动识别
+    :type fmt: str 或 None
+    :return: 三元组（成功创建数, 跳过的行号列表, 未识别的表头列表）
+    :rtype: tuple
+    :raises ValueError: 强制格式与扩展名不符
+    """
     lower = path.lower()
     if fmt == "csv" and not lower.endswith(".csv"):
         raise ValueError("--csv 只接受 .csv 文件："
