@@ -13,6 +13,11 @@ pm_workbench API 参考
 
    db
    main
+   calendar_gui
+   config
+   editor
+   notifier
+   reader
 
 索引
 ====

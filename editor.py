@@ -30,23 +30,49 @@ FLOAT_FIELDS = set(CFG.float_fields)
 
 
 def _text_wheel(e, txt):
-    """滚轮滚多行框内部并吞掉事件，外层表单不再跟着滚。"""
+    """滚轮滚多行框内部并吞掉事件（返回 "break"），外层表单不再跟着滚。
+
+    :param e: Tk 滚轮事件
+    :type e: tkinter.Event
+    :param txt: 目标多行文本框
+    :type txt: tkinter.Text
+    :return: "break"（吞掉事件）
+    :rtype: str
+    """
     txt.yview_scroll(int(-e.delta / 120), "units")
     return "break"
 
 
 def _no_wheel(e):
-    """任何滚轮一律吞掉（下拉的滚轮换条目禁用）。"""
+    """任何滚轮一律吞掉（下拉的滚轮换条目禁用）。
+
+    :param e: Tk 滚轮事件
+    :type e: tkinter.Event
+    :return: "break"（吞掉事件）
+    :rtype: str
+    """
     return "break"
 
 
 def _combo_no_wheel(w):
-    """Combobox 滚轮防线：本体 + 弹出的下拉列表都绑 break。"""
+    """Combobox 滚轮防线：本体 + 弹出的下拉列表都绑 break。
+
+    弹出窗（Tcl 侧 .!popdown）首次点开才创建，届时经 after_idle 补绑。
+
+    :param w: 目标下拉框
+    :type w: ttk.Combobox
+    """
     w.bind("<MouseWheel>", _no_wheel)
     # 弹出窗（ttk 内部 .!popdown 之类）首次点开才创建，届时补绑
     def _guard_popdown(_e=None):
         # post 发生在我们这条绑定之后，推迟到 idle 再取弹出窗
+        """点开下拉时触发的守卫：推迟到 idle 后给弹出窗列表补绑滚轮 break。
+
+        :param _e: Tk 事件（未使用）
+        :type _e: tkinter.Event
+        """
         def _bind():
+            """idle 时刻实际执行：取弹出窗并走纯 Tcl 绑定滚轮 break；失败静默。"""
             try:
                 pop = w.tk.call("ttk::combobox::PopdownWindow", w)
                 # 弹出窗是 Tcl 侧建的，Python 侧没注册，走纯 Tcl 绑定
@@ -65,6 +91,20 @@ class SnapshotEditor(tk.Toplevel):
     """
 
     def __init__(self, master, db, project_id=None, on_saved=None):
+        """构造编辑/新建表单：可滚动容器 + 按字段类型分发的输入控件。
+
+        project_id 为 None 表示新建项目（项目名由 name_fields 组合生成）。
+        预填优先级（新建时）：字段 default > choice 建议值第一个 > 空。
+
+        :param master: 父窗口
+        :type master: tkinter.Misc
+        :param db: 数据库连接
+        :type db: db.Database
+        :param project_id: 项目 id；None = 新建
+        :type project_id: int 或 None
+        :param on_saved: 保存成功回调，接收项目 id
+        :type on_saved: callable 或 None
+        """
         super().__init__(master)
         self.db = db
         self.project_id = project_id
@@ -79,6 +119,7 @@ class SnapshotEditor(tk.Toplevel):
 
     def _build(self):
         # 可滚动外框：Canvas + 右侧滚动条
+        """搭表单：Canvas 可滚动外框 + 逐字段控件（多行 Text / 下拉 / Entry）+ 改动说明行。"""
         canvas = tk.Canvas(self, highlightthickness=0)
         vsb = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=vsb.set)
@@ -159,12 +200,21 @@ class SnapshotEditor(tk.Toplevel):
                   command=self.destroy).pack(side="left")
 
     def _field(self, f):
+        """取某字段当前输入值（多行框取全文并去首尾空白）。
+
+        :param f: 字段名
+        :type f: str
+        :return: 该字段的输入文本
+        :rtype: str
+        """
         if f in self.texts:
             return self.texts[f].get("1.0", "end").strip()
         return self.vars[f].get().strip()
 
     def _save(self):
         # ① 字段类型校验（日期/整数/实数逐字段报错，字符串不拦）
+        """保存：整表校验 + 日期范围检查，新建走 create_project、跟进走 add_snapshot，
+        成功后回调 on_saved 并关闭。校验不过弹警告停留。"""
         fields, errors = validate_snapshot_fields(
             {f: self._field(f) for f in SNAPSHOT_FIELDS})
         if errors:
