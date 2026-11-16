@@ -23,7 +23,7 @@ class SplitApp(tk.Tk):
     def __init__(self):
         """初始化按键分拆器主窗口并搭建界面。"""
         super().__init__()
-        gui_fonts.apply(self)
+        gui_fonts.apply(self, "db_split")
         self.title("按键分拆器 v1.0.0")
         self.geometry("620x420")
         self.db = None

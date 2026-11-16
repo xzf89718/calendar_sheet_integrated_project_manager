@@ -25,7 +25,7 @@ def run_gui(db, db_path=""):
     :return: run_gui 调用结果。
     """
     root = tk.Tk()
-    gui_fonts.apply(root)
+    gui_fonts.apply(root, "db_recycled")
     root.title(f"回收站 - {db_path}")
     root.geometry("760x480")
     root.minsize(640, 400)

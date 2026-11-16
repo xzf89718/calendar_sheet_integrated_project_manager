@@ -2,13 +2,17 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
-- **v3.15.0**（2026-11-16，GUI 高清化第一批，重做版）
-  - 新增根级 gui_fonts.py：按 fields.json 的 ui.font 段（default /
-    heading_size / tree_rowheight，均可缺省）应用全局命名字体与表格
-    样式，零硬编码字号，幂等可重复调用
+- **v3.15.1**（2026-11-16，GUI 高清化第一批·独立配置版）
+  - 新增根级 gui_fonts.py：各工具包读 fields.json 各自独立的
+    ui.<程序名>.font 段（ui.db_append / ui.db_assign / ui.db_copy /
+    ui.db_recycled / ui.db_split / ui.weekreport_clean），三个键
+    default / heading_size / tree_rowheight 均可缺省（12/13/38），
+    段缺失不报错、非法值自动回落缺省；主窗口 ui 段原样不动
   - db_append / db_assign / db_copy / db_recycled / db_split /
-    weekreport_clean 六个工具包 GUI 接入，与主窗口同一配置口径；
-    主窗口 main.py 不动（保持原布局行为）
+    weekreport_clean 六个工具包 GUI 接入，各程序字号完全独立可调
+- **v3.15.0**（2026-11-16，GUI 高清化第一批，共享配置过渡版）
+  - 新增根级 gui_fonts.py（初版共享 ui.font 段），六工具包 GUI 接入，
+    主窗口 main.py 不动；v3.15.1 起改为各程序独立 ui 段，本版存档
 - **v3.14.9**（2026-11-16，文档卫生小补丁）
   - check_docs 全绿修复：db_split/split_core 4 处 :return: 标注补齐，
     scripts/check_docs.py 自身 4 个函数 + scripts/myanalysis 11 个函数

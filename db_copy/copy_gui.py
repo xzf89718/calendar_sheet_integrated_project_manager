@@ -406,7 +406,7 @@ class CopierApp(tk.Tk):
     def __init__(self):
         """初始化 A/B 对照复制器主窗口（1280x640）并搭建界面。"""
         super().__init__()
-        gui_fonts.apply(self)
+        gui_fonts.apply(self, "db_copy")
         self.title("项目库复制器 v1.1.0")
         self.geometry("1280x640")
         self.db_a = None

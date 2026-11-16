@@ -28,7 +28,7 @@ class AssignApp(tk.Tk):
     def __init__(self):
         """初始化批量赋值器主窗口并搭建界面。"""
         super().__init__()
-        gui_fonts.apply(self)
+        gui_fonts.apply(self, "db_assign")
         self.title("批量赋值器 v1.2.0")
         self.geometry("720x640")
         self.db = None

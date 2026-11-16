@@ -24,7 +24,7 @@ class CleanApp(tk.Tk):
     def __init__(self):
         """初始化周报清洗器主窗口并搭建界面。"""
         super().__init__()
-        gui_fonts.apply(self)
+        gui_fonts.apply(self, "weekreport_clean")
         self.title("周报清洗器 v1.0.0")
         self.geometry("1100x680")
         self.headers = []
