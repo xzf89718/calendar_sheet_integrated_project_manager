@@ -15,6 +15,9 @@ _backends = None
 
 
 def _load_backends():
+    """探测可用的通知后端（windows_toasts / win10toast），只探一次。
+
+    非 Windows 或都没装时后端列表为空，notify() 恒返回 False。"""
     global _backends
     if _backends is not None:
         return
@@ -34,13 +37,25 @@ def _load_backends():
 
 
 def available():
-    """当前可用的推送后端列表（空 = 不可用）。"""
+    """当前可用的推送后端列表（空 = 不可用）。
+
+    :return: 后端名字符串列表
+    :rtype: list
+    """
     _load_backends()
     return list(_backends)
 
 
 def notify(title, lines):
-    """推送一条通知。lines 为内容行列表。成功返回 True。"""
+    """推送一条通知；两个后端依次尝试，成功即返回。
+
+    :param title: 通知标题
+    :type title: str
+    :param lines: 内容行列表
+    :type lines: list
+    :return: 推送是否成功（无后端或异常时 False）
+    :rtype: bool
+    """
     _load_backends()
     if "windows_toasts" in _backends:
         try:
@@ -62,7 +77,13 @@ def notify(title, lines):
 
 
 def build_today_message(entries):
-    """把当天条目聚合成 (标题, 内容行列表)。"""
+    """把当天条目聚合成 (标题, 内容行列表)：按类别计数，每类最多列 3 条。
+
+    :param entries: 当日日历条目 dict 列表
+    :type entries: list
+    :return: 二元组（标题, 内容行列表，最多 6 行）
+    :rtype: tuple
+    """
     by = {}
     for e in entries:
         by.setdefault(e["kind"], []).append(e["text"])
