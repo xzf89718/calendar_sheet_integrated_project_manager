@@ -19,7 +19,8 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 from db import Database                       # noqa: E402
-from config import CFG                        # noqa: E402
+from config import CFG
+import gui_fonts                 # noqa: E402                        # noqa: E402
 import db_assign.assign_core as core          # noqa: E402
 
 
@@ -27,6 +28,7 @@ class AssignApp(tk.Tk):
     def __init__(self):
         """初始化批量赋值器主窗口并搭建界面。"""
         super().__init__()
+        gui_fonts.apply(self, "db_assign")
         self.title("批量赋值器 v1.2.0")
         self.geometry("720x640")
         self.db = None
