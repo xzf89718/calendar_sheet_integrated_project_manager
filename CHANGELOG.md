@@ -2,6 +2,22 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.13.0** 零值数据语义修复（用户定，2026-11-16，P1）：
+  ① 修 `_insert_snapshot()` 写入——新增 `_db_value()` 规范化，
+  只有 None 和空字符串转 NULL，0 / 0.0 原样入库（原
+  `fields.get(f) or None` 的 truthiness 判断把数值零折叠成
+  NULL，"明确输入 0"与"没填写"无法区分）；
+  ② 修 `diff_summary()` 比较——新增 `_cmp_value()` 归一化，
+  None 与空字符串等价（都视为"未填写"），数字零保留语义，
+  `0→30` / `30→0` / `None→0` / `0→None` 均正确生成摘要；
+  ③ 补 11 项回归测试：整数零/浮点零/空串/None 覆盖
+  create_project + add_snapshot 两条写入路径，差异摘要
+  四方向 + 零等于零 + 空等价空。三路径核对：导入走
+  create_project、CLI/GUI 走 add_snapshot，均汇聚
+  `_insert_snapshot` 同一套规范化。290 passed + 2 failed
+  （timeline 两例为 main 上已存在的日期敏感用例，与本修复
+  无关，另案处理）。
+
 - **v3.12.4** example 配置全面体检修正（用户定，2026-11-13，小补丁）：
   按最新根模板逐段核对 example 两个 JSON：① qiuzhi/shiyan 的
   ui.calendar 补 max_per_day_view=4（对齐 v3.12.3）；② qiuzhi 的

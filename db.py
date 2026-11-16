@@ -189,6 +189,25 @@ def normalize_date(s):
     return None
 
 
+def _db_value(value):
+    """字段值 -> SQL 写入值（v3.13.0 数据语义红线）。
+
+    只有 None 和空字符串转 NULL；0 / 0.0 是有效数值必须原样入库。
+    禁止用 truthiness 判断——空值、零值、缺失值三种语义永不相混。
+    """
+    if value is None or value == "":
+        return None
+    return value
+
+
+def _cmp_value(value):
+    """差异比较的归一化（v3.13.0）：None 与空字符串都视为"未填写"
+    且彼此等价；数字零保留自身语义，不与空值折叠。"""
+    if value is None or value == "":
+        return None
+    return value
+
+
 def diff_summary(old, new):
     """对比两份快照（dict/Sqlite Row），生成一句话改动说明。
 
@@ -204,7 +223,7 @@ def diff_summary(old, new):
         else:                      # sqlite3.Row
             ov = old[f] if f in old.keys() else None
         nv = new.get(f)
-        if str(ov or "") != str(nv or ""):
+        if str(_cmp_value(ov)) != str(_cmp_value(nv)):
             changes.append(f"{f}: {ov} → {nv}")
     return "; ".join(changes) if changes else "无字段变化（仅跟进记录）"
 
@@ -683,7 +702,7 @@ class Database:
         old = self.get_current(project_id)   # 联动判定基准（None=新建首快照）
         cols = ["project_id", "changed_by", "change_summary"] + SNAPSHOT_FIELDS
         vals = [project_id, changed_by, summary] + \
-               [fields.get(f) or None for f in SNAPSHOT_FIELDS]
+               [_db_value(fields.get(f)) for f in SNAPSHOT_FIELDS]
         cur = self.conn.execute(
             f"INSERT INTO snapshots({','.join(cols)}) "
             f"VALUES ({','.join('?'*len(cols))})", vals)
