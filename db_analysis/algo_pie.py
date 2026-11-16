@@ -15,7 +15,29 @@ from .analysis_core import AnalysisError
 def cmd_pies(db, fields, closed=False, top=9, where=None,
              date_field=None, d1=None, d2=None):
     """多变量饼图内核（v3.5.1）：逐字段取数 + 归段，共享全部筛选条件。
-    返回 [(field_name, segments), ...]——空字段由调用方决定跳过策略。"""
+
+    空字段不抛错，返回空 segments 由调用方决定跳过策略（CLI：个别跳过 +
+    提示，全部为空才报业务错误）。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :param fields: 统计字段英文 name 列表。
+    :type fields: list
+    :param closed: 是否含已归档项目。
+    :type closed: bool
+    :param top: 段数上限。
+    :type top: int
+    :param where: --where 筛选列表。
+    :type where: list 或 None
+    :param date_field: 日期区间作用的列。
+    :type date_field: str 或 None
+    :param d1: 区间起点。
+    :type d1: str 或 None
+    :param d2: 区间终点。
+    :type d2: str 或 None
+    :return: [(field_name, [(段名, 计数), ...]), ...]。
+    :rtype: list
+    """
     from . import analysis_core as ac
     out = []
     for f in fields:
@@ -26,7 +48,18 @@ def cmd_pies(db, fields, closed=False, top=9, where=None,
 
 
 def cmd_pie(db, field, **kw):
-    """单字段兼容包装（GUI/算法表用）。无匹配抛 AnalysisError。"""
+    """单字段兼容包装（GUI / 算法表用）。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :param field: 统计字段英文 name。
+    :type field: str
+    :param kw: 透传给 cmd_pies 的筛选参数（closed/top/where/...）。
+    :type kw: dict
+    :return: [(段名, 计数), ...]。
+    :rtype: list
+    :raises AnalysisError: 无匹配项目时。
+    """
     results = cmd_pies(db, [field], **kw)
     segments = results[0][1]
     if not segments:
@@ -36,9 +69,16 @@ def cmd_pie(db, field, **kw):
 
 
 def dump_csv(results, path):
-    """画饼数据 → csv（utf-8-sig + 纯 LF）。results =
-    [(field_label, segments), ...]；单字段保持 v3.5.0 两列格式
-    （段,计数），多字段加「字段」列。"""
+    """画饼数据 -> csv 文件（utf-8-sig + 纯 LF，与导出端编码纪律一致）。
+
+    单字段保持 v3.5.0 两列格式（段,计数），多字段加「字段」列。
+
+    :param results: [(字段中文 label, [(段名, 计数), ...]), ...]。
+    :type results: list
+    :param path: 输出路径，必须 .csv 结尾。
+    :type path: str
+    :raises AnalysisError: 路径不是 .csv 时。
+    """
     if not str(path).lower().endswith(".csv"):
         raise AnalysisError("--dump 只支持 .csv 路径："
                             f"{path}")
@@ -52,9 +92,19 @@ def dump_csv(results, path):
 
 
 def render_png(segments, path, title=""):
-    """matplotlib 饼图。中文字体按 Microsoft YaHei → SimHei →
-    Noto Sans CJK 顺序探测，全失败仍出图但中文可能显示为方框
-    （附警告）。抛 AnalysisError 仅当 matplotlib 缺失/路径不可写。"""
+    """matplotlib 饼图渲染（可选依赖）。
+
+    中文字体按 Microsoft YaHei -> SimHei -> Noto Sans CJK 顺序探测，
+    全失败仍出图但中文可能显示为方框（附警告）。
+
+    :param segments: [(段名, 计数), ...]。
+    :type segments: list
+    :param path: PNG 输出路径。
+    :type path: str
+    :param title: 图标题（段名），空 = 只写"分布"。
+    :type title: str
+    :raises AnalysisError: matplotlib 缺失或路径不可写时。
+    """
     try:
         import matplotlib
         matplotlib.use("Agg")

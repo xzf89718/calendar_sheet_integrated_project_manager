@@ -15,7 +15,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKIP_DIRS = {"tests", "docs", "build", "dist", "exports", "backups",
              "bin", "__pycache__", ".docs-venv"}
-EXTRA_SKIP = {".git", ".github", "db_analysis"}  # db_analysis joins later
+EXTRA_SKIP = {".git", ".github"}  # db_analysis joins later
 
 
 def iter_py_files(only=None):

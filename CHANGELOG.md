@@ -2,6 +2,9 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.7**
+  - db_analysis 包全部模块（analysis_core 6、algo_pie 4、algo_timeline 24、__main__ 9 共 43 个函数 + 2 个排序闭包）补齐 Sphinx reST 中文 docstring，纯文档改动零逻辑变更；check_docs.py 解除 db_analysis 跳过
+  - docs 新增 db_analysis.rst，index.rst 收录 db_analysis 包
 - **v3.14.6**
   - workbench_ui 包全部模块（bench_core 38 函数 + BenchError、__main__ 17 函数 + 内层闭包 take、gui.run_gui）补齐 Sphinx reST 中文 docstring，纯文档改动零逻辑变更
   - docs 新增 workbench_ui.rst，index.rst 收录 workbench_ui 包
