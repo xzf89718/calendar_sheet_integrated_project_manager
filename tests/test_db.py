@@ -43,6 +43,43 @@ def test_diff_summary_no_change(cfg):
     assert diff_summary(old, new) == "无字段变化（仅跟进记录）"
 
 
+def test_diff_summary_zero_to_value(cfg):
+    s = diff_summary({"amount": 0}, {"amount": 30})
+    assert "amount: 0 → 30" in s
+
+
+def test_diff_summary_value_to_zero(cfg):
+    s = diff_summary({"amount": 30}, {"amount": 0})
+    assert "amount: 30 → 0" in s
+
+
+def test_diff_summary_none_to_zero(cfg):
+    s = diff_summary({}, {"amount": 0})
+    assert "amount: None → 0" in s
+
+
+def test_diff_summary_zero_to_none(cfg):
+    s = diff_summary({"amount": 0}, {"amount": None})
+    assert "amount: 0 → None" in s
+
+
+def test_diff_summary_zero_vs_empty_is_change(cfg):
+    # 0 ≠ 空：清零与未填写是两种语义，必须出现在摘要里
+    s = diff_summary({"amount": 0}, {"amount": ""})
+    assert "amount" in s
+
+
+def test_diff_summary_empty_vs_none_no_change(cfg):
+    # None 与空字符串等价（都视为"未填写"）
+    s = diff_summary({"note": ""}, {"note": None})
+    assert s == "无字段变化（仅跟进记录）"
+
+
+def test_diff_summary_zero_equals_zero(cfg):
+    s = diff_summary({"qty": 0}, {"qty": 0})
+    assert s == "无字段变化（仅跟进记录）"
+
+
 # ---------- 创建项目：默认值 / 命名 / 状态联动 ----------
 
 def test_create_applies_defaults(dbs, cfg):
@@ -82,6 +119,52 @@ def test_empty_string_becomes_null(dbs):
     pid = dbs.create_project(manufacturer="甲", note="", status="进行中")
     row = dbs.conn.execute(
         "SELECT note FROM snapshots WHERE project_id=?", (pid,)).fetchone()
+    assert row["note"] is None
+
+
+# v3.13.0：0 / 0.0 是有效数值，禁止 truthiness 折叠成 NULL
+def test_snapshot_preserves_integer_zero(dbs):
+    pid = dbs.create_project(manufacturer="甲", qty=0, status="进行中")
+    row = dbs.conn.execute(
+        "SELECT qty FROM snapshots WHERE project_id=?", (pid,)).fetchone()
+    assert row["qty"] == 0
+
+    dbs.add_snapshot(pid, manufacturer="甲", qty=0, status="进行中")
+    row = dbs.conn.execute(
+        "SELECT qty FROM snapshots WHERE project_id=? ORDER BY id DESC",
+        (pid,)).fetchone()
+    assert row["qty"] == 0
+
+
+def test_snapshot_preserves_float_zero(dbs):
+    pid = dbs.create_project(manufacturer="甲", amount=0.0, status="进行中")
+    row = dbs.conn.execute(
+        "SELECT amount FROM snapshots WHERE project_id=?", (pid,)).fetchone()
+    assert row["amount"] == 0.0
+
+    dbs.add_snapshot(pid, manufacturer="甲", amount=0.0, status="进行中")
+    row = dbs.conn.execute(
+        "SELECT amount FROM snapshots WHERE project_id=? ORDER BY id DESC",
+        (pid,)).fetchone()
+    assert row["amount"] == 0.0
+
+
+def test_follow_empty_string_becomes_null(dbs):
+    # 跟进路径：空字符串同样落 NULL（与创建路径同一套规范化）
+    pid = dbs.create_project(manufacturer="甲", note="", status="进行中")
+    dbs.add_snapshot(pid, manufacturer="甲", note="", status="进行中")
+    row = dbs.conn.execute(
+        "SELECT note FROM snapshots WHERE project_id=? ORDER BY id DESC",
+        (pid,)).fetchone()
+    assert row["note"] is None
+
+
+def test_follow_none_stays_null(dbs):
+    pid = dbs.create_project(manufacturer="甲", note=None, status="进行中")
+    dbs.add_snapshot(pid, manufacturer="甲", note=None, status="进行中")
+    row = dbs.conn.execute(
+        "SELECT note FROM snapshots WHERE project_id=? ORDER BY id DESC",
+        (pid,)).fetchone()
     assert row["note"] is None
 
 
