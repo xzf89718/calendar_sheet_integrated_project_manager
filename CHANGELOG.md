@@ -2,6 +2,17 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.2** 文档工具链部署（用户定，2026-11-16，文档批）：
+  Sphinx + sphinx-rtd-theme 原生 reST 构建链落地——
+  requirements-docs.txt、docs/（conf.py + index + db/main 两个
+  automodule 页）、scripts/build_docs.ps1（PS7，建 .docs-venv、
+  先跑 docstring 检查再出 HTML 并自动打开）、scripts/check_docs.py
+  （AST 级检查：缺 docstring / doc 声称有返回但函数无返回 /
+  有返回但 doc 未写 return，非零退出）；.gitignore 补
+  .docs-venv/ 与 docs/build/。db.py、main.py 两个已文档化
+  模块全绿，其余模块待后续批次文档化后逐步加入目录。
+  不随版本打包 HTML 产物，本地构建。
+
 - **v3.14.1** main.py 全函数 reST 文档化（用户定，2026-11-16，
   文档批第二批）：100 个 def 全覆盖——重写/新增 reST 中文
   docstring（摘要 + 详细说明 + param/type/return/rtype 字段），

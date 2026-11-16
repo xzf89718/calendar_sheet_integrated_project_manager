@@ -9,3 +9,5 @@ exports/
 backups/
 build/
 dist/
+.docs-venv/
+docs/build/
