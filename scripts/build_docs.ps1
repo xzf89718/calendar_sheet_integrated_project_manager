@@ -11,9 +11,10 @@ $html  = Join-Path $root "docs/build/html"
 if (-not (Test-Path $py)) {
     Write-Host "creating docs venv..."
     python -m venv $venv
-    & $py -m pip install --quiet --upgrade pip
-    & $py -m pip install --quiet -r (Join-Path $root "requirements-docs.txt")
 }
+
+# idempotent: also picks up deps added after the venv was first created
+& $py -m pip install --quiet -r (Join-Path $root "requirements-docs.txt") -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 Write-Host "checking docstrings (documented modules only)..."
 $modules = @()

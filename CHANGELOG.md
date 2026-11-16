@@ -2,6 +2,12 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.3** 文档工具链修复（用户定，2026-11-16，小补丁）：
+  ① venv 依赖安装走 tuna 镜像并改为每次幂等执行——已存在的
+  .docs-venv 也能补装新增依赖（openpyxl，autodoc 导入
+  workbench_ui→exporter 链需要）；② 修复 FavoritesDialog 类
+  docstring 列表缩进不符合 reST 导致的 autodoc ERROR，重建零告警。
+
 - **v3.14.2** 文档工具链部署（用户定，2026-11-16，文档批）：
   Sphinx + sphinx-rtd-theme 原生 reST 构建链落地——
   requirements-docs.txt、docs/（conf.py + index + db/main 两个
