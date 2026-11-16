@@ -22,6 +22,7 @@ class AppendApp(tk.Tk):
     def __init__(self):
         """初始化多库追加器主窗口（标题/尺寸/状态量）并搭建界面。"""
         super().__init__()
+        gui_fonts.apply(self)
         self.title("多库追加器 v1.0.0")
         self.geometry("820x620")
         self._build()
