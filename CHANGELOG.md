@@ -5,6 +5,16 @@
 - **v3.14.6**
   - workbench_ui 包全部模块（bench_core 38 函数 + BenchError、__main__ 17 函数 + 内层闭包 take、gui.run_gui）补齐 Sphinx reST 中文 docstring，纯文档改动零逻辑变更
   - docs 新增 workbench_ui.rst，index.rst 收录 workbench_ui 包
+- **v3.14.5** 第三批模块 reST 文档化（用户定，2026-11-16，文档批）：
+  importer.py / exporter.py / show_icon.py 共 34 个 def 全覆盖，
+  AST 剥离比对零逻辑改动；docs/ 目录加入三个 automodule 页，
+  check_docs 全绿。
+- **v3.14.4** 第二批模块 reST 文档化（用户定，2026-11-16，文档批）：
+  config.py / editor.py / reader.py / calendar_gui.py / notifier.py
+  共 43 个 def 全覆盖（含嵌套闭包 _guard_popdown/_bind），重写/新增
+  中文 reST docstring 并补齐 return/rtype 字段；AST 剥离比对零逻辑
+  改动；docs/ 目录同步加入五个 automodule 页，check_docs 全绿。
+
 - **v3.14.3** 文档工具链修复（用户定，2026-11-16，小补丁）：
   ① venv 依赖安装走 tuna 镜像并改为每次幂等执行——已存在的
   .docs-venv 也能补装新增依赖（openpyxl，autodoc 导入

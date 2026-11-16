@@ -14,6 +14,14 @@ pm_workbench API 参考
    db
    main
    workbench_ui
+   calendar_gui
+   config
+   editor
+   notifier
+   reader
+   exporter
+   importer
+   show_icon
 
 索引
 ====
