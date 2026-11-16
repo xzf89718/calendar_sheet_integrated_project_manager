@@ -15,7 +15,8 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 from openpyxl import Workbook, load_workbook      # noqa: E402
-from config import CFG                             # noqa: E402
+from config import CFG
+import gui_fonts                 # noqa: E402                             # noqa: E402
 import weekreport_clean.clean_core as core         # noqa: E402
 
 
@@ -23,6 +24,7 @@ class CleanApp(tk.Tk):
     def __init__(self):
         """初始化周报清洗器主窗口并搭建界面。"""
         super().__init__()
+        gui_fonts.apply(self)
         self.title("周报清洗器 v1.0.0")
         self.geometry("1100x680")
         self.headers = []
