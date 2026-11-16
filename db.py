@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
-"""数据库层：SQLite，只负责存取，不认识任何 GUI。
+"""SQLite 数据库层：只负责存取，不认识任何 GUI。
 
-对外暴露 Database 类。数据结构（与已确认的设计一致）：
-  projects   项目主表，只管"当前指针"和开关状态
-  snapshots  快照表，一次跟进 = 一条完整快照，只增不改
+对外暴露 :class:`Database`。数据结构：
+
+- ``projects``：项目主表，只管"当前指针"和开关状态；
+- ``snapshots``：快照表，一次跟进 = 一条完整快照，只增不改。
+
+一切表结构与字段列由 fields.json 驱动（锚定同目录，不提供路径
+参数）；配置新增字段经 :meth:`Database._reconcile_columns` 自动
+补列。写库统一走 :func:`_db_value` 规范化，禁止 truthiness 判断
+（v3.13.0 数据语义红线：空值、零值、缺失值三种语义永不相混）。
 """
 import re
 import sqlite3
@@ -21,15 +27,23 @@ _SQL_TYPES = {"date": "TEXT", "int": "INTEGER", "float": "REAL",
 
 
 def validate_field_input(name, raw):
-    """单字段输入校验（v2.6.0 起在 editor.py，v3.3.0 下沉 db.py：
-    CLI（workbench_ui）也要用，db 层不认识 GUI）。
+    """单字段输入校验：按字段类型清洗并检查原始输入。
 
-    按字段类型（fields.json 的 type）分别检查：
-      date   须能被识别为真实日期（兼容全角/中文写法），统一成 YYYY-MM-DD；
-      int    必须是整数（兼容 "30%" 写法），拒绝小数与字母；
-      float  必须是实数；
-      其余   字符串/choice/status：任意文本合法，仅去首尾空白。
-    返回 (清洗后的值, 错误消息或 None)。
+    v2.6.0 起在 editor.py，v3.3.0 下沉 db.py（CLI 的 workbench_ui
+    也要用，db 层不认识 GUI）。按 fields.json 的字段类型分别处理：
+
+    - date：须能被识别为真实日历日（兼容全角/中文写法），统一为
+      ``YYYY-MM-DD``；
+    - int：必须是整数（兼容 "30%" 写法），拒绝小数与字母；
+    - float：必须是实数；
+    - 其余（text/choice/status）：任意文本合法，仅去首尾空白。
+
+    :param name: 字段名（以 fields.json 的 name 为准）
+    :type name: str
+    :param raw: 原始输入值；None 视为空
+    :type raw: str 或 None
+    :return: 二元组（清洗后的值, 错误消息）；通过时错误消息为 None
+    :rtype: tuple
     """
     from datetime import date as _date
     raw = "" if raw is None else str(raw).strip()
@@ -62,9 +76,13 @@ def validate_field_input(name, raw):
 
 
 def validate_snapshot_fields(fields):
-    """整表校验：对全部配置字段逐个过 validate_field_input。
+    """整表校验：对全部配置字段逐个过 :func:`validate_field_input`。
 
-    返回 (清洗后的 dict, 错误消息列表)。错误带字段显示名，逐条列出。
+    :param fields: 业务字段原始键值对
+    :type fields: dict
+    :return: 二元组（清洗后的字段 dict, 错误消息列表）；错误带字段
+        显示名、逐条列出；空列表 = 全部通过
+    :rtype: tuple
     """
     cleaned, errors = {}, []
     for f in CFG.names:
@@ -76,11 +94,16 @@ def validate_snapshot_fields(fields):
 
 
 def check_date_bounds(fields):
-    """日期范围检查器（v2.6.0，fields.json 的 date_check 段驱动）。
+    """日期范围检查器（fields.json 的 date_check 段驱动）。
 
     被检查的日期字段（date_check.fields）若有值，必须落在
-    [开始日期, 关闭日期] 内；某侧边界为空则该侧不检。enabled=false
-    或段缺省时直接放行。返回错误消息列表（空 = 通过）。
+    [开始日期, 关闭日期] 区间内；某侧边界为空则该侧不检。
+    enabled=false 或段缺省时直接放行。
+
+    :param fields: 业务字段键值对
+    :type fields: dict
+    :return: 错误消息列表；空列表 = 通过
+    :rtype: list
     """
     if not CFG.date_check_enabled:
         return []
@@ -105,6 +128,14 @@ def check_date_bounds(fields):
 
 
 def _schema_sql():
+    """生成主表建表 SQL（projects + snapshots + 快照索引）。
+
+    snapshots 的业务字段列由 fields.json 的 fields 段平铺生成
+    （类型映射见 ``_SQL_TYPES``），便于外部工具阅读和 diff。
+
+    :return: 建表语句文本，可交 executescript 直接执行
+    :rtype: str
+    """
     cols = ",\n    ".join(
         f"{f['name']} {_SQL_TYPES[f['type']]}" for f in CFG.fields)
     return f"""
@@ -137,6 +168,9 @@ def _recycled_schema_sql():
 
     列结构与主表完全同构（snapshots 含全部配置字段列），外加
     recycled_at 回收时间。恢复/彻底删除的全部逻辑在 db_recycled/ 子模块。
+
+    :return: 建表语句文本，可交 executescript 直接执行
+    :rtype: str
     """
     cols = ",\n    ".join(
         f"{f['name']} {_SQL_TYPES[f['type']]}" for f in CFG.fields)
@@ -175,9 +209,17 @@ _FW_MAP = {0xFF01 + i: 0x21 + i for i in range(94)}  # 全角->半角（键必�
 
 
 def normalize_date(s):
-    """各种日期写法统一成 YYYY-MM-DD；无法识别返回 None。
+    """把常见中文/全角/斜杠日期统一规范为 ISO 格式。
 
     兼容全角字符（２０２６／３／１９）和中文（2026年3月19日）。
+    只做前缀匹配：``_DATE_RE.match`` 命中日期开头即返回，
+    尾随字符不视为错误；对结果的日历合法性不做检查
+    （由调用方用 ``date.fromisoformat`` 兜真实日期）。
+
+    :param s: 原始日期字符串；空值返回 None
+    :type s: str
+    :return: 规范化后的 ``YYYY-MM-DD`` 字符串；无法识别返回 None
+    :rtype: str 或 None
     """
     if not s:
         return None
@@ -190,10 +232,15 @@ def normalize_date(s):
 
 
 def _db_value(value):
-    """字段值 -> SQL 写入值（v3.13.0 数据语义红线）。
+    """字段值转 SQL 写入值（v3.13.0 数据语义红线）。
 
     只有 None 和空字符串转 NULL；0 / 0.0 是有效数值必须原样入库。
     禁止用 truthiness 判断——空值、零值、缺失值三种语义永不相混。
+
+    :param value: 原始字段值
+    :type value: object
+    :return: 规范化后的写入值；None 表示 SQL NULL
+    :rtype: object 或 None
     """
     if value is None or value == "":
         return None
@@ -201,18 +248,34 @@ def _db_value(value):
 
 
 def _cmp_value(value):
-    """差异比较的归一化（v3.13.0）：None 与空字符串都视为"未填写"
-    且彼此等价；数字零保留自身语义，不与空值折叠。"""
+    """差异比较的归一化（v3.13.0）。
+
+    None 与空字符串都视为"未填写"且彼此等价；数字零保留自身语义，
+    不与空值折叠。
+
+    :param value: 待比较的原始值
+    :type value: object
+    :return: 归一化后的值；"未填写"统一为 None
+    :rtype: object 或 None
+    """
     if value is None or value == "":
         return None
     return value
 
 
 def diff_summary(old, new):
-    """对比两份快照（dict/Sqlite Row），生成一句话改动说明。
+    """对比两份快照，生成一句话改动说明。
 
-    例: "里程碑: Lead → Quotation; 金额: 10 → 20"
-    old 为 None 时返回 "创建项目"。
+    例："里程碑: Lead → Quotation; 金额: 10 → 20"。``old`` 为 None
+    时返回 "创建项目"。比较前经 :func:`_cmp_value` 归一化：None 与
+    空字符串都视为"未填写"，数字零保留语义不参与折叠。
+
+    :param old: 旧快照；None 表示项目刚创建、无历史
+    :type old: dict 或 sqlite3.Row 或 None
+    :param new: 新快照的业务字段键值对
+    :type new: dict
+    :return: 改动说明；无字段变化时返回固定提示"无字段变化（仅跟进记录）"
+    :rtype: str
     """
     if old is None:
         return "创建项目"
@@ -229,7 +292,23 @@ def diff_summary(old, new):
 
 
 class Database:
+    """数据库连接与全部存取操作的入口。
+
+    持有 sqlite3 连接（Row 工厂），对外提供项目/快照写入、
+    列表查询引擎、收藏夹、回收站搬运、日历与周报取数。
+    """
+
     def __init__(self, path="sales_pm.db"):
+        """打开（或创建）数据库文件并初始化全部表结构。
+
+        依次执行：建主表（CREATE IF NOT EXISTS）、按配置补列
+        （:meth:`_reconcile_columns`）、按开关建收藏夹表与回收站表。
+        旧迁移逻辑 v1.5.5 起停用（考古见 :meth:`_migrate_DEPRECATED`
+        上方注释块）。
+
+        :param path: 数据库文件路径；缺省取当前目录 sales_pm.db
+        :type path: str
+        """
         self.db_path = path                  # v3.3.0：备份等场景要用
         self.conn = sqlite3.connect(path)
         self.conn.row_factory = sqlite3.Row
@@ -243,7 +322,10 @@ class Database:
 
     def _reconcile_columns(self):
         """核对配置与表结构：fields.json 里新增的字段时间自动补列。
-        SQLite 不支持删列，配置里去掉的字段列会留在表中不再使用。"""
+
+        主表 snapshots 与回收表 recycled_snapshots 同步补列。
+        SQLite 不支持删列，配置里去掉的字段列会留在表中不再使用。
+        """
         existing = {r[1] for r in self.conn.execute(
             "PRAGMA table_info(snapshots)")}
         rexisting = {r[1] for r in self.conn.execute(
@@ -261,6 +343,13 @@ class Database:
                         f"{f['name']} {_SQL_TYPES[f['type']]}")
 
     def _table_exists(self, name):
+        """判断指定表是否已存在。
+
+        :param name: 表名
+        :type name: str
+        :return: 存在返回 True
+        :rtype: bool
+        """
         return self.conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
             (name,)).fetchone() is not None
@@ -276,8 +365,12 @@ class Database:
     # 命令行工具（见 development_project.md 1.5），而不是常驻启动路径。
     # def _migrate(self):
     def _migrate_DEPRECATED(self):
-        """旧数据库迁移（全部幂等）：
-        1. 补充新增字段  2. 重建表去掉里程碑 CHECK  3. 标题改为自动命名
+        """旧数据库迁移（v1.5.5 起停用，保留代码仅供考古）。
+
+        四步，全部幂等：1. 补 status/fail_reason 列；2. 重建表去掉
+        里程碑 CHECK；3. 标题改为自动命名（厂家-客户-产品）；
+        4. 历史脏日期统一为 YYYY-MM-DD。停用原因与后续方案见本方法
+        上方的注释块。
         """
         for col, decl in (("status", "TEXT"), ("fail_reason", "TEXT")):
             try:
@@ -338,10 +431,23 @@ class Database:
 
     # ---------- 项目 ----------
     def create_project(self, changed_by="", change_summary="", **fields):
-        """新建项目 = 项目行 + 第一条快照，一个事务。
-        项目名自动生成：厂家-客户-产品（取不到的字段跳过）。
-        字段默认值（fields.json 的 default）在新建时兜底，显式传值优先；
-        后续的添加跟进不套默认值，允许有意清空。"""
+        """新建项目：写入项目行 + 第一条快照，单个事务完成。
+
+        项目名按 fields.json 的 ``name_fields`` 配置拼接生成
+        （默认"厂家-客户-产品"，取不到的字段跳过，全空时兜底为
+        "项目<id>"）。fields.json 的字段默认值在新建时兜底，
+        显式传值优先；后续跟进不套默认值，允许有意清空。
+        变更说明缺省时自动记为"创建项目"。
+
+        :param changed_by: 修改人标识；未传时存空字符串
+        :type changed_by: str
+        :param change_summary: 变更说明；为空时自动记"创建项目"
+        :type change_summary: str
+        :param fields: 业务字段键值对，字段名以 fields.json 为准
+        :type fields: dict
+        :return: 新项目 ID
+        :rtype: int
+        """
         fields = {**CFG.field_defaults, **fields}
         with self.conn:
             cur = self.conn.execute(
@@ -353,6 +459,16 @@ class Database:
             return pid
 
     def list_projects(self, include_closed=False):
+        """列出全部项目（当前快照口径）。
+
+        projects 行 LEFT JOIN 当前快照的全部配置字段；缺省只含
+        open 项目，按项目 ID 倒序。
+
+        :param include_closed: True 时包含已关闭项目
+        :type include_closed: bool
+        :return: 项目行列表（sqlite3.Row，含 id/title/created_at 与全部快照字段）
+        :rtype: list
+        """
         fields = ", ".join(f"s.{f}" for f in SNAPSHOT_FIELDS)
         sql = f"""
         SELECT p.id, p.title, p.created_at, {fields}
@@ -365,17 +481,40 @@ class Database:
         return self.conn.execute(sql).fetchall()
 
     def get_project(self, project_id):
+        """按 ID 取项目主表行。
+
+        :param project_id: 项目 ID
+        :type project_id: int
+        :return: 项目行；不存在返回 None
+        :rtype: sqlite3.Row 或 None
+        """
         return self.conn.execute(
             "SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
 
     def get_current(self, project_id):
-        """当前快照（完整状态）。"""
+        """取项目的当前快照（完整状态）。
+
+        :param project_id: 项目 ID
+        :type project_id: int
+        :return: 当前快照行；项目无快照返回 None
+        :rtype: sqlite3.Row 或 None
+        """
         return self.conn.execute(
             """SELECT s.* FROM snapshots s
                JOIN projects p ON p.current_id = s.id
                WHERE p.id=?""", (project_id,)).fetchone()
 
     def set_status(self, project_id, status):
+        """直接改写项目开关状态（open/closed）。
+
+        常规业务应走快照的状态字段联动（见 :meth:`_insert_snapshot`），
+        本方法仅供绕过快照的显式开关场景。
+
+        :param project_id: 项目 ID
+        :type project_id: int
+        :param status: 目标状态值（projects.status 列口径）
+        :type status: str
+        """
         with self.conn:
             self.conn.execute("UPDATE projects SET status=? WHERE id=?",
                               (status, project_id))
@@ -383,10 +522,13 @@ class Database:
     def delete_project(self, project_id):
         """删除项目（需调用方二次确认）。
 
-        recycle_bin 关闭（默认）：物理删除项目 + 全部快照（v2.7.3 行为）。
-        recycle_bin 开启：整行搬进独立回收表（项目 + 快照 + 收藏夹
-        索引一并备份），主表所有查询天然不再命中；恢复/彻底删除
-        由 db_recycled/ 负责，主程序不再感知。
+        recycle_bin 关闭（默认）：物理删除项目 + 全部快照
+        （v2.7.3 行为）。recycle_bin 开启：整行搬进独立回收表，
+        由 :meth:`_recycle_project` 执行，主表所有查询天然不再命中；
+        恢复/彻底删除由 db_recycled/ 子模块负责，主程序不再感知。
+
+        :param project_id: 项目 ID
+        :type project_id: int
         """
         if CFG.recycle_bin_enabled:
             self._recycle_project(project_id)
@@ -399,13 +541,24 @@ class Database:
 
     # ---------- 回收站（v3.1.0，B 方案：只负责"搬进去"，出去归 db_recycled）
     def _ensure_recycled_tables(self):
-        """按配置开关建表：enabled=false 的库不建，保持干净。"""
+        """按配置开关建回收站表：enabled=false 的库不建，保持干净。
+        旧库打开时自动补建（CREATE IF NOT EXISTS），无需迁移。
+        """
         if not CFG.recycle_bin_enabled:
             return
         self.conn.executescript(_recycled_schema_sql())
 
     def _recycle_project(self, project_id):
-        """项目 + 快照 + 收藏夹索引整体备份进回收表（单事务）。"""
+        """项目 + 快照 + 收藏夹索引整体备份进回收表（单事务）。
+
+        收藏夹索引跟项目走（favorites 关闭的库没有 collection_items
+        表，自动跳过）；快照搬运必须显式列清单——配置变更时两表
+        追加列的位置可能不一致（回收表尾部多 recycled_at），按位置
+        INSERT 会错位爆 NOT NULL。
+
+        :param project_id: 项目 ID
+        :type project_id: int
+        """
         with self.conn:
             # 收藏夹索引备份（纯索引，跟项目走；恢复时尽力带回）。
             # favorites 关闭的库没有 collection_items 表，跳过
@@ -442,7 +595,23 @@ class Database:
     # ---------- SQL 化列表查询（v2.1：筛选/搜索/排序/分页下沉 SQLite） ----------
     def _build_where(self, filters=None, keywords=None,
                      search_fields=None):
-        """把筛选/搜索状态翻译成 WHERE 片段。返回 (where_sql, args)。"""
+        """把筛选/搜索状态翻译成 WHERE 片段。
+
+        filters 支持三种形态：``id`` 键 = 项目 id 集合（收藏夹模式
+        注入，沿用本接口传参不新增查询入口，空集 = 全不显示）；
+        tuple = 日期区间 (d1, d2)，空串日期不参与比较；其他 =
+        勾选值集合（空集 = 全不显示）。keywords 为搜索词列表，
+        AND 语义、字段间 OR，仅作用于 SNAPSHOT_FIELDS 内的字段。
+
+        :param filters: 筛选条件字典；None 或空 dict = 不筛选
+        :type filters: dict 或 None
+        :param keywords: 搜索词列表；None = 不搜索
+        :type keywords: list 或 None
+        :param search_fields: 参与搜索的字段名列表
+        :type search_fields: list 或 None
+        :return: 二元组（WHERE 片段列表, 参数列表）；片段间以 AND 连接
+        :rtype: tuple
+        """
         where, args = [], []
         for c, spec in (filters or {}).items():
             if spec is None:
@@ -492,11 +661,30 @@ class Database:
                        cols=None):
         """列表查询：筛选/搜索/排序/分页全部在 SQLite 完成（v2.1）。
 
-        filters   {列名: set(勾选) 或 (d1,d2)(日期区间)}
-        keywords  搜索词列表（AND 语义，字段间 OR）
-        sort      列名；"id" 或字段名；数字按值、文本按不区分大小写，
-                  与旧 Python 排序语义一致（typeof 分组）
-        返回 (当前页 [dict], 全量匹配数 int)
+        排序与旧 Python 排序语义一致：数字按值、文本按不区分大小写
+        （typeof 分组实现）。快照字段的 NULL 读出后统一转成空串，
+        便于 UI 直接展示。
+
+        :param filters: 筛选条件字典；格式见 :meth:`_build_where`
+        :type filters: dict 或 None
+        :param keywords: 搜索词列表（AND 语义，字段间 OR）
+        :type keywords: list 或 None
+        :param search_fields: 参与搜索的字段名列表
+        :type search_fields: list 或 None
+        :param sort: 排序列名；"id" 或字段名
+        :type sort: str 或 None
+        :param sort_desc: True = 降序
+        :type sort_desc: bool
+        :param include_closed: True 时包含已关闭项目
+        :type include_closed: bool
+        :param offset: 分页偏移
+        :type offset: int
+        :param limit: 分页大小；None = 不分页
+        :type limit: int 或 None
+        :param cols: 返回的快照字段列；缺省为全部快照字段
+        :type cols: list 或 None
+        :return: 二元组（当前页 dict 列表, 全量匹配数）
+        :rtype: tuple
         """
         cols = cols or SNAPSHOT_FIELDS
         sel = ", ".join(f"cur.{c}" for c in cols)
@@ -534,7 +722,22 @@ class Database:
 
     def query_project_ids(self, filters=None, keywords=None,
                           search_fields=None, include_closed=False):
-        """只取匹配的项目 id 列表（日历 filtered 模式用，轻量）。"""
+        """只取匹配的项目 id 列表（日历 filtered 模式用，轻量）。
+
+        筛选语义与 :meth:`query_projects` 完全相同，仅省去排序与
+        取行，返回开销最小。
+
+        :param filters: 筛选条件字典；格式见 :meth:`_build_where`
+        :type filters: dict 或 None
+        :param keywords: 搜索词列表
+        :type keywords: list 或 None
+        :param search_fields: 参与搜索的字段名列表
+        :type search_fields: list 或 None
+        :param include_closed: True 时包含已关闭项目
+        :type include_closed: bool
+        :return: 匹配的项目 id 列表
+        :rtype: list
+        """
         where, args = self._build_where(filters, keywords, search_fields)
         if not include_closed:
             where.append("p.status='open'")
@@ -548,8 +751,9 @@ class Database:
     # 收藏夹不是新实体：表里只存项目 id 引用，项目数据始终只有一份。
     # 收藏夹模式只是给现有筛选接口传一组 id（见 _build_where 的 id 分支）。
     def _ensure_fav_tables(self):
-        """按配置开关建表：enabled=false 的库不建，保持干净。
-        旧库打开时自动补建（CREATE IF NOT EXISTS），无需迁移。"""
+        """按配置开关建收藏夹表：enabled=false 的库不建，保持干净。
+        旧库打开时自动补建（CREATE IF NOT EXISTS），无需迁移。
+        """
         if not CFG.favorites_enabled:
             return
         self.conn.executescript("""
@@ -568,7 +772,11 @@ class Database:
         """)
 
     def list_collections(self):
-        """[(id, name, 项目数)]，按创建顺序。"""
+        """列出全部收藏夹。
+
+        :return: 三元组列表 [(id, name, 项目数)]，按创建顺序
+        :rtype: list
+        """
         if not CFG.favorites_enabled:
             return []
         return self.conn.execute(
@@ -577,42 +785,87 @@ class Database:
             "GROUP BY c.id ORDER BY c.id").fetchall()
 
     def create_collection(self, name):
+        """新建收藏夹。
+
+        :param name: 收藏夹名称
+        :type name: str
+        :return: 新收藏夹 ID
+        :rtype: int
+        """
         with self.conn:
             cur = self.conn.execute(
                 "INSERT INTO collections(name) VALUES(?)", (name,))
         return cur.lastrowid
 
     def delete_collection(self, cid):
+        """删除收藏夹（先清收藏夹-项目索引，再删收藏夹本身）。
+
+        :param cid: 收藏夹 ID
+        :type cid: int
+        """
         with self.conn:
             self.conn.execute(
                 "DELETE FROM collection_items WHERE collection_id=?", (cid,))
             self.conn.execute("DELETE FROM collections WHERE id=?", (cid,))
 
     def collection_name(self, cid):
+        """按 ID 查收藏夹名称。
+
+        :param cid: 收藏夹 ID
+        :type cid: int
+        :return: 名称；不存在返回 None
+        :rtype: str 或 None
+        """
         r = self.conn.execute(
             "SELECT name FROM collections WHERE id=?", (cid,)).fetchone()
         return r[0] if r else None
 
     def collection_rename(self, cid, name):
+        """收藏夹改名。
+
+        :param cid: 收藏夹 ID
+        :type cid: int
+        :param name: 新名称
+        :type name: str
+        """
         with self.conn:
             self.conn.execute("UPDATE collections SET name=? WHERE id=?",
                               (name, cid))
 
     def collection_projects(self, cid):
-        """收藏夹内仍存在的项目 id（join projects，自动剔除已删项目）。"""
+        """收藏夹内仍存在的项目 id（join projects，自动剔除已删项目）。
+
+        :param cid: 收藏夹 ID
+        :type cid: int
+        :return: 项目 id 列表，按加入顺序
+        :rtype: list
+        """
         return [r[0] for r in self.conn.execute(
             "SELECT i.project_id FROM collection_items i "
             "JOIN projects p ON p.id = i.project_id "
             "WHERE i.collection_id=? ORDER BY i.position, i.rowid", (cid,))]
 
     def collection_items_detail(self, cid):
-        """收藏夹内项目明细 [(project_id, 项目名)]，按加入顺序。"""
+        """收藏夹内项目明细。
+
+        :param cid: 收藏夹 ID
+        :type cid: int
+        :return: 二元组列表 [(project_id, 项目名)]，按加入顺序
+        :rtype: list
+        """
         return [(r[0], r[1]) for r in self.conn.execute(
             "SELECT i.project_id, p.title FROM collection_items i "
             "JOIN projects p ON p.id = i.project_id "
             "WHERE i.collection_id=? ORDER BY i.position, i.rowid", (cid,))]
 
     def collection_add(self, cid, project_ids):
+        """把若干项目加入收藏夹（已存在的组合忽略，不报错）。
+
+        :param cid: 收藏夹 ID
+        :type cid: int
+        :param project_ids: 项目 id 列表
+        :type project_ids: list
+        """
         with self.conn:
             for pid in project_ids:
                 self.conn.execute(
@@ -620,6 +873,13 @@ class Database:
                     "(collection_id, project_id) VALUES(?, ?)", (cid, pid))
 
     def collection_remove(self, cid, project_id):
+        """把一个项目移出收藏夹（只删索引，项目本身不动）。
+
+        :param cid: 收藏夹 ID
+        :type cid: int
+        :param project_id: 项目 ID
+        :type project_id: int
+        """
         with self.conn:
             self.conn.execute(
                 "DELETE FROM collection_items WHERE collection_id=? "
@@ -627,7 +887,15 @@ class Database:
 
     # ---------- 周报模式（只读视图：数据唯一入口是跟进表） ----------
     def snapshots_between(self, d1, d2):
-        """时间区间内的全部快照（周报取数，按天含端点，时间正序）。"""
+        """时间区间内的全部快照（周报取数，按天含端点，时间正序）。
+
+        :param d1: 起始日期（含），YYYY-MM-DD
+        :type d1: str
+        :param d2: 结束日期（含），YYYY-MM-DD
+        :type d2: str
+        :return: 快照行列表（sqlite3.Row，带 ptitle/pstatus 附加列）
+        :rtype: list
+        """
         return self.conn.execute(
             """SELECT s.*, p.title AS ptitle, p.status AS pstatus
                FROM snapshots s JOIN projects p ON p.id = s.project_id
@@ -635,7 +903,20 @@ class Database:
                ORDER BY s.snapshot_at, s.id""", (d1, d2)).fetchall()
 
     def calendar_entries_for(self, project_ids, year, month):
-        """只给指定项目集合供给日历条目（filtered 模式用）。"""
+        """只给指定项目集合供给日历条目（filtered 模式用）。
+
+        条目口径与 :meth:`calendar_entries` 一致，仅限定项目范围；
+        空集合直接返回空列表。
+
+        :param project_ids: 项目 id 集合
+        :type project_ids: list
+        :param year: 年
+        :type year: int
+        :param month: 月
+        :type month: int
+        :return: 日历条目 dict 列表，键为 date/text/kind/project_id
+        :rtype: list
+        """
         if not project_ids:
             return []
         # show_calendar=false 的类别不上日历（v2.6.0 显示开关）
@@ -669,7 +950,16 @@ class Database:
 
     def calendar_snapshots(self, year, month):
         """周报模式的日历供给：该月每天的追加记录。
-        条目格式与跟进表日历一致，kind 恒为 "append"。"""
+
+        条目格式与跟进表日历一致，kind 恒为 "append"。
+
+        :param year: 年
+        :type year: int
+        :param month: 月
+        :type month: int
+        :return: 日历条目 dict 列表，额外含 snapshot_id 键
+        :rtype: list
+        """
         prefix = f"{year:04d}-{month:02d}"
         rows = self.conn.execute(
             """SELECT s.id AS sid, s.snapshot_at, s.project_id, p.title
@@ -681,7 +971,17 @@ class Database:
                  "snapshot_id": r["sid"]} for r in rows]
 
     def weekly_plan(self, d1, d2, include_closed=False):
-        """下周计划：next_followup 落在 [d1,d2] 的项目当前状态。"""
+        """下周计划：next_followup 落在 [d1,d2] 的项目当前状态。
+
+        :param d1: 区间起始日期（含），YYYY-MM-DD
+        :type d1: str
+        :param d2: 区间结束日期（含），YYYY-MM-DD
+        :type d2: str
+        :param include_closed: True 时包含已关闭项目
+        :type include_closed: bool
+        :return: 项目行列表（sqlite3.Row，含全部快照字段与 change_summary）
+        :rtype: list
+        """
         wh = "" if include_closed else "AND p.status='open'"
         fields = ", ".join(f"cur.{f}" for f in SNAPSHOT_FIELDS)
         return self.conn.execute(
@@ -693,12 +993,39 @@ class Database:
                 ORDER BY cur.next_followup""", (d1, d2)).fetchall()
 
     def find_project_by_title(self, title):  # noqa: D102 保留公共查询
+        """按标题精确查找项目（标题先做 strip）。
+
+        :param title: 项目标题
+        :type title: str
+        :return: 项目行（sqlite3.Row）；不存在返回 None
+        :rtype: sqlite3.Row 或 None
+        """
         return self.conn.execute(
             "SELECT id FROM projects WHERE title=?",
             (title.strip(),)).fetchone()
 
     # ---------- 快照 ----------
     def _insert_snapshot(self, project_id, changed_by, summary, fields):
+        """插入一条快照行，并联动更新项目行（当前指针/状态/标题）。
+
+        字段值经 :func:`_db_value` 规范化后落库（仅 None 与空字符串
+        转 NULL，0/0.0 原样保留）。状态联动：未传状态字段时继承
+        项目现开关，传了则按 status_closed 配置判定 open/closed。
+        标题联动：取 name_fields 组合，全空时新建项目兜底编号、
+        跟进项目保持原标题。调用方约定：``fields`` 为完整快照字段
+        集，未传列落 NULL。
+
+        :param project_id: 所属项目 ID
+        :type project_id: int
+        :param changed_by: 修改人标识
+        :type changed_by: str
+        :param summary: 变更说明文本
+        :type summary: str
+        :param fields: 完整业务字段键值对
+        :type fields: dict
+        :return: 新快照 ID
+        :rtype: int
+        """
         old = self.get_current(project_id)   # 联动判定基准（None=新建首快照）
         cols = ["project_id", "changed_by", "change_summary"] + SNAPSHOT_FIELDS
         vals = [project_id, changed_by, summary] + \
@@ -736,7 +1063,21 @@ class Database:
 
     def add_snapshot(self, project_id, changed_by="", change_summary="",
                      **fields):
-        """保存一次跟进 = 插入完整快照 + 更新当前指针。"""
+        """保存一次跟进 = 插入完整快照 + 更新当前指针。
+
+        变更说明缺省时由 :func:`diff_summary` 对比当前快照自动生成。
+
+        :param project_id: 所属项目 ID
+        :type project_id: int
+        :param changed_by: 修改人标识；未传时存空字符串
+        :type changed_by: str
+        :param change_summary: 变更说明；为空时自动生成
+        :type change_summary: str
+        :param fields: 完整业务字段键值对，字段名以 fields.json 为准
+        :type fields: dict
+        :return: 新快照 ID
+        :rtype: int
+        """
         old = self.get_current(project_id)
         summary = change_summary or diff_summary(old, fields)
         with self.conn:
@@ -744,6 +1085,13 @@ class Database:
                                          fields)
 
     def get_snapshots(self, project_id):
+        """取项目全部快照（按时间正序）。
+
+        :param project_id: 项目 ID
+        :type project_id: int
+        :return: 快照行列表（sqlite3.Row）
+        :rtype: list
+        """
         return self.conn.execute(
             "SELECT * FROM snapshots WHERE project_id=? ORDER BY snapshot_at",
             (project_id,)).fetchall()
@@ -752,8 +1100,17 @@ class Database:
     def calendar_entries(self, year, month):
         """给日历组件的数据：当月内所有 open 项目的关键日期。
 
-        返回 list[dict]: date('YYYY-MM-DD'), text, kind, project_id
-        日历组件不认识项目，只认这三个字段 + payload。
+        返回 list[dict]：date('YYYY-MM-DD')、text、kind、project_id。
+        日历组件不认识项目，只认这三个字段 + payload。日历类别全
+        配置化（fields.json 的 calendar_dates 段）；
+        show_calendar=false 的类别不上日历。
+
+        :param year: 年
+        :type year: int
+        :param month: 月
+        :type month: int
+        :return: 日历条目 dict 列表
+        :rtype: list
         """
         prefix = f"{year:04d}-{month:02d}"
         # 日历类别全配置化（v2.5.0 calendar_dates）：字段/显示名/颜色
@@ -785,4 +1142,5 @@ class Database:
         return entries
 
     def close(self):
+        """关闭数据库连接（进程退出前调用）。"""
         self.conn.close()

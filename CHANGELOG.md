@@ -2,6 +2,14 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.0** db.py 全函数 reST 文档化（用户定，2026-11-16，
+  文档批标杆批）：44 个函数 + Database 类 + 模块头全部改写为
+  Sphinx 原生 reST 风格 docstring——一行中文摘要 + 中文详细说明 +
+  :param:/:type:/:return:/:rtype: 字段段（有返回值必写 return 与
+  rtype，无返回值省略）；内容全部对照源码撰写。AST 递归剥离
+  docstring 比对确认零逻辑改动；docstring 覆盖率 100%；
+  292 passed。后续七批照此样板执行。
+
 - **v3.13.1** 测试卫生修复（用户定，2026-11-16，小补丁）：
   ① `copy_pkg` 排除清单对齐 .gitignore——顶层补 bin/ exports/
   build/ dist/，copytree 忽略 db_analysis 的 pie/ timeline/ 输出
