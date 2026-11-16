@@ -17,6 +17,16 @@ import db_copy.copy_core as core
 
 
 def main(argv=None):
+    """db_copy CLI 总入口（python -m db_copy）。
+
+    gui 子命令转交图形界面；CLI 要求源库/目标库 + 项目 id（或 --all），
+    先做兼容性检查再复制，失败整体回滚。
+
+    :param argv: 参数列表，None = sys.argv[1:]。
+    :type argv: list 或 None
+    :return: 进程退出码（0 成功 / 1 业务错误 / 2 参数错误）。
+    :rtype: int
+    """
     ap = argparse.ArgumentParser(
         prog="db_copy", description="把源库项目（含全部历史）追加到目标库")
     ap.add_argument("src", nargs="?", help="源库 A 路径")

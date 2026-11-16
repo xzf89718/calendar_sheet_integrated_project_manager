@@ -21,6 +21,7 @@ import weekreport_clean.clean_core as core         # noqa: E402
 
 class CleanApp(tk.Tk):
     def __init__(self):
+        """初始化周报清洗器主窗口并搭建界面。"""
         super().__init__()
         self.title("周报清洗器 v1.0.0")
         self.geometry("1100x680")
@@ -31,6 +32,7 @@ class CleanApp(tk.Tk):
         self._build()
 
     def _build(self):
+        """搭建主界面：文件选择 + 表格 + 清洗/导出按钮。"""
         pad = {"padx": 8, "pady": 4}
         top = tk.Frame(self)
         top.pack(fill="x", **pad)
@@ -60,6 +62,13 @@ class CleanApp(tk.Tk):
         self.tree_low = self._make_tree(low)
 
     def _make_tree(self, parent):
+        """构造预览表格（Treeview + 滚动条），挂到 parent。
+
+        :param parent: 父容器。
+        :type parent: tk.Widget
+        :return: 建好的 ttk.Treeview。
+        :rtype: ttk.Treeview
+        """
         tree = ttk.Treeview(parent, show="headings", height=10)
         ysb = ttk.Scrollbar(parent, orient="vertical", command=tree.yview)
         xsb = ttk.Scrollbar(parent, orient="horizontal", command=tree.xview)
@@ -71,6 +80,7 @@ class CleanApp(tk.Tk):
 
     # ---------- 动作 ----------
     def _pick(self):
+        """文件浏览选择周报 xlsx。"""
         p = filedialog.askopenfilename(
             parent=self,
             filetypes=[("Excel", "*.xlsx"), ("所有", "*.*")])
@@ -78,6 +88,7 @@ class CleanApp(tk.Tk):
             self.path_var.set(p)
 
     def _load(self):
+        """读取 xlsx 并填充预览表格（保留/丢弃标注）。"""
         p = self.path_var.get().strip()
         if not p or not os.path.exists(p):
             messagebox.showwarning("提示", "请先选择存在的文件", parent=self)
@@ -101,6 +112,13 @@ class CleanApp(tk.Tk):
                  f" ｜ 点「清洗预览」")
 
     def _fill(self, tree, rows):
+        """把行数据填进预览表格。
+
+        :param tree: 目标 Treeview。
+        :type tree: ttk.Treeview
+        :param rows: 待填行。
+        :type rows: list
+        """
         tree.configure(columns=list(range(len(self.headers))),
                        displaycolumns=list(range(len(self.headers))))
         for i, h in enumerate(self.headers):
@@ -112,6 +130,7 @@ class CleanApp(tk.Tk):
                                            for v in r])
 
     def _clean(self):
+        """执行清洗规则并刷新预览（不写文件）。"""
         if not self.rows:
             messagebox.showinfo("提示", "请先加载文件", parent=self)
             return
@@ -128,6 +147,7 @@ class CleanApp(tk.Tk):
                  f"规则: 第一列日期出现在跟进记录中才保留")
 
     def _export(self):
+        """导出清洗结果 xlsx（结果为空拒绝写出）。"""
         if not self.kept:
             messagebox.showinfo("提示", "请先清洗预览（结果为空不能导出）",
                                 parent=self)

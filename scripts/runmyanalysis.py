@@ -98,6 +98,12 @@ TIMELINES = [
 
 
 def _ctx():
+    """汇总四张任务清单为一次运行的上下文 dict。
+
+    :return: {"out": 输出目录 Path, "exports": ..., "weeklies": ...,
+        "pies": ..., "timelines": ...}。
+    :rtype: dict
+    """
     return {
         "out": Path(OUT_DIR).expanduser(),
         "exports": EXPORTS,
@@ -108,6 +114,10 @@ def _ctx():
 
 
 def main():
+    """本地一键分析入口：依次跑导出 / 周报 / 饼图 / 时间线四组任务。
+
+    产出全部进 OUT_DIR（自动创建），完成后打印产出文件清单。
+    """
     ctx = _ctx()
     ctx["out"].mkdir(parents=True, exist_ok=True)
     print(f"输出文件夹：{ctx['out']}")

@@ -21,7 +21,11 @@ import db as _db                             # noqa: E402
 
 
 def list_recycled(db):
-    """回收站清单 [(id, 项目名, 回收时间, 快照数)]，新回收在前。"""
+    """回收站清单，新回收在前。
+
+    :return: [(id, 项目名, 回收时间, 快照数), ...]。
+    :rtype: list
+    """
     return db.conn.execute(
         "SELECT r.id, r.title, r.recycled_at,"
         "       (SELECT COUNT(*) FROM recycled_snapshots s"
@@ -31,13 +35,34 @@ def list_recycled(db):
 
 
 def snapshots_of(db, project_id):
+    """取回收项目的全部回收快照（按时间正序）。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :param project_id: 回收项目 id。
+    :type project_id: int
+    :return: 快照行列表。
+    :rtype: list
+    """
     return db.conn.execute(
         "SELECT * FROM recycled_snapshots WHERE project_id=? "
         "ORDER BY snapshot_at, id", (project_id,)).fetchall()
 
 
 def restore_project(db, project_id):
-    """把回收项目搬回主表。返回 (新项目id, 是否换了新id)。"""
+    """把回收项目搬回主表。
+
+    原 id 空闲则原样放回（收藏夹索引一并带回）；id 已被新项目占用才
+    发新 id。快照 id 一律重新分配，projects.current_id 同步修正。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :param project_id: 回收项目 id。
+    :type project_id: int
+    :return: (新项目 id, 是否换了新 id)。
+    :rtype: tuple
+    :raises ValueError: 回收站里没有该项目时。
+    """
     rp = db.conn.execute(
         "SELECT * FROM recycled_projects WHERE id=?",
         (project_id,)).fetchone()
@@ -104,6 +129,13 @@ def empty_recycle(db):
 
 
 def _drop_recycled_rows(db, project_id):
+    """物理删除一个回收项目的全部回收表记录（快照/收藏夹索引/项目本体）。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :param project_id: 回收项目 id。
+    :type project_id: int
+    """
     with db.conn:
         db.conn.execute(
             "DELETE FROM recycled_snapshots WHERE project_id=?",

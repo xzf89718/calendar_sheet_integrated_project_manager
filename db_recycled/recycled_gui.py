@@ -20,6 +20,10 @@ import db_recycled.recycled_core as core     # noqa: E402
 
 
 def run_gui(db, db_path=""):
+    """GUI 入口：构造并进入 CopierApp 主循环。
+
+    :return: run_gui 调用结果。
+    """
     root = tk.Tk()
     root.title(f"回收站 - {db_path}")
     root.geometry("760x480")
@@ -41,16 +45,23 @@ def run_gui(db, db_path=""):
     btns.pack(fill="x", padx=8, pady=(0, 8))
 
     def refresh():
+        """刷新回收站清单表格。"""
         tree.delete(*tree.get_children())
         for pid, title, at, cnt in core.list_recycled(db):
             tree.insert("", "end", iid=str(pid),
                         values=(pid, title, at, cnt))
 
     def selected_id():
+        """当前选中的回收项目 id。
+
+        :return: 回收项目 id；无选中返回 None。
+        :rtype: int 或 None
+        """
         sel = tree.selection()
         return int(sel[0]) if sel else None
 
     def do_view():
+        """查看选中回收项目的详情（快照列表弹窗）。"""
         pid = selected_id()
         if pid is None:
             return
@@ -64,6 +75,11 @@ def run_gui(db, db_path=""):
         txt.pack(side="left", fill="both", expand=True, padx=8, pady=8)
 
         def show(_e=None):
+            """回收站窗口的 <Map> 绑定回调：首次显示时刷新清单。
+
+            :param _e: 事件对象（未使用）。
+            :type _e: tk.Event
+            """
             s = snaps[lb.curselection()[0]]
             txt.delete("1.0", "end")
             txt.insert("end", f"时间: {s['snapshot_at']}\n"
@@ -81,6 +97,7 @@ def run_gui(db, db_path=""):
             show()
 
     def do_restore():
+        """恢复选中回收项目（确认后调 recycled_core.restore_project）。"""
         pid = selected_id()
         if pid is None:
             return
@@ -92,7 +109,7 @@ def run_gui(db, db_path=""):
         refresh()
 
     def do_purge():
-        """永久删除：与原删除确认同设计——二次确认弹窗。"""
+        """永久删除选中回收项目（二次确认，物理销毁不可恢复）。"""
         pid = selected_id()
         if pid is None:
             return
@@ -107,6 +124,7 @@ def run_gui(db, db_path=""):
         refresh()
 
     def do_empty():
+        """清空回收站（二次确认，全部物理销毁不可恢复）。"""
         n = len(core.list_recycled(db))
         if n == 0:
             return

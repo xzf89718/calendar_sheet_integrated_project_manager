@@ -18,6 +18,16 @@ import db_append.append_core as core
 
 
 def main(argv=None):
+    """db_append CLI 总入口（python -m db_append）。
+
+    gui 子命令转交图形界面（带品牌图标开关）；CLI 要求目标库 + 至少一
+    个源库，逐个做兼容性检查（不一致即报错退出）后依次追加。
+
+    :param argv: 参数列表，None = sys.argv[1:]。
+    :type argv: list 或 None
+    :return: 进程退出码（0 成功 / 1 业务错误 / 2 参数错误）。
+    :rtype: int
+    """
     ap = argparse.ArgumentParser(
         prog="db_append", description="多个源库依次全部追加进目标库")
     ap.add_argument("target", nargs="?", help="目标库路径（合并进这里）")

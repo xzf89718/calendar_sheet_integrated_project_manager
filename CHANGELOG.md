@@ -2,6 +2,9 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.8**
+  - db_append / db_assign / db_copy / db_recycled / db_split / weekreport_clean 六个工具包全部模块 + scripts/runmyanalysis.py 补齐 Sphinx reST 中文 docstring（CLI/内核 45 处 + GUI 89 处），顺手补齐历史遗留的 :return: 标注缺口（clean_core 7 处、recycled_core 2 处、split 1 处、_build_cols 1 处），纯文档改动零逻辑变更
+  - docs 新增六个工具包页面（core + gui + __main__），index.rst 全部收录
 - **v3.14.3** 文档工具链修复（用户定，2026-11-16，小补丁）：
   ① venv 依赖安装走 tuna 镜像并改为每次幂等执行——已存在的
   .docs-venv 也能补装新增依赖（openpyxl，autodoc 导入

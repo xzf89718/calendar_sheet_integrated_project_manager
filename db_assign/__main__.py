@@ -20,6 +20,11 @@ import db_assign.assign_core as core
 
 def _resolve_field(name_or_label):
     """字段名或显示名 -> 字段名，找不到返回 None。
+
+    :param name_or_label: 字段英文 name 或中文显示 label。
+    :type name_or_label: str
+    :return: 字段名；找不到时为 None。
+    :rtype: str 或 None
     """
     from config import CFG
     cols = [c for c, _h in CFG.display_cols if c != "id"]
@@ -32,6 +37,15 @@ def _resolve_field(name_or_label):
 
 
 def main(argv=None):
+    """db_assign CLI 总入口（python -m db_assign）。
+
+    默认只预览不写库，--yes 才真正执行；作用域 = 库内全部项目。
+
+    :param argv: 参数列表，None = sys.argv[1:]。
+    :type argv: list 或 None
+    :return: 进程退出码（0 成功 / 1 业务错误 / 2 参数错误）。
+    :rtype: int
+    """
     ap = argparse.ArgumentParser(
         prog="db_assign", description="对整个库统一给一列赋值（走快照可回溯）")
     ap.add_argument("db", nargs="?", help="数据库路径")
