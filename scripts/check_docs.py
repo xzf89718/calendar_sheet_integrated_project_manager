@@ -19,6 +19,16 @@ EXTRA_SKIP = {".git", ".github"}  # db_analysis joins later
 
 
 def iter_py_files(only=None):
+    """遍历项目内待检查的 .py 文件。
+
+    只走未被 SKIP_DIRS / EXTRA_SKIP 排除的目录；only 给出相对路径列表
+    时只检查这些文件（build_docs.ps1 按 docs/*.rst automodule 列表传入）。
+
+    :param only: 相对路径列表（None = 全仓库扫描）。
+    :type only: list 或 None
+    :yield: 待检查的 .py 相对路径。
+    """
+
     if only:
         for rel in only:
             yield os.path.join(ROOT, rel)
@@ -36,7 +46,16 @@ def iter_py_files(only=None):
 
 
 def real_return(fn):
-    """True only if some return statement yields a non-None value."""
+    """True only if some return statement yields a non-None value.
+
+    裸 return 与 return None 都不算"返回值"（它们不产生 doc 要求的
+    :return: 字段）。
+
+    :param fn: 函数 AST 节点。
+    :type fn: ast.FunctionDef
+    :return: 函数体是否有真正返回值的 return。
+    :rtype: bool
+    """
     for node in ast.walk(fn):
         if isinstance(node, ast.Return):
             v = node.value
@@ -49,6 +68,16 @@ def real_return(fn):
 
 
 def check_file(path):
+    """检查单个文件的 docstring 卫生，返回问题列表。
+
+    三类问题：缺 docstring；doc 声明 :return: 但函数体无返回值；函数体
+    有返回值但 doc 没有 :return:。
+
+    :param path: 文件绝对路径。
+    :type path: str
+    :return: [(行号, 函数名, 问题描述), ...]。
+    :rtype: list
+    """
     with open(path, encoding="utf-8") as f:
         tree = ast.parse(f.read())
     issues = []
@@ -70,6 +99,12 @@ def check_file(path):
 
 
 def main():
+    """CLI 入口：扫描并打印问题清单，0 = 全绿，1 = 有问题。
+
+    只读检查，从不改文件。只给具体文件参数时只查这些文件。
+
+    :return: 0 = 全绿，1 = 有问题。
+    """
     only = sys.argv[1:] or None
     total = 0
     bad = 0

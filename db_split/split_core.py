@@ -17,7 +17,15 @@ from db_append.append_core import copy_projects  # noqa: E402
 
 
 def list_keys(db, key_field):
-    """该列的全部取值（None 也算一个键，排最前）。"""
+    """该列的全部取值（None 也算一个键，排最前）。
+
+    :param db: 已打开的源库。
+    :type db: db.Database
+    :param key_field: 键列字段名。
+    :type key_field: str
+    :return: 键值列表（None 排最前）。
+    :rtype: list
+    """
     rows = db.conn.execute(
         f"""SELECT DISTINCT cur.{key_field} FROM projects p
             JOIN snapshots cur ON cur.id = p.current_id
@@ -27,7 +35,15 @@ def list_keys(db, key_field):
 
 
 def preview(db, key_field):
-    """预览：{键值: 项目数}（None 显示为 未分配）。"""
+    """预览：{键值: 项目数}（None 显示为 未分配）。
+
+    :param db: 已打开的源库。
+    :type db: db.Database
+    :param key_field: 键列字段名。
+    :type key_field: str
+    :return: {键值字符串: 项目数}。
+    :rtype: dict
+    """
     rows = db.conn.execute(
         f"""SELECT cur.{key_field}, COUNT(*) FROM projects p
             JOIN snapshots cur ON cur.id = p.current_id
@@ -42,6 +58,17 @@ def build_filename(key, field_label, when=None, cfg=None):
 
     组成部分：prefix(前缀文本)/field(键列名)/key(键值,空→未分配)/
     time(时间戳 YYYYMMDD-HHMMSS)。空段自动跳过，非法文件名字符清洗。
+
+    :param key: 键值，空/None → "未分配"。
+    :type key: str
+    :param field_label: 键列显示名。
+    :type field_label: str
+    :param when: 时间戳基准时间，None = 现在。
+    :type when: datetime.datetime 或 None
+    :param cfg: 配置对象（取 split_components/split_prefix），None = CFG。
+    :type cfg: config.Config 或 None
+    :return: 输出文件名（含 .db 后缀）。
+    :rtype: str
     """
     from datetime import datetime
     from config import CFG
@@ -71,7 +98,18 @@ def split_by_key(db_src, dest_dir, key_field, safe=True):
 
     文件名由 fields.json 的 split 段配方生成（build_filename）。
     safe=True 时目标文件已存在则报错拒绝。
-    返回 {文件名: (项目数, 快照数)}。
+
+    :param db_src: 已打开的源库。
+    :type db_src: db.Database
+    :param dest_dir: 输出目录。
+    :type dest_dir: str
+    :param key_field: 键列字段名。
+    :type key_field: str
+    :param safe: 目标文件已存在时是否拒绝（True = 拒绝）。
+    :type safe: bool
+    :return: {文件名: (项目数, 快照数)}。
+    :rtype: dict
+    :raises FileExistsError: safe=True 且目标文件已存在时。
     """
     from config import CFG
     os.makedirs(dest_dir, exist_ok=True)

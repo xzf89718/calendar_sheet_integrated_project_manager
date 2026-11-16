@@ -8,6 +8,11 @@ from common import expand_where, mkdir, run, with_on
 
 
 def run_exports(ctx):
+    """按 EXPORTS 配置行逐行执行导出（每行一张表，文件名自动命名）。
+
+    :param ctx: runmyanalysis 上下文（out/exports 等任务清单）。
+    :type ctx: dict
+    """
     rows = with_on(ctx["exports"])
     if not rows:
         print("EXPORTS 没有开启的行，跳过导出。")

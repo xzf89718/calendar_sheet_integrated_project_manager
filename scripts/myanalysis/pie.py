@@ -16,6 +16,11 @@ from common import expand_where, has_matplotlib, mkdir, run, with_on
 
 
 def run_pies(ctx):
+    """按 PIES 配置行逐行执行饼图分析；matplotlib 缺失自动降级只出 CSV。
+
+    :param ctx: runmyanalysis 上下文（out/pies 等任务清单）。
+    :type ctx: dict
+    """
     rows = with_on(ctx["pies"])
     if not rows:
         print("PIES 没有开启的行，跳过饼图。")
