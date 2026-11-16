@@ -42,11 +42,24 @@ PROG = "python -m workbench_ui"
 
 
 def _err(msg):
+    """打印错误到 stderr 并以业务错误退出码 1 结束进程。
+
+    :param msg: 面向用户的错误消息。
+    :type msg: str
+    """
     print(msg, file=sys.stderr)
     sys.exit(1)
 
 
 def _add_filter_args(p):
+    """给 argparse 子解析器加公共筛选参数组。
+
+    --closed / --search / --where / --sort / --desc，list 与 export
+    共用。
+
+    :param p: argparse 子解析器。
+    :type p: argparse.ArgumentParser
+    """
     p.add_argument("--closed", action="store_true",
                    help="包含已完结项目（默认只看进行中）")
     p.add_argument("--search", action="append", default=None, metavar="词",
@@ -60,6 +73,13 @@ def _add_filter_args(p):
 
 
 def _add_format_args(p):
+    """给 argparse 子解析器加公共输出格式参数组。
+
+    --format(table|csv) / --limit / --offset。
+
+    :param p: argparse 子解析器。
+    :type p: argparse.ArgumentParser
+    """
     p.add_argument("--format", choices=("table", "csv"), default="table",
                    help="输出格式（默认 table）")
     p.add_argument("--limit", type=int, default=None, metavar="N",
@@ -69,15 +89,36 @@ def _add_format_args(p):
 
 
 def _list_like(bc_fn):
-    """list / export 共用的取数调用。"""
+    """list / export 共用的取数调用闭包工厂。
+
+    返回的闭包直接转发位置参数（保留这层包装是为命令分发形式统一）。
+
+    :param bc_fn: bench_core 的取数函数。
+    :type bc_fn: callable
+    :return: 单参数转发闭包 take(a)。
+    :rtype: callable
+    """
 
     def take(a):
+        """转发调用：bc_fn(a) -> 结果。
+
+        :param a: 已解析的 argparse 命名空间。
+        :return: bc_fn 的返回值。
+        """
         return bc_fn(a)
 
     return take
 
 
 def cmd_list(a):
+    """list 子命令：打印项目列表（table 或 csv）。
+
+    翻页时额外打印"本页 N 条 / 共 M 条"；--fav 时输出追加「收藏夹」
+    归属列。
+
+    :param a: 已解析的 argparse 命名空间。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         rows, total = bc.cmd_list(
@@ -103,6 +144,14 @@ def cmd_list(a):
 
 
 def cmd_show(a):
+    """show 子命令：打印项目详情。
+
+    默认打印当前快照全字段（按 display_cols）+ 历史快照清单（新在上）；
+    --hist N 时改打印第 N 条历史全字段。
+
+    :param a: 已解析的 argparse 命名空间（含 id / hist）。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         r = bc.cmd_show(db, a.id, hist=a.hist)
@@ -140,6 +189,11 @@ def cmd_show(a):
 
 
 def cmd_new(a):
+    """new 子命令：新建项目并打印新 id 与后续操作提示。
+
+    :param a: 已解析的 argparse 命名空间（含 set / note）。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         pid, title = bc.cmd_new(db, a.set, note=a.note)
@@ -150,6 +204,11 @@ def cmd_new(a):
 
 
 def cmd_follow(a):
+    """follow 子命令：追加跟进快照并打印快照 id 与改动摘要。
+
+    :param a: 已解析的 argparse 命名空间（含 id / set / note）。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         sid, summary = bc.cmd_follow(db, a.id, a.set, note=a.note)
@@ -162,6 +221,11 @@ def cmd_follow(a):
 
 
 def cmd_import(a):
+    """import 子命令：表格导入并打印新建/跳过统计与未识别列。
+
+    :param a: 已解析的 argparse 命名空间（含 file / template / csv）。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         created, skipped, unmapped = bc.cmd_import(db, a.file, a.template,
@@ -174,6 +238,13 @@ def cmd_import(a):
 
 
 def cmd_export(a):
+    """export 子命令：批量导出并打印输出路径与条数。
+
+    顺带提示导出为全量匹配行，不受 --limit/--offset 影响。
+
+    :param a: 已解析的 argparse 命名空间（含 out / template / 筛选参数）。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         n, path = bc.cmd_export(db, a.out, template=a.template,
@@ -187,6 +258,11 @@ def cmd_export(a):
 
 
 def cmd_weekly(a):
+    """weekly 子命令：周报导出并打印两段条数与输出路径。
+
+    :param a: 已解析的 argparse 命名空间（含 out / date-* / plan-* / csv）。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         nf, np_, path = bc.cmd_weekly(db, a.out, d1=a.date_from,
@@ -198,6 +274,11 @@ def cmd_weekly(a):
 
 
 def cmd_backup(a):
+    """backup 子命令：库备份并打印备份路径（含 fields.json 配对备份）。
+
+    :param a: 已解析的 argparse 命名空间。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         target, json_target = bc.backup_database(db, db.db_path)
@@ -209,6 +290,11 @@ def cmd_backup(a):
 
 
 def cmd_notify(a):
+    """notify 子命令：打印今日项目时间节点到终端（不走系统通知）。
+
+    :param a: 已解析的 argparse 命名空间。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         print(bc.today_notify_text(db))
@@ -217,6 +303,11 @@ def cmd_notify(a):
 
 
 def cmd_cal(a):
+    """cal 子命令：只读打印年/月/日时间节点清单。
+
+    :param a: 已解析的 argparse 命名空间（含 year / month / day）。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         entries = bc.cmd_cal(db, a.year, month=a.month, day=a.day)
@@ -232,6 +323,13 @@ def cmd_cal(a):
 
 
 def cmd_fav(a):
+    """fav 子命令：收藏夹动作分发（list/new/rename/delete/add/remove）。
+
+    按 a.fav_cmd 分发到 bench_core 对应内核函数并打印结果。
+
+    :param a: 已解析的 argparse 命名空间（含 fav_cmd 及动作参数）。
+    :type a: argparse.Namespace
+    """
     db = bc.open_db()
     try:
         sub = a.fav_cmd
@@ -265,6 +363,16 @@ def cmd_fav(a):
 
 
 def build_parser():
+    """构建完整 argparse 解析器：全部子命令 + 参数 + 图标开关。
+
+    v3.7.2：每个子命令（含 fav 二级动作）都注入 --show-icon /
+    --no-show-icon（覆盖 fields.json 的 ui.show_icon），图标先播再执
+    行命令。sp._subparsers 是参数组，真正的子解析器表在 _group_actions
+    里，需两层遍历。
+
+    :return: 组装完成的 ArgumentParser。
+    :rtype: argparse.ArgumentParser
+    """
     p = argparse.ArgumentParser(
         prog=PROG,
         description="日历+表格聚合项目工作台 —— 命令行接口")
@@ -365,6 +473,17 @@ def build_parser():
 
 
 def main(argv=None):
+    """CLI 总入口（python -m workbench_ui）。
+
+    gui 子命令在 argparse 之前整体转交 main.py（argparse 的 REMAINDER
+    吞不下 --view 之类选项形参）；``--show-icon`` 单独使用 = CLI
+    standalone 品牌字符画，打印后退出。正常流程：parse_args（参数错误
+    退出码 2）-> 播图标 -> 按子命令分发到 cmd_* 函数；BenchError 打
+    印到 stderr 退出 1；SystemExit 原样上抛。
+
+    :param argv: 参数列表，None = sys.argv[1:]。
+    :type argv: list 或 None
+    """
     av = list(sys.argv[1:] if argv is None else argv)
     # gui 在 argparse 之前拦截透传：argparse 的 REMAINDER 吞不下
     # 选项形参（--view 之类），直接整体转交 main.py 最稳。

@@ -15,15 +15,29 @@ from db import normalize_date
 
 
 class AnalysisError(Exception):
-    """业务错误：CLI 端捕获后打印 stderr、退出码 1（无 traceback）。"""
+    """业务错误异常。
+
+    db_analysis 各层抛出的可预期错误一律是 AnalysisError；CLI 端捕获
+    后打印 stderr、退出码 1（无 traceback）。
+    """
 
 
 # ---------- 数据口径 ----------
 
 def _pick_snapshot_sql(date_field, d1, d2):
-    """按日期口径拼"每项目取哪条快照"的条件片段。
+    """按日期口径拼"每项目取哪条快照"的 SQL 条件片段。
 
-    返回 (where_sql, args)。date_field=None 表示当前行口径。
+    date_field=None 表示当前行口径（s.id = p.current_id，与列表默认口径
+    一致）；否则取窗口内 snapshot_at 最大的一条（相关子查询）。
+
+    :param date_field: 日期字段名，"__snap__" = 快照时间本身，None = 当前行。
+    :type date_field: str 或 None
+    :param d1: 区间起点（date_field 非 None 时必填）。
+    :type d1: str
+    :param d2: 区间终点。
+    :type d2: str
+    :return: (where 条件 SQL, 参数列表)。
+    :rtype: tuple
     """
     if date_field is None:
         return "s.id = p.current_id", []
@@ -36,9 +50,18 @@ def _pick_snapshot_sql(date_field, d1, d2):
 
 
 def _parse_where(items):
-    """--where 语法与 workbench_ui 对齐：字段=值（可多次，同字段
-    取并集、异字段取交集）、日期字段=起~止（任一端可省略）。
-    返回 {字段: set(值)} 与 [(字段, d1, d2)]。"""
+    """--where 语法解析（与 workbench_ui 对齐）。
+
+    字段=值（可多次，同字段取并集、异字段取交集）；日期字段=起~止（任
+    一端可省略；v3.8.14 起非日期字段用 ~ 明确报错，非法日期/反向区间
+    不再静默落到误导性的空结果）。错误立即 raise。
+
+    :param items: 原始 --where 字符串列表，可为 None。
+    :type items: list 或 None
+    :return: ({字段: set(值)}, [(字段, d1 或 None, d2 或 None)])。
+    :rtype: tuple
+    :raises AnalysisError: 格式错、字段不存在或区间非法时。
+    """
     filters, ranges = {}, []
     ftypes = {f["name"]: f["type"] for f in CFG.fields}
     for item in items or []:
@@ -70,9 +93,17 @@ def _parse_where(items):
 
 
 def _validate_field(field):
-    """字段必须存在。date 类型自 v3.5.1 起允许作为饼图变量——按原始
-    日期值分段（配合 --top/「其他」兜长尾），满足"筛选里的字段也要
-    能画"（如"开始日期分布"）。"""
+    """校验统计字段存在并返回其类型。
+
+    date 类型自 v3.5.1 起允许作为饼图变量——按原始日期值分段（配合
+    --top/「其他」兜长尾）。
+
+    :param field: 字段英文 name。
+    :type field: str
+    :return: 字段类型（ftypes 值）。
+    :rtype: str
+    :raises AnalysisError: 字段不存在时。
+    """
     ftypes = {f["name"]: f["type"] for f in CFG.fields}
     if field not in ftypes:
         raise AnalysisError(f"--field 不存在的字段：{field}"
@@ -82,7 +113,29 @@ def _validate_field(field):
 
 def collect_rows(db, field, closed=False, where=None,
                  date_field=None, d1=None, d2=None):
-    """按口径取数：返回该字段的原始取值列表（含 None/空串，未归段）。"""
+    """按口径取数：返回该字段的原始取值列表（含 None/空串，未归段）。
+
+    口径链：_validate_field -> _parse_where -> _pick_snapshot_sql；默认
+    只取 open 项目（closed=True 含归档）。单值筛选带空值兜底
+    （NULL 视为 '' 参与 IN），日期区间用 date() 比较。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :param field: 统计字段英文 name。
+    :type field: str
+    :param closed: 是否含已归档项目。
+    :type closed: bool
+    :param where: --where 原始参数列表。
+    :type where: list 或 None
+    :param date_field: 日期区间作用的列（"__snap__" = 快照时间）。
+    :type date_field: str 或 None
+    :param d1: 区间起点。
+    :type d1: str 或 None
+    :param d2: 区间终点。
+    :type d2: str 或 None
+    :return: 原始取值列表。
+    :rtype: list
+    """
     _validate_field(field)
     filters, ranges = _parse_where(where)
     pick_sql, pick_args = _pick_snapshot_sql(date_field, d1, d2)
@@ -109,8 +162,15 @@ def collect_rows(db, field, closed=False, where=None,
 
 
 def aggregate(values, top=9):
-    """原始取值 → 饼图段：空值归「（空）」，计数降序，
-    超过 top 个段时长尾合并「其他」。返回 [(段名, 计数), ...]。"""
+    """原始取值 -> 饼图段：空值归「（空）」，计数降序，长尾合并「其他」。
+
+    :param values: 原始取值列表。
+    :type values: list
+    :param top: 段数上限，超出合并为「其他」。
+    :type top: int
+    :return: [(段名, 计数), ...]，按计数降序（同计数按段名字典序）。
+    :rtype: list
+    """
     counts = {}
     for v in values:
         key = str(v) if v not in (None, "") else "（空）"

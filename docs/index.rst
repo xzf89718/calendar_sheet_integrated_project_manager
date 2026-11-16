@@ -19,6 +19,8 @@ pm_workbench API 参考
    db_recycled
    db_split
    weekreport_clean
+   db_analysis
+   workbench_ui
    calendar_gui
    config
    editor
