@@ -373,6 +373,11 @@ def test_timeline_line_partial_cell_dash_filled(pkg):
     恒 4 字符）；点模式用 $ 标记。"""
     import re
     _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    # v3.13.1：「最近跟进」端点 = 最新快照日，回写钉死，
+    # 否则预期随运行日漂移（日期敏感时间炸弹修复）
+    with _db(pkg) as c:
+        c.execute("UPDATE snapshots SET snapshot_at='2026-11-10 12:00:00' "
+                  "WHERE project_id=1")
     r = run_ana(pkg, "timeline")
     assert r.returncode == 0, r.stderr
     text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
@@ -401,6 +406,11 @@ def test_timeline_seg_line_fills_weeks_from_start(pkg):
     """line 模式：每行线段从开始日期逐周画 #：开始 11-01、下个跟进
     11-20 → 11 月格内 3 个 #（第 1~3 周）。"""
     _mk(pkg, "甲", "2026-11-01", "2026-11-20")
+    # v3.13.1：「最近跟进」端点 = 最新快照日，回写钉死，
+    # 否则预期随运行日漂移（日期敏感时间炸弹修复）
+    with _db(pkg) as c:
+        c.execute("UPDATE snapshots SET snapshot_at='2026-11-10 12:00:00' "
+                  "WHERE project_id=1")
     r = run_ana(pkg, "timeline")
     assert r.returncode == 0, r.stderr
     text = list(pkg.glob("db_analysis/timeline/timeline_*.html"))[0] \
