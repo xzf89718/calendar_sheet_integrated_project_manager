@@ -13,6 +13,11 @@ from common import expand_where, mkdir, run, with_on
 
 
 def run_timelines(ctx):
+    """按 TIMELINES 配置行逐行执行时间线（HTML 整页写出）。
+
+    :param ctx: runmyanalysis 上下文（out/timelines 等任务清单）。
+    :type ctx: dict
+    """
     rows = with_on(ctx["timelines"])
     if not rows:
         print("TIMELINES 没有开启的行，跳过时间线。")

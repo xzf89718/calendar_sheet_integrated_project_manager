@@ -2,6 +2,10 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.9**（2026-11-16，文档卫生小补丁）
+  - check_docs 全绿修复：db_split/split_core 4 处 :return: 标注补齐，
+    scripts/check_docs.py 自身 4 个函数 + scripts/myanalysis 11 个函数
+    补齐 Sphinx reST 中文 docstring，零逻辑改动
 - **v3.14.8**
   - db_append / db_assign / db_copy / db_recycled / db_split / weekreport_clean 六个工具包全部模块 + scripts/runmyanalysis.py 补齐 Sphinx reST 中文 docstring（CLI/内核 45 处 + GUI 89 处），顺手补齐历史遗留的 :return: 标注缺口（clean_core 7 处、recycled_core 2 处、split 1 处、_build_cols 1 处），纯文档改动零逻辑变更
   - docs 新增六个工具包页面（core + gui + __main__），index.rst 全部收录

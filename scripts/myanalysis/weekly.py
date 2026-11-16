@@ -13,6 +13,14 @@ from common import mkdir, run, with_on
 
 
 def run_weeklies(ctx):
+    """按 WEEKLIES 配置行逐行执行周报导出；clean=True 顺手跑清洗。
+
+    清洗对"无历史变动"的库以退出码 1 拒绝写出——那是数据状态不是脚本
+    错误，本步 check=False 永不中止流水线。
+
+    :param ctx: runmyanalysis 上下文（out/weeklies 等任务清单）。
+    :type ctx: dict
+    """
     rows = with_on(ctx["weeklies"])
     if not rows:
         print("WEEKLIES 没有开启的行，跳过周报。")
