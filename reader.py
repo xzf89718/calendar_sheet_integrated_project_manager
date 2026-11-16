@@ -17,6 +17,17 @@ DIFF_IGNORE = {"id", "project_id", "snapshot_at", "changed_by",
 
 class ProjectReader(tk.Toplevel):
     def __init__(self, master, db, project_id, on_changed=None):
+        """构造项目详情窗：左"当前状态"（可滚动）+ 右"跟进历史"时间线 + 对比入口。
+
+        :param master: 父窗口
+        :type master: tkinter.Misc
+        :param db: 数据库连接
+        :type db: db.Database
+        :param project_id: 项目 id
+        :type project_id: int
+        :param on_changed: 数据变动回调（编辑/删除后由主窗口刷新用）
+        :type on_changed: callable 或 None
+        """
         super().__init__(master)
         self.db = db
         self.project_id = project_id
@@ -29,6 +40,8 @@ class ProjectReader(tk.Toplevel):
         self.grab_set()
 
     def _build(self):
+        """搭界面：历史版本横幅（默认隐藏，before= 钉顶）+ 左可滚动画布（限高字段给
+        固定行数 + 滚动条）+ 右时间线列表与"最新跟进记录"区。"""
         self.geometry("1300x760")      # 默认窗口更宽，富余宽度全给当前状态
         root = tk.Frame(self, padx=8, pady=8)
         root.pack(fill="both", expand=True)
@@ -121,9 +134,15 @@ class ProjectReader(tk.Toplevel):
     def _reflow(self, canvas, win, e):
         """画布宽度变化：内容窗跟着宽，字段值换行宽度跟随实际宽度。
 
-        不换行的病根：wraplength 写死 360，窗口拉窄时长行超出画布
-        边缘被裁掉。改为 wraplength = 画布宽 - 标签列宽，文字永远在
-        可视区内换行。
+        不换行的病根：wraplength 写死 360，窗口拉窄时长行超出画布边缘被裁。
+        改为 wraplength = 画布宽 - 标签列宽，文字永远在可视区内换行。
+
+        :param canvas: 左侧可滚动画布
+        :type canvas: tkinter.Canvas
+        :param win: 画布上的内容窗 id
+        :type win: int
+        :param e: Configure 事件（带新宽度）
+        :type e: tkinter.Event
         """
         canvas.itemconfigure(win, width=e.width)
         wrap = max(120, e.width - 150)
@@ -131,16 +150,20 @@ class ProjectReader(tk.Toplevel):
             lbl.config(wraplength=wrap)
 
     def _load(self):
+        """载入最新状态：填左侧面板、重建历史列表、藏横幅。"""
         self._show_snapshot(self.db.get_current(self.project_id))
         self.viewing_hist = False
         self.banner.pack_forget()
 
     def _show_latest(self):
+        """回到最新版本（横幅按钮）并重载。"""
         self._load()
         self.listbox.selection_clear(0, "end")
 
     def _view_selected(self):
-        """查看选中条目对应的历史版本（按钮触发，与多选对比互不干扰）。"""
+        """查看选中条目对应的历史版本（按钮触发，与多选对比互不干扰）。
+
+        选中最新一条时等价于回到最新。"""
         sel = self.listbox.curselection()
         if len(sel) != 1:
             messagebox.showinfo("提示", "请先在历史列表里选中一条记录",
@@ -161,7 +184,11 @@ class ProjectReader(tk.Toplevel):
         self.banner.pack(fill="x", pady=(0, 6), before=self.left_wrap)
 
     def _show_snapshot(self, cur):
-        """把某条快照（或当前状态）填进左侧面板。"""
+        """把某条快照（或当前状态）填进左侧面板并重建历史列表。
+
+        :param cur: 快照行（sqlite3.Row）或 None
+        :type cur: sqlite3.Row 或 None
+        """
         for f, lbl in self.cur_labels.items():
             lbl.config(text="" if cur is None or cur[f] is None
                        else str(cur[f]))
@@ -185,10 +212,13 @@ class ProjectReader(tk.Toplevel):
         self.note_lbl.config(text=latest_note or "（无）")
 
     def _edit(self):
+        """打开编辑器添加跟进；保存后经 _reload 刷新本窗并通知主窗口。"""
         SnapshotEditor(self, self.db, self.project_id,
                        on_saved=lambda pid: self._reload())
 
     def _delete(self):
+        """删除项目：回收站开启时移入回收站（可恢复），否则物理删除（不可恢复），
+        均需二次确认；完成后回调 on_changed 并关闭本窗。"""
         p = self.db.get_project(self.project_id)
         if CFG.recycle_bin_enabled:
             # 回收站开启（v3.1.0）：删除 = 移入回收站，可恢复；
@@ -211,11 +241,13 @@ class ProjectReader(tk.Toplevel):
         self.destroy()
 
     def _reload(self):
+        """编辑保存后的刷新：重载本窗内容并通知主窗口数据已变。"""
         self._load()
         if self.on_changed:
             self.on_changed()
 
     def _diff(self):
+        """取历史列表选中的两条快照，打开 DiffWindow 逐字段对比。"""
         sel = self.listbox.curselection()
         if len(sel) != 2:
             messagebox.showinfo("提示", "请选中两条记录", parent=self)
@@ -228,6 +260,15 @@ class ConfirmDialog(tk.Toplevel):
     """屏幕居中的确认弹窗。result 为 True/False。"""
 
     def __init__(self, master, title, message):
+        """屏幕居中的确认弹窗（模态等待，返回时 result 已定）。
+
+        :param master: 父窗口
+        :type master: tkinter.Misc
+        :param title: 窗口标题
+        :type title: str
+        :param message: 正文文本
+        :type message: str
+        """
         super().__init__(master)
         self.title(title)
         self.result = False
@@ -253,16 +294,24 @@ class ConfirmDialog(tk.Toplevel):
         self.wait_window()          # 模态等待，返回时 result 已定
 
     def _yes(self):
+        """确定：result=True 并关闭。"""
         self.result = True
         self.destroy()
 
     def _no(self):
+        """取消：result=False 并关闭。"""
         self.result = False
         self.destroy()
 
 
 def _one_line(s):
-    """多行文本压成一行显示，换行处标 ↵。"""
+    """多行文本压成一行显示，换行处标 ↵。
+
+    :param s: 任意文本；None 返回空串
+    :type s: object
+    :return: 单行显示文本
+    :rtype: str
+    """
     return "" if s is None else str(s).replace("\n", " ↵ ")
 
 
@@ -270,6 +319,15 @@ class DiffWindow(tk.Toplevel):
     """两版快照逐字段对比（含跟进记录），不同标红，长行可横滚。"""
 
     def __init__(self, master, snap_a, snap_b):
+        """两版快照逐字段对比（跟进记录纳入统一对比），不同标红，长行可横滚。
+
+        :param master: 父窗口
+        :type master: tkinter.Misc
+        :param snap_a: 快照 A（sqlite3.Row）
+        :type snap_a: sqlite3.Row
+        :param snap_b: 快照 B（sqlite3.Row）
+        :type snap_b: sqlite3.Row
+        """
         super().__init__(master)
         self.title(f"对比  #{snap_a['id']} ↔ #{snap_b['id']}")
         cols = ("field", "a", "b")

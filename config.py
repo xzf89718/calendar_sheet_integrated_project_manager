@@ -42,16 +42,22 @@ def validate_config_data(data):
 
     纯函数：不读文件、不抛异常，返回错误消息列表（空 = 通过）。
     校验项：
-      1. fields 段：非空、name 不重复、type 合法；
-      2. 必须有一个 type=status 的字段（归档联动依赖它），且只能有一个；
-      3. status_closed 段必须在（允许是空数组 []）；
-      4. calendar_dates：start/followup/close/append 法定四类必须在
-         （旧式 fields.calendar 标记的配置除外，会自动转换），key 不重复，
-         三类日期字段必须绑定 date 类型字段，append 不应绑定字段，
-         自定义类别必须绑定未被占用的 date 字段；
-      5. date_check 段（可缺省）：fields 里必须是已配置的 date 字段；
-      6. 周报模板（kind=weekly）的 columns 不能为空；
-      7. favorites 段（可缺省）：enabled 必须是布尔，label 必须非空。
+
+    1. fields 段：非空、name 不重复、type 合法；
+    2. 必须有一个 type=status 的字段（归档联动依赖它），且只能有一个；
+    3. status_closed 段必须在（允许是空数组 []）；
+    4. calendar_dates：start/followup/close/append 法定四类必须在
+       （旧式 fields.calendar 标记的配置除外，会自动转换），key 不重复，
+       三类日期字段必须绑定 date 类型字段，append 不应绑定字段，
+       自定义类别必须绑定未被占用的 date 字段；
+    5. date_check 段（可缺省）：fields 里必须是已配置的 date 字段；
+    6. 周报模板（kind=weekly）的 columns 不能为空；
+    7. favorites 段（可缺省）：enabled 必须是布尔，label 必须非空。
+
+    :param data: fields.json 解析后的 JSON 数据
+    :type data: dict
+    :return: 错误消息列表；空列表 = 通过
+    :rtype: list
     """
     errs = []
     if not isinstance(data, dict):
@@ -231,6 +237,17 @@ def validate_config_data(data):
 
 class Config:
     def __init__(self, path=None):
+        """加载并校验 fields.json，展开为常用派生视图（只读快照，运行期不变）。
+
+        加载即剔除所有 "_" 开头的键（JSON 注释约定）；display_mainsheet 里
+        没写的新字段自动补尾；旧式 calendar 标记配置自动转换为 calendar_dates。
+        校验失败抛 ValueError（错误清单在消息里）。
+
+        :param path: 配置文件路径；None 时用锚定的 fields.json（BASE_DIR，
+            frozen 模式下向上找一级共享根目录）
+        :type path: str 或 None
+        :raises ValueError: 配置校验失败或 display/calendar_dates 指向无效字段
+        """
         with open(path or _CFG_PATH, encoding="utf-8") as f:
             data = json.load(f)
         # 配置校验器（v2.6.0）：启动即全量核对 fields.json，错误逐条列出
@@ -482,7 +499,13 @@ class Config:
 
 
     def io_format(self, key):
-        """ui.io.<key> 的合法化取值：只认 excel/csv，其余按 excel。"""
+        """ui.io.<key> 的合法化取值：只认 excel/csv，其余按 excel。
+
+        :param key: ui.io 段里的键（import_format / export_format / weekly_format）
+        :type key: str
+        :return: "excel" 或 "csv"
+        :rtype: str
+        """
         return "csv" if self.io_ui.get(key) == "csv" else "excel"
 
 
