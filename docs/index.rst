@@ -16,6 +16,11 @@ pm_workbench API 参考
    exporter
    importer
    show_icon
+   calendar_gui
+   config
+   editor
+   notifier
+   reader
 
 索引
 ====
