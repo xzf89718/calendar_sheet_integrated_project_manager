@@ -1,2 +1,4 @@
 sphinx>=7.0
 sphinx-rtd-theme>=2.0
+# runtime import-time deps of the documented modules (autodoc imports them)
+openpyxl>=3.0
