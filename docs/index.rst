@@ -19,6 +19,14 @@ pm_workbench API 参考
    db_recycled
    db_split
    weekreport_clean
+   calendar_gui
+   config
+   editor
+   notifier
+   reader
+   exporter
+   importer
+   show_icon
 
 索引
 ====
