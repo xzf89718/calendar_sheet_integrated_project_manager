@@ -2,6 +2,9 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.6**
+  - workbench_ui 包全部模块（bench_core 38 函数 + BenchError、__main__ 17 函数 + 内层闭包 take、gui.run_gui）补齐 Sphinx reST 中文 docstring，纯文档改动零逻辑变更
+  - docs 新增 workbench_ui.rst，index.rst 收录 workbench_ui 包
 - **v3.14.5** 第三批模块 reST 文档化（用户定，2026-11-16，文档批）：
   importer.py / exporter.py / show_icon.py 共 34 个 def 全覆盖，
   AST 剥离比对零逻辑改动；docs/ 目录加入三个 automodule 页，
