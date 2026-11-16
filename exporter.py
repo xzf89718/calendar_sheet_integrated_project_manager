@@ -14,14 +14,30 @@ HEADS = [CFG.labels[c] for c in COLS]
 
 
 def _fill(v, field):
-    """导出值：有值出值，空值补字段的 default（未配置则空）。"""
+    """导出值：有值出值，空值补字段的 default（未配置则空）。
+
+    :param v: 单元格原值
+    :type v: object
+    :param field: 字段名
+    :type field: str
+    :return: 导出值；无值且无 default 时 None（空单元格）
+    :rtype: object 或 None
+    """
     if v not in (None, ""):
         return v
     return CFG.field_defaults.get(field) or None
 
 
 def export_excel(rows, path):
-    """按模板列序导出（默认 = fields.json 字段顺序）。返回导出行数。"""
+    """按默认列序导出（fields.json 字段顺序 + 显示名表头）。返回导出行数。
+
+    :param rows: 行 dict 列表（即界面上筛选/排序后的结果）
+    :type rows: list
+    :param path: 输出 .xlsx 路径
+    :type path: str
+    :return: 导出行数
+    :rtype: int
+    """
     wb = Workbook()
     ws = wb.active
     ws.append(HEADS)
@@ -32,7 +48,17 @@ def export_excel(rows, path):
 
 
 def export_with_template(rows, path, template):
-    """按命名模板导出。不在库里的列填配置的固定值。返回导出行数。"""
+    """按命名模板导出 xlsx：不在库里的列填配置的固定值（const）。返回导出行数。
+
+    :param rows: 行 dict 列表
+    :type rows: list
+    :param path: 输出 .xlsx 路径
+    :type path: str
+    :param template: 模板（config.CFG.templates 的一项，columns 三元组列表）
+    :type template: dict
+    :return: 导出行数
+    :rtype: int
+    """
     wb = Workbook()
     ws = wb.active
     ws.append([label for label, _f, _c in template["columns"]])
@@ -50,8 +76,19 @@ def export_with_template(rows, path, template):
 
 def export_csv(rows, path, template):
     """按命名模板导出 CSV（utf-8-sig，Excel 双击打开中文不乱码）。
-    列与取值规则和 export_with_template 完全一致（const 列原样、
-    空值补 default），仅无固定列样式。返回导出行数。"""
+
+    列与取值规则和 export_with_template 完全一致（const 列原样、空值补
+    default），仅无固定列样式。返回导出行数。
+
+    :param rows: 行 dict 列表
+    :type rows: list
+    :param path: 输出 .csv 路径
+    :type path: str
+    :param template: 模板（config.CFG.templates 的一项）
+    :type template: dict
+    :return: 导出行数
+    :rtype: int
+    """
     import csv
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f, lineterminator="\n")
@@ -65,7 +102,15 @@ def export_csv(rows, path, template):
 
 # ---------- 周报 ----------
 def _weekly_cell(snap, field):
-    """本周跟进行取值：快照记录 + 项目名。"""
+    """本周跟进表取值：__date__=快照日期、__name__=项目名、其余取快照字段。
+
+    :param snap: 快照行（sqlite3.Row，带 ptitle）
+    :type snap: sqlite3.Row
+    :param field: 模板列的字段名或特殊键
+    :type field: str
+    :return: 单元格值；空为 None
+    :rtype: object 或 None
+    """
     if field == "__date__":
         return snap["snapshot_at"][:10]
     if field == "__name__":
@@ -74,7 +119,15 @@ def _weekly_cell(snap, field):
 
 
 def _weekly_plan_cell(proj, field):
-    """下周计划行取值：项目当前状态，日期列 = next_followup。"""
+    """下周计划表取值：__date__=next_followup、__name__=项目名、其余取当前状态字段。
+
+    :param proj: 项目当前状态行（sqlite3.Row）
+    :type proj: sqlite3.Row
+    :param field: 模板列的字段名或特殊键
+    :type field: str
+    :return: 单元格值；空为 None
+    :rtype: object 或 None
+    """
     if field == "__date__":
         return proj["next_followup"]
     if field == "__name__":
@@ -83,9 +136,21 @@ def _weekly_plan_cell(proj, field):
 
 
 def export_weekly(rows_follow, rows_plan, template, path):
-    """周报导出：两个时间段的内容合并到一个文件的两个工作表。
-    表1=本周跟进（区间内的全部快照），表2=下周计划（next_followup
-    落在计划区间内的项目）。列结构由周报模板（kind=weekly）定义。"""
+    """周报导出 xlsx：两个工作表——表1=本周跟进（区间内全部快照），
+    表2=下周计划（next_followup 落在计划区间内的项目）。列结构由周报
+    模板（kind=weekly）定义。
+
+    :param rows_follow: 本周跟进行列表
+    :type rows_follow: list
+    :param rows_plan: 下周计划行列表
+    :type rows_plan: list
+    :param template: 周报模板（kind=weekly）
+    :type template: dict
+    :param path: 输出 .xlsx 路径
+    :type path: str
+    :return: 二元组（跟进行数, 计划行数）
+    :rtype: tuple
+    """
     wb = Workbook()
     heads = [label for label, _f, _c in template["columns"]]
     ws1 = wb.active
@@ -103,9 +168,20 @@ def export_weekly(rows_follow, rows_plan, template, path):
 
 
 def export_weekly_csv(rows_follow, rows_plan, template, path):
-    """周报 CSV（v3.9.0）：与 export_weekly 同内容的单文件两段形态——
-    段标题行「本周跟进」、表头、数据，空行，段标题行「下周计划」、
-    表头、数据。utf-8-sig + 纯 LF。返回 (跟进行数, 计划行数)。"""
+    """周报 CSV（v3.9.0）：单文件两段形态——段标题「本周跟进」、表头、数据，
+    空行，段标题「下周计划」、表头、数据。utf-8-sig + 纯 LF。
+
+    :param rows_follow: 本周跟进行列表
+    :type rows_follow: list
+    :param rows_plan: 下周计划行列表
+    :type rows_plan: list
+    :param template: 周报模板（kind=weekly）
+    :type template: dict
+    :param path: 输出 .csv 路径
+    :type path: str
+    :return: 二元组（跟进行数, 计划行数）
+    :rtype: tuple
+    """
     import csv
     heads = [label for label, _f, _c in template["columns"]]
     with open(path, "w", newline="", encoding="utf-8-sig") as f:

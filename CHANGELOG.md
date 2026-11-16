@@ -2,6 +2,11 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.5** 第三批模块 reST 文档化（用户定，2026-11-16，文档批）：
+  importer.py / exporter.py / show_icon.py 共 34 个 def 全覆盖，
+  AST 剥离比对零逻辑改动；docs/ 目录加入三个 automodule 页，
+  check_docs 全绿。
+
 - **v3.14.3** 文档工具链修复（用户定，2026-11-16，小补丁）：
   ① venv 依赖安装走 tuna 镜像并改为每次幂等执行——已存在的
   .docs-venv 也能补装新增依赖（openpyxl，autodoc 导入
