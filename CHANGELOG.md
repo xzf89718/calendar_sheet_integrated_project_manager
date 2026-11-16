@@ -2,6 +2,10 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.5** 第三批模块 reST 文档化（用户定，2026-11-16，文档批）：
+  importer.py / exporter.py / show_icon.py 共 34 个 def 全覆盖，
+  AST 剥离比对零逻辑改动；docs/ 目录加入三个 automodule 页，
+  check_docs 全绿。
 - **v3.14.4** 第二批模块 reST 文档化（用户定，2026-11-16，文档批）：
   config.py / editor.py / reader.py / calendar_gui.py / notifier.py
   共 43 个 def 全覆盖（含嵌套闭包 _guard_popdown/_bind），重写/新增

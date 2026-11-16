@@ -13,6 +13,9 @@ pm_workbench API 参考
 
    db
    main
+   exporter
+   importer
+   show_icon
    calendar_gui
    config
    editor
