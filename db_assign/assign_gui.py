@@ -25,6 +25,7 @@ import db_assign.assign_core as core          # noqa: E402
 
 class AssignApp(tk.Tk):
     def __init__(self):
+        """初始化批量赋值器主窗口并搭建界面。"""
         super().__init__()
         self.title("批量赋值器 v1.2.0")
         self.geometry("720x640")
@@ -33,6 +34,7 @@ class AssignApp(tk.Tk):
         self._build()
 
     def _build(self):
+        """搭建主界面：库路径 + 字段/值输入 + 项目表格 + 预览/应用按钮。"""
         pad = {"padx": 10, "pady": 4}
         top = tk.Frame(self)
         top.pack(fill="x", **pad)
@@ -90,6 +92,13 @@ class AssignApp(tk.Tk):
                  fg="#888888").pack(side="bottom", pady=4)
 
     def _mk_tree(self, parent):
+        """构造项目表格（Treeview + 滚动条），挂到 parent。
+
+        :param parent: 父容器。
+        :type parent: tk.Widget
+        :return: 建好的 ttk.Treeview。
+        :rtype: ttk.Treeview
+        """
         tree = ttk.Treeview(parent, show="headings", height=8,
                             selectmode="none")   # 不可选中=不可误操作
         tree.pack(side="left", fill="both", expand=True)
@@ -100,6 +109,7 @@ class AssignApp(tk.Tk):
 
     # ---------- 数据 ----------
     def _pick(self):
+        """文件浏览选择库路径并触发加载。"""
         p = filedialog.askopenfilename(
             parent=self,
             filetypes=[("SQLite 数据库", "*.db"), ("所有", "*.*")])
@@ -107,12 +117,18 @@ class AssignApp(tk.Tk):
             self.path_var.set(p)
 
     def _field(self):
+        """取当前选中的赋值字段名。
+
+        :return: 字段英文 name。
+        :rtype: str
+        """
         label = self.col_var.get()
         cols = [c for c, _h in CFG.display_cols if c != "id"]
         return next((c for c in cols
                      if CFG.labels.get(c, c) == label), None)
 
     def _load(self):
+        """打开库并加载项目列表到表格（走 ui.render_limit 分页）。"""
         p = self.path_var.get().strip()
         if not p or not os.path.exists(p):
             messagebox.showwarning("提示", "请选择存在的数据库", parent=self)
@@ -141,6 +157,7 @@ class AssignApp(tk.Tk):
         self._clear(self.tree_low)
 
     def _fill_current(self):
+        """在表格中标注每个项目该字段的当前值。"""
         field = self._field()
         if not self.rows:
             return
@@ -165,11 +182,16 @@ class AssignApp(tk.Tk):
                              else "disabled")
 
     def _shown(self):
-        """当前页的行（翻页式，与主程序共用 ui.render_limit）。"""
+        """当前分页显示的行数。
+
+        :return: 本页行数。
+        :rtype: int
+        """
         from config import CFG
         return self.rows[self.offset: self.offset + CFG.render_limit]
 
     def _load_more(self):
+        """表格翻到下一页。"""
         from config import CFG
         self.offset += CFG.render_limit
         self._fill_current()
@@ -177,6 +199,7 @@ class AssignApp(tk.Tk):
             self._preview()
 
     def _load_prev(self):
+        """表格翻到上一页。"""
         from config import CFG
         self.offset = max(0, self.offset - CFG.render_limit)
         self._fill_current()
@@ -184,6 +207,7 @@ class AssignApp(tk.Tk):
             self._preview()
 
     def _preview(self):
+        """预览：将有多少项目、该字段现值分布如何（不写库）。"""
         field = self._field()
         if not self.rows or field is None:
             return
@@ -195,6 +219,7 @@ class AssignApp(tk.Tk):
                                  values=(name, value or "(清空)"))
 
     def _apply(self):
+        """执行赋值：确认对话框后调 assign_core 逐项目追加快照，报告成败。"""
         if self.db is None:
             messagebox.showwarning("提示", "请先加载数据库", parent=self)
             return
@@ -226,6 +251,13 @@ class AssignApp(tk.Tk):
 
     @staticmethod
     def _setup(tree, heads):
+        """配置表格列与表头。
+
+        :param tree: 目标 Treeview。
+        :type tree: ttk.Treeview
+        :param heads: 列名/表头定义。
+        :type heads: list
+        """
         tree.delete(*tree.get_children())      # 先清旧行，防换列后残留
         tree.configure(columns=list(range(len(heads))))
         for i, h in enumerate(heads):
@@ -235,10 +267,19 @@ class AssignApp(tk.Tk):
 
     @staticmethod
     def _clear(tree):
+        """清空表格全部行。
+
+        :param tree: 目标 Treeview。
+        :type tree: ttk.Treeview
+        """
         tree.delete(*tree.get_children())
 
 
 def run_gui():
+    """GUI 入口：构造并进入 CopierApp 主循环。
+
+    :return: run_gui 调用结果。
+    """
     AssignApp().mainloop()
     return 0
 

@@ -33,7 +33,17 @@ class CliError(Exception):
 
 
 def _load(path):
-    """读取 xlsx -> (headers, rows, note_idx)。业务问题抛 CliError。"""
+    """读取周报 xlsx -> (headers, rows, note_idx)。业务问题抛 CliError。
+
+    只支持 .xlsx；跟进记录列定位：周报模板 followup_note 标签优先，
+    其次表头含"跟进"；都找不到时 note_idx = None。
+
+    :param path: xlsx 文件路径。
+    :type path: str
+    :return: (表头列表, 数据行列表, 跟进记录列下标或 None)。
+    :rtype: tuple
+    :raises CliError: 扩展名不对 / 文件不存在 / 读取失败 / 无数据行。
+    """
     if not path.lower().endswith(".xlsx"):
         raise CliError("只支持 .xlsx 文件")
     if not os.path.exists(path):
@@ -53,6 +63,16 @@ def _load(path):
 
 
 def _note_idx_or_die(note_idx, headers):
+    """取跟进记录列名；找不到抛 CliError（preview/clean 共用的前置校验）。
+
+    :param note_idx: 跟进记录列下标，None = 找不到。
+    :type note_idx: int 或 None
+    :param headers: 表头列表。
+    :type headers: list
+    :return: 跟进记录列的表头名。
+    :rtype: str
+    :raises CliError: 找不到跟进记录列时。
+    """
     if note_idx is None:
         raise CliError("找不到「跟进记录」列（表头需含'跟进'或匹配"
                        "周报模板标签）")
@@ -60,12 +80,28 @@ def _note_idx_or_die(note_idx, headers):
 
 
 def _fmt_cell(v, width=28):
+    """单元格 -> 终端显示文本：换行压空格、截断到 width。
+
+    :param v: 单元格原始值。
+    :type v: object
+    :param width: 最大显示宽度。
+    :type width: int
+    :return: 显示文本。
+    :rtype: str
+    """
     s = "" if v is None else str(v)
     s = s.replace("\n", " ").replace("\r", " ")
     return s[:width]
 
 
 def cmd_preview(args):
+    """preview 子命令：终端打印保留/丢弃逐行标注 + 汇总（只读不写文件）。
+
+    :param args: 已解析的 argparse 命名空间（含 file）。
+    :type args: argparse.Namespace
+    :return: 进程退出码（恒 0）。
+    :rtype: int
+    """
     from show_icon import tty_if_wanted
     tty_if_wanted(args.show_icon, args.no_show_icon)
     headers, rows, note_idx = _load(args.file)
@@ -86,6 +122,16 @@ def cmd_preview(args):
 
 
 def cmd_clean(args):
+    """clean 子命令：生成清洗结果 xlsx（-o 指定输出，缺省原名_cleaned.xlsx）。
+
+    清洗结果为空拒绝写出（对齐 GUI）。
+
+    :param args: 已解析的 argparse 命名空间（含 file / output）。
+    :type args: argparse.Namespace
+    :return: 进程退出码（恒 0）。
+    :rtype: int
+    :raises CliError: 结果为空或导出失败时。
+    """
     from show_icon import tty_if_wanted
     tty_if_wanted(args.show_icon, args.no_show_icon)
     headers, rows, note_idx = _load(args.file)
@@ -118,6 +164,13 @@ def cmd_clean(args):
 
 
 def cmd_gui(args):
+    """gui 子命令：启动清洗图形界面（带品牌图标开关）。
+
+    :param args: 已解析的 argparse 命名空间（含图标开关）。
+    :type args: argparse.Namespace
+    :return: 进程退出码（恒 0）。
+    :rtype: int
+    """
     from show_icon import splash_if_wanted
     splash_if_wanted(args.show_icon, args.no_show_icon)
     from .clean_gui import CleanApp
@@ -126,6 +179,15 @@ def cmd_gui(args):
 
 
 def main(argv=None):
+    """weekreport_clean CLI 总入口（python -m weekreport_clean）。
+
+    preview / clean / gui 三子命令分发；CliError 打印 stderr 退出 1。
+
+    :param argv: 参数列表，None = sys.argv[1:]。
+    :type argv: list 或 None
+    :return: 进程退出码（0 成功 / 1 业务错误 / 2 参数错误）。
+    :rtype: int
+    """
     ap = argparse.ArgumentParser(
         prog="weekreport_clean",
         description="周报清洗：同一天匹配，去掉非真实当日跟进的行")

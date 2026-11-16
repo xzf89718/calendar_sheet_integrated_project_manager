@@ -16,6 +16,16 @@ from db import Database                         # noqa: E402
 
 
 def list_projects(db):
+    """项目清单（含当前快照全部字段 + 快照数/最近更新）。
+
+    字段列按运行时的 _db.SNAPSHOT_FIELDS 动态拼 SQL（import 时冻结的
+    from-import 会拿到错误配置的列）。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :return: 行列表（id/title/各字段/snap_count/last_at）。
+    :rtype: list
+    """
     fields = ", ".join(f"cur.{f} AS {f}" for f in _db.SNAPSHOT_FIELDS)
     sql = f"""
     SELECT p.id, p.title, {fields},
@@ -32,6 +42,15 @@ def list_projects(db):
 
 
 def check_compatible(db_src, db_target):
+    """源/目标库字段兼容性检查：目标库必须包含当前配置的全部快照字段列。
+
+    :param db_src: 源库。
+    :type db_src: db.Database
+    :param db_target: 目标库。
+    :type db_target: db.Database
+    :return: (是否兼容, 错误消息；兼容时为空串)。
+    :rtype: tuple
+    """
     need = set(_db.SNAPSHOT_FIELDS)
     cols = {r[1] for r in db_target.conn.execute(
         "PRAGMA table_info(snapshots)")}
@@ -42,7 +61,20 @@ def check_compatible(db_src, db_target):
 
 
 def copy_projects(db_src, db_target, pids):
-    """单库内把 pids 项目追加到目标库。返回 (项目数, 快照数)。"""
+    """把 pids 项目从源库追加进目标库（含全部历史快照）。
+
+    只新增：目标库已有数据不动；快照时间/内容原样保留；当前状态指向
+    时间最新的一条（最后插入的）。全部插入在一个事务里，失败整体回滚。
+
+    :param db_src: 源库。
+    :type db_src: db.Database
+    :param db_target: 目标库。
+    :type db_target: db.Database
+    :param pids: 要追加的项目 id 列表。
+    :type pids: list
+    :return: (追加项目数, 追加快照数)。
+    :rtype: tuple
+    """
     n_proj = n_snap = 0
     cols = _db.SNAPSHOT_FIELDS
     with db_target.conn:
@@ -77,7 +109,15 @@ def copy_projects(db_src, db_target, pids):
 def append_sources(db_target, db_sources):
     """把多个源库依次全部追加进目标库。
 
-    返回 (总项目数, 总快照数, [每个源的明细...])。
+    每个源库一个事务（copy_projects 内部保证），单个源失败只回滚该源、
+    已完成的源保留。重复执行会产生重复项目（追加语义）。
+
+    :param db_target: 目标库。
+    :type db_target: db.Database
+    :param db_sources: 源库列表（依次追加）。
+    :type db_sources: list
+    :return: (总项目数, 总快照数, [(源文件名, 项目数, 快照数), ...])。
+    :rtype: tuple
     """
     total_p = total_s = 0
     details = []

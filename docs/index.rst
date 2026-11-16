@@ -13,6 +13,12 @@ pm_workbench API 参考
 
    db
    main
+   db_append
+   db_assign
+   db_copy
+   db_recycled
+   db_split
+   weekreport_clean
    db_analysis
    workbench_ui
    calendar_gui

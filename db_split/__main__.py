@@ -17,8 +17,13 @@ import db_split.split_core as core
 
 
 def _resolve_field(name_or_label):
-    """字段名或显示名 -> 字段名，找不到返回 None。  python -m db_split gui [--show-icon|--no-show-icon]  图形界面（品牌图标开关，覆盖 ui.show_icon）
-"""
+    """字段名或显示名 -> 字段名，找不到返回 None。
+
+    :param name_or_label: 字段英文 name 或中文显示 label。
+    :type name_or_label: str
+    :return: 字段名；找不到时为 None。
+    :rtype: str 或 None
+    """
     from config import CFG
     cols = [c for c, _h in CFG.display_cols if c != "id"]
     if name_or_label in cols:
@@ -30,6 +35,17 @@ def _resolve_field(name_or_label):
 
 
 def _cmd_preview(db, field, label):
+    """终端打印分拆预览：按键列将拆成哪些文件、各多少项目。
+
+    :param db: 已打开的源库。
+    :type db: db.Database
+    :param field: 键列字段名。
+    :type field: str
+    :param label: 键列显示名。
+    :type label: str
+    :return: 进程退出码（恒 0）。
+    :rtype: int
+    """
     counts = core.preview(db, field)
     if not counts:
         print("源库里没有项目。")
@@ -41,6 +57,15 @@ def _cmd_preview(db, field, label):
 
 
 def main(argv=None):
+    """db_split CLI 总入口（python -m db_split）。
+
+    --preview 只预览；否则要求 --dest，执行分拆（目标文件已存在则拒绝）。
+
+    :param argv: 参数列表，None = sys.argv[1:]。
+    :type argv: list 或 None
+    :return: 进程退出码（0 成功 / 1 业务错误 / 2 参数错误）。
+    :rtype: int
+    """
     ap = argparse.ArgumentParser(
         prog="db_split", description="按某列取值把源库拆成多个库文件")
     ap.add_argument("db", nargs="?", help="源库路径，如 xxx.db")

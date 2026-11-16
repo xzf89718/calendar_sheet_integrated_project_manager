@@ -13,15 +13,35 @@ from config import CFG                              # noqa: E402
 
 
 def all_project_ids(db):
-    """库内全部项目 id（赋值作用域 = 整个库，刻意不做子集选择）。"""
+    """库内全部项目 id（赋值作用域 = 整个库，刻意不做子集选择）。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :return: 项目 id 列表。
+    :rtype: list
+    """
     return [r[0] for r in db.conn.execute("SELECT id FROM projects")]
 
 
 def assign_value(db, pids, field, value, changed_by="批量赋值"):
     """对 pids 逐项目追加一条快照：field 列 = value，其余保持当前值。
 
-    返回 (成功项目数, 失败列表[(pid, 错误)])。
-    一个事务，全部成功或全部回滚。
+    铁律：不直接改数据——走跟进方法生成新快照，动作全程可追溯。值为
+    空串写 None（清空该列）。单个事务，全部成功或全部回滚；单项目失
+    败计入失败列表不中断整体。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :param pids: 目标项目 id 列表。
+    :type pids: list
+    :param field: 字段英文 name。
+    :type field: str
+    :param value: 新值（空串 = 清空）。
+    :type value: str
+    :param changed_by: 快照的 changed_by 署名。
+    :type changed_by: str
+    :return: (成功项目数, [(失败 pid, 错误消息), ...])。
+    :rtype: tuple
     """
     ok, fails = 0, []
     with db.conn:

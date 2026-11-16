@@ -20,6 +20,7 @@ import db_split.split_core as core            # noqa: E402
 
 class SplitApp(tk.Tk):
     def __init__(self):
+        """初始化按键分拆器主窗口并搭建界面。"""
         super().__init__()
         self.title("按键分拆器 v1.0.0")
         self.geometry("620x420")
@@ -27,6 +28,7 @@ class SplitApp(tk.Tk):
         self._build()
 
     def _build(self):
+        """搭建主界面：源库 + 键列 + 输出目录 + 预览/执行按钮。"""
         pad = {"padx": 10, "pady": 6}
         frm = tk.Frame(self, padx=6, pady=6)
         frm.pack(fill="both", expand=True)
@@ -67,6 +69,7 @@ class SplitApp(tk.Tk):
         self.stat.pack(side="left", padx=8)
 
     def _pick_src(self):
+        """文件浏览选择源库路径。"""
         p = filedialog.askopenfilename(
             parent=self,
             filetypes=[("SQLite 数据库", "*.db"), ("所有", "*.*")])
@@ -74,11 +77,13 @@ class SplitApp(tk.Tk):
             self.src_var.set(p)
 
     def _pick_dir(self):
+        """目录浏览选择输出目录。"""
         d = filedialog.askdirectory(parent=self)
         if d:
             self.dir_var.set(d)
 
     def _load(self):
+        """打开源库并加载键列候选。"""
         p = self.src_var.get().strip()
         if not p or not os.path.exists(p):
             messagebox.showwarning("提示", "请选择源库", parent=self)
@@ -95,11 +100,17 @@ class SplitApp(tk.Tk):
         self.stat.config(text="源库已加载，选键列后点「预览」")
 
     def _key_field(self):
+        """当前选中的键列字段名。
+
+        :return: 字段英文 name。
+        :rtype: str
+        """
         label = self.key_var.get()
         return next((c for c, _h in CFG.display_cols
                      if c != "id" and CFG.labels.get(c, c) == label), None)
 
     def _preview(self):
+        """预览：按键列将拆成哪些文件、各多少项目。"""
         if self.db is None or self._key_field() is None:
             return
         from datetime import datetime
@@ -113,6 +124,7 @@ class SplitApp(tk.Tk):
         self.stat.config(text=f"将生成 {len(counts)} 个文件（时间以执行时为准）")
 
     def _run(self):
+        """执行分拆：确认后调 split_core.split_by_key 并报告结果。"""
         if self.db is None:
             return
         field = self._key_field()
@@ -151,6 +163,10 @@ class SplitApp(tk.Tk):
 
 
 def run_gui():
+    """GUI 入口：构造并进入 CopierApp 主循环。
+
+    :return: run_gui 调用结果。
+    """
     SplitApp().mainloop()
     return 0
 

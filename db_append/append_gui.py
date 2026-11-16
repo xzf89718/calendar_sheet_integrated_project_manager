@@ -20,12 +20,14 @@ import db_append.append_core as core          # noqa: E402
 
 class AppendApp(tk.Tk):
     def __init__(self):
+        """初始化多库追加器主窗口（标题/尺寸/状态量）并搭建界面。"""
         super().__init__()
         self.title("多库追加器 v1.0.0")
         self.geometry("820x620")
         self._build()
 
     def _build(self):
+        """搭建主界面：目标库 + 源库列表 + 预览/追加按钮区。"""
         pad = {"padx": 8, "pady": 4}
         # 目标库
         top = tk.Frame(self)
@@ -64,12 +66,22 @@ class AppendApp(tk.Tk):
 
     # ---------- 工具 ----------
     def _say(self, s):
+        """状态栏提示。
+
+        :param s: 提示文本。
+        :type s: str
+        """
         self.log.configure(state="normal")
         self.log.insert("end", s + "\n")
         self.log.see("end")
         self.log.configure(state="disabled")
 
     def _pick(self, var):
+        """文件浏览选择框：把选中的 .db 路径写入对应 StringVar。
+
+        :param var: 接收路径的 StringVar。
+        :type var: tk.StringVar
+        """
         p = filedialog.askopenfilename(
             parent=self,
             filetypes=[("SQLite 数据库", "*.db"), ("所有", "*.*")])
@@ -77,6 +89,7 @@ class AppendApp(tk.Tk):
             var.set(p)
 
     def _add_src(self):
+        """把输入框里的源库路径追加进源库列表。"""
         ps = filedialog.askopenfilenames(
             parent=self,
             filetypes=[("SQLite 数据库", "*.db"), ("所有", "*.*")])
@@ -85,11 +98,16 @@ class AppendApp(tk.Tk):
                 self.src_list.insert("end", p)
 
     def _remove_src(self):
+        """从源库列表移除选中项。"""
         for i in reversed(self.src_list.curselection()):
             self.src_list.delete(i)
 
     def _open_dbs(self):
-        """打开目标+所有源库，做基础校验。失败返回 None。"""
+        """打开目标库与全部源库并做兼容性预检。
+
+        :return: (目标库, 源库列表)；任一步失败弹错误框并返回 None。
+        :rtype: tuple 或 None
+        """
         pt = self.path_t.get().strip()
         srcs = list(self.src_list.get(0, "end"))
         if not pt:
@@ -119,6 +137,7 @@ class AppendApp(tk.Tk):
             return None
 
     def _preview(self):
+        """追加前预览：各源库将追加多少项目/快照。"""
         opened = self._open_dbs()
         if not opened:
             return
@@ -136,6 +155,7 @@ class AppendApp(tk.Tk):
         t.close()
 
     def _append(self):
+        """执行追加：确认对话框后调 append_core 依次追加并打印明细。"""
         opened = self._open_dbs()
         if not opened:
             return
@@ -169,6 +189,10 @@ class AppendApp(tk.Tk):
 
 
 def run_gui():
+    """GUI 入口：构造并进入 CopierApp 主循环。
+
+    :return: run_gui 调用结果。
+    """
     AppendApp().mainloop()
     return 0
 

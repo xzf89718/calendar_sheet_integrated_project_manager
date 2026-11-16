@@ -18,8 +18,13 @@ from db import Database                         # noqa: E402
 def list_projects(db):
     """项目清单：id/title + 当前快照全部字段 + 快照数/最近更新。
 
-    字段列按运行时的 _db.SNAPSHOT_FIELDS 动态拼（import 时冻结的
-    from-import 会拿到错误配置的列，milestone 之类硬编码更不可行）。
+    字段列按运行时的 _db.SNAPSHOT_FIELDS 动态拼 SQL（import 时冻结的
+    from-import 会拿到错误配置的列）。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :return: 行列表（id/title/各字段/snap_count/last_at）。
+    :rtype: list
     """
     fields = ", ".join(f"cur.{f} AS {f}" for f in _db.SNAPSHOT_FIELDS)
     sql = f"""
@@ -37,7 +42,15 @@ def list_projects(db):
 
 
 def check_compatible(db_a, db_b):
-    """两库字段兼容性检查：目标库必须包含当前配置的全部字段列。"""
+    """两库字段兼容性检查：目标库必须包含当前配置的全部快照字段列。
+
+    :param db_a: 源库。
+    :type db_a: db.Database
+    :param db_b: 目标库。
+    :type db_b: db.Database
+    :return: (是否兼容, 错误消息；兼容时为空串)。
+    :rtype: tuple
+    """
     need = set(_db.SNAPSHOT_FIELDS)
     cols_b = {r[1] for r in db_b.conn.execute(
         "PRAGMA table_info(snapshots)")}
@@ -48,9 +61,20 @@ def check_compatible(db_a, db_b):
 
 
 def copy_projects(db_a, db_b, pids):
-    """把 pids 项目从 A 追加到 B。返回 (项目数, 快照数)。
+    """把 pids 项目从 A 库追加到 B 库（含完整历史）。
 
-    全部插入在一个事务里，失败整体回滚。
+    只新增：B 库已有数据不动；项目与快照在 B 库获得全新 id；快照
+    snapshot_at/内容原样保留；当前状态指向时间最新的一条。全部插入在
+    一个事务里，失败整体回滚。
+
+    :param db_a: 源库。
+    :type db_a: db.Database
+    :param db_b: 目标库。
+    :type db_b: db.Database
+    :param pids: 要复制的项目 id 列表。
+    :type pids: list
+    :return: (复制项目数, 复制快照数)。
+    :rtype: tuple
     """
     n_proj = n_snap = 0
     cols = _db.SNAPSHOT_FIELDS

@@ -17,6 +17,11 @@ import db_recycled.recycled_core as core
 
 
 def _cmd_list(db):
+    """终端打印回收站清单。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    """
     rows = core.list_recycled(db)
     if not rows:
         print("回收站是空的。")
@@ -27,6 +32,16 @@ def _cmd_list(db):
 
 
 def main(argv=None):
+    """db_recycled CLI 总入口（python -m db_recycled）。
+
+    无动作参数 = 列出回收站；--restore ID|all 恢复；--purge ID 永久删
+    除单个；--empty 清空；gui 子命令转交图形界面（库路径必给）。
+
+    :param argv: 参数列表，None = sys.argv[1:]。
+    :type argv: list 或 None
+    :return: 进程退出码（0 成功 / 非 0 错误）。
+    :rtype: int
+    """
     ap = argparse.ArgumentParser(
         prog="db_recycled", description="回收站管理（查看/恢复/彻底删除）")
     argv = list(argv) if argv is not None else sys.argv[1:]

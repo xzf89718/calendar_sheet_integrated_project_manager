@@ -24,6 +24,9 @@ def _build_cols():
     """列定义按当前 fields.json 动态拼：id/项目 + 前几个显示列 + 快照数/更新。
 
     不硬编码 milestone——真实配置可能没这一列，硬编码会直接崩。
+
+    :return: [(列名, 中文表头, 像素宽), ...]。
+    :rtype: list
     """
     cols = [("id", "ID", 60), ("title", "项目", 260)]
     for name, head in CFG.display_cols:
@@ -40,6 +43,13 @@ COLS = _build_cols()
 
 
 def rowdict(r):
+    """查询行 -> 表格行 dict（列值全部转字符串，id/snap_count 补键）。
+
+    :param r: 查询结果行（sqlite3.Row）。
+    :type r: sqlite3.Row
+    :return: {列名: 显示值}。
+    :rtype: dict
+    """
     d = {c: ("" if r[c] is None else str(r[c])) for c, _h, _w in COLS}
     d["id"] = r["id"]
     d["snaps"] = r["snap_count"]
@@ -50,6 +60,19 @@ class FilterPopup(tk.Toplevel):
     """列筛选勾选清单（Excel 式）。on_apply(set 或 None)。"""
 
     def __init__(self, master, col_name, values, selected, on_apply):
+        """列筛选勾选清单弹窗（Excel 式）。
+
+        :param master: 父窗口。
+        :type master: tk.Widget
+        :param col_name: 列名。
+        :type col_name: str
+        :param values: 该列全部可选值。
+        :type values: list
+        :param selected: 当前勾选集合，None = 全选态。
+        :type selected: set 或 None
+        :param on_apply: 确定回调，接收 set（空集 = 全不显示）。
+        :type on_apply: callable
+        """
         super().__init__(master)
         self.on_apply = on_apply
         self.title(f"筛选 - {col_name}")
@@ -78,10 +101,16 @@ class FilterPopup(tk.Toplevel):
         self.transient(master)
 
     def _all(self, b):
+        """全选 / 全不选。
+
+        :param b: 目标布尔值。
+        :type b: bool
+        """
         for v in self.vars.values():
             v.set(b)
 
     def _ok(self):
+        """确定：把勾选集合交给 on_apply 后关闭弹窗。"""
         checked = {v for v, var in self.vars.items() if var.get()}
         self.on_apply(checked if checked else set())   # 空集=全不显示
         self.destroy()
@@ -91,6 +120,17 @@ class RangePopup(tk.Toplevel):
     """日期区间筛选（工具内表格用）：从 ~ 到，留空=不限。"""
 
     def __init__(self, master, col_name, current, on_apply):
+        """日期区间筛选弹窗：从 ~ 到，留空 = 不限。
+
+        :param master: 父窗口。
+        :type master: tk.Widget
+        :param col_name: 列名。
+        :type col_name: str
+        :param current: 当前区间 (d1, d2)，None = 未筛选。
+        :type current: tuple 或 None
+        :param on_apply: 确定回调，接收 (d1, d2) 或 None（清除）。
+        :type on_apply: callable
+        """
         super().__init__(master)
         self.on_apply = on_apply
         self.title(f"筛选 - {col_name}")
@@ -120,10 +160,12 @@ class RangePopup(tk.Toplevel):
         self.transient(master)
 
     def _clear(self):
+        """清除筛选：on_apply(None) 并关闭。"""
         self.on_apply(None)
         self.destroy()
 
     def _ok(self):
+        """确定：两端 normalize_date 规范化后交给 on_apply（全空 = 清除）。"""
         from db import normalize_date
         a, b = self.v1.get().strip(), self.v2.get().strip()
         na = normalize_date(a) if a else ""
@@ -136,6 +178,13 @@ class SidePanel(tk.LabelFrame):
     """单侧库的项目表：搜索框 + 可排序/可筛选的 Treeview。"""
 
     def __init__(self, master, title):
+        """单侧库的项目表面板：搜索框 + 可排序/可筛选 Treeview + 分页。
+
+        :param master: 父容器。
+        :type master: tk.Widget
+        :param title: 面板标题（源库 A / 目标库 B）。
+        :type title: str
+        """
         super().__init__(master, text=title, padx=6, pady=6)
         self.rows_all = []
         self.filters = {c: None for c, _h, _w in COLS}
@@ -175,10 +224,16 @@ class SidePanel(tk.LabelFrame):
         self._refresh_headings()
 
     def _search_changed(self):
+        """搜索词变化回调：回到第一页并重填表格。"""
         self.offset = 0
         self.refill()
 
     def load(self, db):
+        """载入一个库的项目清单（重置筛选/排序/分页后重填）。
+
+        :param db: 已打开的库。
+        :type db: db.Database
+        """
         self.rows_all = [rowdict(r) for r in core.list_projects(db)]
         self.sort_col = None
         self.filters = {c: None for c, _h, _w in COLS}
@@ -186,6 +241,11 @@ class SidePanel(tk.LabelFrame):
         self.refill()
 
     def visible_rows(self):
+        """当前 搜索+筛选+排序 口径下的全部可见行。
+
+        :return: 行 dict 列表。
+        :rtype: list
+        """
         rows = list(self.rows_all)
         kw = self.search_var.get().strip().casefold()
         if kw:
@@ -197,6 +257,19 @@ class SidePanel(tk.LabelFrame):
             if isinstance(sel, tuple):        # 日期区间
                 d1, d2 = sel
                 def in_range(r, c=c, d1=d1, d2=d2):
+                    """单行是否落在日期区间内（闭区间，任一端可省略）。
+
+                    :param r: 行 dict。
+                    :type r: dict
+                    :param c: 列名。
+                    :type c: str
+                    :param d1: 区间起点，空 = 不限。
+                    :type d1: str
+                    :param d2: 区间终点，空 = 不限。
+                    :type d2: str
+                    :return: 是否命中。
+                    :rtype: bool
+                    """
                     v = str(r[c])[:10]
                     return bool(v) and (not d1 or v >= d1) \
                         and (not d2 or v <= d2)
@@ -212,6 +285,7 @@ class SidePanel(tk.LabelFrame):
         return rows
 
     def refill(self):
+        """按当前 offset/render_limit 重填表格并更新翻页控件状态。"""
         from config import CFG
         self.tree.delete(*self.tree.get_children())
         rows = self.visible_rows()          # 筛选+排序全量
@@ -234,16 +308,23 @@ class SidePanel(tk.LabelFrame):
                 state="normal" if end < len(rows) else "disabled")
 
     def load_more(self):
+        """翻到下一页。"""
         from config import CFG
         self.offset += CFG.render_limit
         self.refill()
 
     def load_prev(self):
+        """翻到上一页（不越过 0）。"""
         from config import CFG
         self.offset = max(0, self.offset - CFG.render_limit)
         self.refill()
 
     def sort(self, col):
+        """按列排序：同列再点切换升降序，换列重置升序。
+
+        :param col: 列名。
+        :type col: str
+        """
         if self.sort_col == col:
             self.sort_rev = not self.sort_rev
         else:
@@ -253,6 +334,7 @@ class SidePanel(tk.LabelFrame):
         self.refill()
 
     def _refresh_headings(self):
+        """刷新表头：叠加排序箭头与筛选标记。"""
         for c, h, _w in COLS:
             mark = ""
             if c == self.sort_col:
@@ -263,6 +345,11 @@ class SidePanel(tk.LabelFrame):
                               command=lambda cc=c: self.sort(cc))
 
     def _header_menu(self, ev):
+        """表头右键菜单：日期列出区间弹窗，其余列出勾选筛选弹窗。
+
+        :param ev: 鼠标事件。
+        :type ev: tk.Event
+        """
         if self.tree.identify_region(ev.x, ev.y) != "heading":
             return
         col = self.tree.identify_column(ev.x)
@@ -270,6 +357,11 @@ class SidePanel(tk.LabelFrame):
         # 日期类列用区间筛选（与主程序一致）
         if col in ("last_at",):
             def apply_range(rng):
+                """区间筛选弹窗的确定回调：写入该列筛选并重刷。
+
+                :param rng: (d1, d2) 或 None（清除）。
+                :type rng: tuple 或 None
+                """
                 self.filters[col] = rng
                 self._refresh_headings()
                 self.refill()
@@ -279,6 +371,11 @@ class SidePanel(tk.LabelFrame):
         values = sorted({str(r[col]) for r in self.rows_all})
 
         def apply(sel):
+            """勾选筛选弹窗的确定回调：写入该列筛选并重刷（回第一页）。
+
+            :param sel: 勾选值集合。
+            :type sel: set
+            """
             self.filters[col] = sel
             self.offset = 0
             self._refresh_headings()
@@ -288,6 +385,7 @@ class SidePanel(tk.LabelFrame):
                     self.filters[col], apply)
 
     def clear_filters(self):
+        """清除全部列筛选与搜索词。"""
         self.filters = {c: None for c, _h, _w in COLS}
         self.search_var.set("")
         self.offset = 0
@@ -295,11 +393,17 @@ class SidePanel(tk.LabelFrame):
         self.refill()
 
     def selected_ids(self):
+        """当前勾选的行 id 列表。
+
+        :return: 项目 id 列表。
+        :rtype: list
+        """
         return [int(i) for i in self.tree.selection()]
 
 
 class CopierApp(tk.Tk):
     def __init__(self):
+        """初始化 A/B 对照复制器主窗口（1280x640）并搭建界面。"""
         super().__init__()
         self.title("项目库复制器 v1.1.0")
         self.geometry("1280x640")
@@ -308,6 +412,7 @@ class CopierApp(tk.Tk):
         self._build()
 
     def _build(self):
+        """搭建主界面：A/B 路径 + 双侧 SidePanel + 复制按钮。"""
         pad = {"padx": 8, "pady": 4}
         top = tk.Frame(self)
         top.pack(fill="x", **pad)
@@ -362,6 +467,11 @@ class CopierApp(tk.Tk):
         self.status.pack(side="left", padx=12)
 
     def _pick(self, var):
+        """文件浏览选择库路径并触发加载。
+
+        :param var: 接收路径的 StringVar。
+        :type var: tk.StringVar
+        """
         p = filedialog.askopenfilename(
             parent=self,
             filetypes=[("SQLite 数据库", "*.db"), ("所有", "*.*")])
@@ -369,6 +479,7 @@ class CopierApp(tk.Tk):
             var.set(p)
 
     def _load(self):
+        """加载 A/B 双侧库并刷新各自面板（兼容性预检失败弹错）。"""
         pa, pb = self.path_a.get().strip(), self.path_b.get().strip()
         if not pa or not pb:
             messagebox.showwarning("提示", "请先选择源库 A 和目标库 B",
@@ -396,14 +507,17 @@ class CopierApp(tk.Tk):
                  f"点中间箭头追加到 B（只新增）")
 
     def _reload_b(self):
+        """复制完成后刷新 B 侧面板。"""
         if self.db_b:
             self.panel_b.load(self.db_b)
 
     def _sel_changed(self):
+        """A 侧选择变化回调：更新可复制的选中计数。"""
         n = len(self.panel_a.tree.selection())
         self.sel_label.config(text=f"已选 {n} 项")
 
     def _copy(self):
+        """执行复制：确认后把 A 侧选中项目复制到 B 库并刷新 B 面板。"""
         pids = self.panel_a.selected_ids()
         if not pids:
             messagebox.showinfo("提示", "请先在 A 库列表里选中项目",
@@ -427,6 +541,10 @@ class CopierApp(tk.Tk):
 
 
 def run_gui():
+    """GUI 入口：构造并进入 CopierApp 主循环。
+
+    :return: run_gui 调用结果。
+    """
     CopierApp().mainloop()
     return 0
 
