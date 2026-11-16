@@ -34,6 +34,19 @@ VIEWS = ("aggregate", "calendar", "table")
 
 class MainApp(tk.Tk):
     def __init__(self, db_path=None, view=None):
+        """主窗口构造：数据库锚定与可用性检查、视图模式解析、日历/表格分区搭建、通知与日期哨兵调度。
+
+        视图在构造时一次性确定（命令行 --view > fields.json 缺省 > aggregate），
+        运行中不切换、不回写配置；标题栏加视图标注。仅表格模式不创建日历，
+        仅日历模式不建按钮行与列表。
+
+        :param db_path: 数据库文件路径；None 时锚定 fields.json 同目录
+            （config.BASE_DIR + CFG.db_name）
+        :type db_path: str 或 None
+        :param view: 启动视图（aggregate / calendar / table）；
+            None 或非法值回退 aggregate
+        :type view: str 或 None
+        """
         super().__init__()
         if db_path is None:
             # 数据库锚定基础目录（开发=代码目录；打包=exe 目录）
@@ -116,7 +129,7 @@ class MainApp(tk.Tk):
 
     def _build_buttons(self):
         """按钮行 + 提示行（v3.2.0 抽出方法：
-        仅日历模式下整体不创建，仅表格模式下原样使用。"""
+        仅日历模式下整体不创建，仅表格模式下原样使用）。"""
         # ---- 按钮行：先于列表打包，保证任何情况下底部按钮都在 ----
         btns = tk.Frame(self)
         btns.pack(fill="x", padx=8, pady=(0, 8))
@@ -180,17 +193,26 @@ class MainApp(tk.Tk):
 
 
     def _search_changed(self, *_a):
+        """搜索框防抖回调（trace_add 触发）：取消旧定时器并重置 300ms。
+
+        停手后才真正过滤——输入法合成期间界面不动，避免 Tk+中文IME 的
+        合成串被重绘打断（按"-"吐出旧文字的病根）。
+        """
         if self._search_after is not None:
             self.after_cancel(self._search_after)
         self._search_after = self.after(300, self._do_search)
 
     def _do_search(self):
+        """防抖到期的实际搜索：重载列表并刷新搜索按钮文案。"""
         self._search_after = None
         self.reload()
         self._update_search_btn()
 
     def _open_search(self):
-        """搜索弹框：开在搜索按钮左侧，输入即过滤，关掉后条件保留。"""
+        """搜索弹框：开在搜索按钮左侧，输入即过滤，关掉后条件保留。
+
+        已打开则抬升到最前，不重复创建。
+        """
         if self._search_popup is not None and \
                 self._search_popup.winfo_exists():
             self._search_popup.lift()
@@ -200,11 +222,18 @@ class MainApp(tk.Tk):
         self._update_search_btn()
 
     def _update_search_btn(self):
+        """按当前搜索词刷新搜索按钮文案（有词显示"搜索:词"，无词显示"搜索"）。"""
         term = self.search_var.get().strip()
         self.search_btn.config(text=f"搜索:{term}" if term else "搜索")
 
     def _build_list(self):
         # ---- 下半：项目列表（最后打包，吃掉剩余全部空间） ----
+        """项目列表区构建：列定义、Excel 式筛选状态、翻页行、滚动条、默认排序与启动加载。
+
+        pack 顺序有讲究：翻页行先于表格打包并锚定底部（side=bottom），窗口
+        纵向紧张时表格少显示几行（可滚动），最底行永不被吞。就绪后启动日期
+        哨兵、当日推送与 30 分钟循环通知。
+        """
         bottom = tk.Frame(self)
         bottom.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         # 显示列：由 fields.json 的 display_mainsheet 段决定（原名/别名/
@@ -288,12 +317,24 @@ class MainApp(tk.Tk):
 
     # ---------- 通知 ----------
     def _today_entries(self):
+        """取当天（系统日期）的全部日历条目。
+
+        :return: 当日条目 dict 列表（键含 date/text/kind 等）
+        :rtype: list
+        """
         from datetime import date
         t = date.today()
         return [e for e in self.db.calendar_entries(t.year, t.month)
                 if e["date"] == t.isoformat()]
 
     def _push(self, entries):
+        """把条目列表推送给系统通知；空列表推送"今天没有项目时间节点"。
+
+        :param entries: 当日日历条目
+        :type entries: list
+        :return: 推送是否送达（notifier.notify 的返回值）
+        :rtype: bool
+        """
         import notifier
         if not entries:
             return notifier.notify("今日项目事项", ["今天没有项目时间节点"])
@@ -301,6 +342,7 @@ class MainApp(tk.Tk):
         return notifier.notify(title, lines)
 
     def _notify_today(self):
+        """推送当天事项并记录推送日期（供 30 分钟循环做跨天判断）。"""
         self._push(self._today_entries())
         from datetime import date
         self._last_notify_date = date.today()
@@ -340,7 +382,13 @@ class MainApp(tk.Tk):
     # ---------- 备份 ----------
     @staticmethod
     def _safe_ident(s):
-        """识别符文件名安全化：替换各系统非法字符，去首尾空格和点。"""
+        """识别符文件名安全化：替换各系统非法字符，去首尾空格和点；全空时回退"备份"。
+
+        :param s: 原始识别符（常为收藏夹/项目名）
+        :type s: str
+        :return: 安全化后的文件名片段
+        :rtype: str
+        """
         for ch in '<>:"/\\|?*':
             s = s.replace(ch, "_")
         return s.strip(" .") or "备份"
@@ -379,11 +427,19 @@ class MainApp(tk.Tk):
 
     # ---------- 动作 ----------
     def _new_project(self):
+        """新建项目：打开 SnapshotEditor，保存成功后经 on_saved 回调重载列表。"""
         SnapshotEditor(self, self.db, on_saved=lambda pid: self.reload())
 
     def _pick_template(self, title):
         """弹出模板选择框，返回选中的模板或 None。
-        周报模板是导出专用（只读视图），不出现在通用导入/导出选择里。"""
+
+        周报模板是导出专用（只读视图），不出现在通用导入/导出选择里。
+
+        :param title: 弹窗标题（如"选择导入模板"）
+        :type title: str
+        :return: 选中的模板 dict；无可用模板或用户取消时 None
+        :rtype: dict 或 None
+        """
         tpls = [t for t in CFG.templates if t.get("kind") != "weekly"]
         if not tpls:
             return None
@@ -434,7 +490,11 @@ class MainApp(tk.Tk):
         self._do_export(tpl, CFG.io_format("export_format"), directory)
 
     def _io_cond_summary(self):
-        """当前 GUI 筛选/搜索/归档状态 → 文件名摘要段（仿 bench_core）。"""
+        """当前 GUI 筛选/搜索/归档状态 -> 导出文件名摘要段（仿 bench_core）。
+
+        :return: 摘要段文本；无任何条件时固定为"全量"
+        :rtype: str
+        """
         parts = []
         for c, v in self.col_filters.items():
             if v is None:
@@ -450,6 +510,17 @@ class MainApp(tk.Tk):
         return _bc._safe("_".join(parts)) if parts else "全量"
 
     def _do_export(self, tpl, fmt, directory):
+        """按模板与格式把全量匹配行导出到所选目录（自动命名）。
+
+        行取自 _all_rows（全量匹配，不受渲染截断影响）；失败弹错误框。
+
+        :param tpl: 导出模板（列序 = 模板定义）
+        :type tpl: dict
+        :param fmt: 导出格式（"csv" / "xlsx"）
+        :type fmt: str
+        :param directory: 用户所选输出目录
+        :type directory: str
+        """
         from exporter import export_csv, export_with_template
         rows = self._all_rows()          # 全量匹配，不受渲染截断影响
         try:
@@ -471,6 +542,13 @@ class MainApp(tk.Tk):
                             parent=self)
 
     def _selected_id(self):
+        """当前表格选中行的项目 id（单项目操作用第一个选中项）。
+
+        周报模式 iid = "project_id-序号"，直接解析；跟进表模式取行首列值。
+
+        :return: 项目 id；无选中或解析失败时 None
+        :rtype: int 或 None
+        """
         sel = self.tree.selection()
         if not sel:
             return None
@@ -480,6 +558,7 @@ class MainApp(tk.Tk):
 
     # ---------- 模式切换（v1.4.0 周报） ----------
     def _toggle_mode(self):
+        """跟进表 <-> 周报模式切换：重建列、清筛选、回默认排序、刷新按钮可用性与数据。"""
         self.mode = "weekly" if self.mode == "followup" else "followup"
         self._rebuild_cols()
         self.col_filters = {c: None for c in self.cols}
@@ -515,6 +594,7 @@ class MainApp(tk.Tk):
                              minwidth=60, stretch=False)
 
     def _apply_mode(self):
+        """按当前模式刷新各按钮可用性：周报/收藏夹内置灰导入导出，周报置灰收藏夹增删。"""
         weekly = self.mode == "weekly"
         for b in (self.new_btn, self.import_btn, self.export_btn):
             b.config(state="disabled"
@@ -535,6 +615,18 @@ class MainApp(tk.Tk):
 
     # ---------- 日历供给（按模式分流） ----------
     def _cal_entries(self, year, month):
+        """日历组件的供给回调（按模式分流）：聚合视图跟随筛选，周报给追加记录，纯日历给全量。
+
+        收藏夹模式强制走 filtered 分支，保证表格与日历同步只显示夹内项目；
+        启动初期列表未就绪（cols 不存在）时返回空，首次 reload 后重新填充。
+
+        :param year: 查询年份
+        :type year: int
+        :param month: 查询月份（1-12）
+        :type month: int
+        :return: 该月日历条目 dict 列表
+        :rtype: list
+        """
         if self.view == "calendar":
             # 仅日历模式（v3.2.0）没有表格筛选/搜索/收藏夹：日历恒
             # 显示全部时间节点；filtered 分支会牵扯不存在的筛选状态
@@ -575,11 +667,25 @@ class MainApp(tk.Tk):
 
     # ---------- 周报导出 ----------
     def _export_weekly(self):
+        """周报导出入口（仅周报模式可用）：弹日期区间选择框，确认后执行导出。"""
         if self.mode != "weekly":
             return
         WeeklyReportDialog(self, on_ok=self._do_export_weekly)
 
     def _do_export_weekly(self, d1, d2, p1, p2):
+        """周报导出第一步：解析/兜底周报模板，选输出目录后转 _do_export_weekly2。
+
+        JSON 不配 kind=weekly 模板时使用内置默认四列（日期/项目/跟进记录/改动说明）。
+
+        :param d1: 本周跟进起始日（YYYY-MM-DD）
+        :type d1: str
+        :param d2: 本周跟进结束日
+        :type d2: str
+        :param p1: 下周计划起始日
+        :type p1: str
+        :param p2: 下周计划结束日
+        :type p2: str
+        """
         tpl = next((t for t in CFG.templates
                     if t.get("kind") == "weekly"), None)
         if tpl is None:
@@ -599,6 +705,25 @@ class MainApp(tk.Tk):
                                 CFG.io_format("weekly_format"), directory)
 
     def _do_export_weekly2(self, tpl, d1, d2, p1, p2, fmt, directory):
+        """周报导出第二步：取数（本周快照 + 下周计划）、收藏夹过滤、落盘。
+
+        收藏夹模式下同样只导出夹内项目（与视图联动）。
+
+        :param tpl: 周报模板（kind 必为 weekly）
+        :type tpl: dict
+        :param d1: 本周跟进起始日
+        :type d1: str
+        :param d2: 本周跟进结束日
+        :type d2: str
+        :param p1: 下周计划起始日
+        :type p1: str
+        :param p2: 下周计划结束日
+        :type p2: str
+        :param fmt: 导出格式（"csv" / "xlsx"）
+        :type fmt: str
+        :param directory: 用户所选输出目录
+        :type directory: str
+        """
         try:
             rows_f = self.db.snapshots_between(d1, d2)
             rows_p = self.db.weekly_plan(p1, p2, self.show_closed)
@@ -626,25 +751,36 @@ class MainApp(tk.Tk):
             f"本周跟进 {nf} 条 / 下周计划 {np_} 条\n\n{path}", parent=self)
 
     def _open_selected(self):
+        """打开主表格当前选中项目（查看/跟进，按钮与双击共用）。"""
         pid = self._selected_id()
         if pid:
             self._open_project({"project_id": pid})
 
     def _open_project(self, payload):
-        """日历条目点击的入口：payload 来自 calendar_entries。"""
+        """日历/当天明细条目点击的统一入口：打开项目阅读器。
+
+        :param payload: 条目 dict，须含 project_id（calendar_entries 的产物）
+        :type payload: dict
+        :return: 项目阅读器窗口实例（ProjectReader）
+        :rtype: ProjectReader
+        """
         return ProjectReader(self, self.db, payload["project_id"],
                              on_changed=self.reload)
 
     def _open_day(self, date_str):
-        """点某天日期弹出当天明细。数据一律走 _cal_entries（与日历
-        渲染同一入口，filtered 筛选不会被绕开）；弹窗持有 provider
-        回调，返回时自动重新取数刷新。"""
+        """点某天日期弹出当天明细。数据一律走 _cal_entries（与日历渲染同一入口，
+        filtered 筛选不会被绕开）；弹窗持有 provider 回调，返回时自动重新取数刷新。
+
+        :param date_str: 日期（YYYY-MM-DD）
+        :type date_str: str
+        """
         y, m = int(date_str[:4]), int(date_str[5:7])
         provider = lambda: [e for e in self._cal_entries(y, m)
                             if e["date"] == date_str]
         DayWindow(self, date_str, provider, self._open_project)
 
     def _toggle_closed(self):
+        """显示/隐藏已关闭项目：翻转状态、刷新按钮文案并重载列表。"""
         self.show_closed = not self.show_closed
         self.closed_btn.config(text="隐藏已关闭" if self.show_closed
                                else "显示已关闭")
@@ -671,7 +807,16 @@ class MainApp(tk.Tk):
                               command=lambda cc=c: self._sort(cc))
 
     def _filter_type(self, col):
-        """列的筛选类型：range=日期区间；list=勾选清单（默认）。"""
+        """列的筛选类型：range=日期区间；list=勾选清单（默认）。
+
+        日期字段与 snapshot_at 一律 range，其余可在 fields.json 的
+        col_filter_type 覆盖。
+
+        :param col: 列名（fields.json 字段名）
+        :type col: str
+        :return: "range" 或 "list"
+        :rtype: str
+        """
         if col in CFG.col_filter_type:
             return CFG.col_filter_type[col]
         if col == "snapshot_at" or col in CFG.date_fields:
@@ -679,7 +824,14 @@ class MainApp(tk.Tk):
         return "list"
 
     def _header_menu(self, ev):
-        """右键表头：日期列弹区间筛选，其余列弹取值勾选清单。"""
+        """右键表头：日期列弹区间筛选，其余列弹取值勾选清单。
+
+        取值范围跟随当前视野：收藏夹模式下只列夹内项目的取值，否则按全量
+        数据，避免"筛选和看到的内容对不上"。
+
+        :param ev: Tk 鼠标事件（须落在表头区域，否则忽略）
+        :type ev: tkinter.Event
+        """
         if self.tree.identify_region(ev.x, ev.y) != "heading":
             return
         col_id = self.tree.identify_column(ev.x)      # "#3" 形式
@@ -689,6 +841,11 @@ class MainApp(tk.Tk):
                                    else "")
         if self._filter_type(col) == "range":
             def apply_range(rng):
+                """区间筛选应用闭包：写回列筛选状态并刷新表头与列表。
+
+                :param rng: (d1, d2) 或 None（None=清除该列筛选）
+                :type rng: tuple 或 None
+                """
                 self.col_filters[col] = rng   # (d1, d2) 或 None
                 self._refresh_headings()
                 self.reload()
@@ -709,6 +866,11 @@ class MainApp(tk.Tk):
 
         def apply(selected):
             # 空集 = 该列全不显示，不能当成"无筛选"
+            """取值勾选应用闭包：写回列筛选（空集=该列全不显示，不算"无筛选"）并刷新。
+
+            :param selected: 勾选值集合
+            :type selected: set
+            """
             self.col_filters[col] = selected if selected else set()
             self._refresh_headings()
             self.reload()
@@ -717,15 +879,19 @@ class MainApp(tk.Tk):
                     self.col_filters[col], apply)
 
     def _clear_filters(self):
+        """清除全部列筛选与表头标记并重载列表。"""
         self.col_filters = {c: None for c in self.cols}
         self._refresh_headings()
         self.reload()
 
     def _selected_ids(self):
-        """当前表格选中行的项目 id 列表（两种模式都支持）。
+        """当前表格选中行的项目 id 列表（两种模式都支持，批量操作用）。
 
-        周报模式 iid = "project_id-序号"，直接解析；跟进表模式走
-        _row_ids 行号映射（iid 为 None，不能反查）。
+        周报模式 iid = "project_id-序号"，直接解析；跟进表模式走 _row_ids
+        行号映射（iid 为 None，不能反查）。
+
+        :return: 项目 id 列表；无选中时空列表
+        :rtype: list
         """
         sel = self.tree.selection()
         if not sel:
@@ -749,6 +915,7 @@ class MainApp(tk.Tk):
 
     # ---------- 收藏夹模式（v2.7.0） ----------
     def _open_favorites(self):
+        """打开收藏夹面板（非模态）：已开则抬升，不重复创建。"""
         dlg = getattr(self, "_fav_dialog", None)
         if dlg is not None and dlg.winfo_exists():
             dlg.lift()
@@ -778,6 +945,15 @@ class MainApp(tk.Tk):
                    f"[{CFG.favorites_label}：{name}]")
 
     def _enter_favorites(self, coll_id, name):
+        """进入收藏夹筛选模式：取夹内项目 id、清旧列筛选（防"空表困惑"）、挂横幅、刷新。
+
+        空夹直接弹框拒绝，模式状态不变。周报/跟进表两种模式都允许进入。
+
+        :param coll_id: 收藏夹 id
+        :type coll_id: int
+        :param name: 收藏夹名（横幅与标题栏显示用）
+        :type name: str
+        """
         ids = self.db.collection_projects(coll_id)
         if not ids:
             messagebox.showinfo(
@@ -800,6 +976,7 @@ class MainApp(tk.Tk):
         self.reload()
 
     def _exit_favorites(self):
+        """退出收藏夹模式：清状态、撤横幅、恢复标题与按钮、重载列表。"""
         self.fav_ids = None
         self.fav_coll = None
         self.fav_banner.pack_forget()
@@ -868,9 +1045,12 @@ class MainApp(tk.Tk):
 
     # ---------- 数据 ----------
     def _filtered_rows(self):
-        """周报模式的行（SQL 窗口查询）。跟进表模式已全面走
-        query_projects（_page_rows 显示 / _all_rows 导出），
-        筛选/搜索/排序/分页均在 SQLite 内完成（v2.1）。"""
+        """周报模式的行（SQL 窗口查询 + 内存筛选/搜索/排序）。跟进表模式已全面走
+        query_projects（_page_rows 显示 / _all_rows 导出），正常不会走到本函数。
+
+        :return: 筛选/搜索/排序后的行 dict 列表
+        :rtype: list
+        """
         if self.mode == "weekly":
             rows = self._weekly_base_rows()
         else:                                  # 兼容兜底，正常不会走到
@@ -883,6 +1063,13 @@ class MainApp(tk.Tk):
             if isinstance(sel, tuple):        # 区间 (d1, d2)，空串=不限
                 d1, d2 = sel
                 def in_range(r, c=c, d1=d1, d2=d2):
+                    """日期区间判断闭包：只比日期前 10 位，空串/越界返回 False。
+
+                    :param r: 行 dict
+                    :type r: dict
+                    :return: 该行该列是否落在区间内
+                    :rtype: bool
+                    """
                     v = str(r[c])[:10]        # 只比日期部分
                     if not v:
                         return False
@@ -906,6 +1093,15 @@ class MainApp(tk.Tk):
             if not fields:
                 fields = list(self.cols)
             def hit(r, kw):
+                """单关键词命中判断闭包：任一搜索字段包含该词（大小写不敏感）。
+
+                :param r: 行 dict
+                :type r: dict
+                :param kw: 已 casefold 的关键词
+                :type kw: str
+                :return: 是否命中
+                :rtype: bool
+                """
                 return any(kw in str(r[f]).casefold() for f in fields)
             for kw in keywords:
                 k = kw.casefold()
@@ -914,6 +1110,13 @@ class MainApp(tk.Tk):
         #（周报模式的行可能没有排序列，如默认的 start_date，此时跳过）
         if self.sort_col and rows and self.sort_col in rows[0]:
             def key(r):
+                """排序键闭包：数字列按 (0, 数值)，其余按 (1, 小写文本)，保证两类可比。
+
+                :param r: 行 dict
+                :type r: dict
+                :return: 二元排序键
+                :rtype: tuple
+                """
                 v = r[self.sort_col]
                 try:
                     return (0, float(v))
@@ -925,7 +1128,11 @@ class MainApp(tk.Tk):
     def _weekly_base_rows(self):
         """周报模式表格行：跟随日历当前查看月的 [查看月-1, 查看月+1]
         窗口（跨年正确）。列由 JSON 的 weekly_sheet.columns 决定。
-        v1.5.5 修复：窗口此前锚定"今天"，翻月后表格内容不跟随。"""
+        v1.5.5 修复：窗口此前锚定"今天"，翻月后表格内容不跟随。
+
+        :return: 窗口内的快照行 dict 列表（键含 project_id 与配置列）
+        :rtype: list
+        """
         base = self.cal.year * 12 + (self.cal.month - 1)
         sy, sm0 = divmod(base - 1, 12)        # 窗口起点 = 查看月-1 的1号
         ey, em0 = divmod(base + 2, 12)        # 窗口终点(不含) = 查看月+2 的1号
@@ -959,10 +1166,17 @@ class MainApp(tk.Tk):
         return rows
 
     def _display(self, r, c):
-        """显示值：搜索命中且在搜索字段范围内 -> 前加红点标记。
+        """显示值：搜索命中且在搜索字段范围内 -> 前加红点标记，其余原样。
 
-        仅影响界面显示，数据层（r）不变，导出不受影响。
-        Tk 表格控件不支持单元格级颜色，红点标记是等价方案。
+        仅影响界面显示，数据层（r）不变，导出不受影响。Tk 表格控件不支持
+        单元格级颜色，红点标记是等价方案。
+
+        :param r: 行 dict
+        :type r: dict
+        :param c: 列名
+        :type c: str
+        :return: 该单元格的显示文本
+        :rtype: str
         """
         v = str(r[c])
         kws = [k.casefold() for k in self.search_var.get().split()]
@@ -972,6 +1186,7 @@ class MainApp(tk.Tk):
         return v
 
     def reload(self):
+        """重载视图：表格回到第一页并重新渲染（仅表格/聚合模式），日历刷新。"""
         if self.view != "calendar":       # 仅日历模式无表格（v3.2.0）
             self.render_offset = 0        # 任何数据变化回到第一页
             self._render_rows()
@@ -981,9 +1196,14 @@ class MainApp(tk.Tk):
     def _query_kwargs(self, favorites=True):
         """当前筛选/搜索状态 -> SQL 查询参数（followup 模式）。
 
-        favorites=True 时并入收藏夹模式的项目 id 集合（key="id" 走
-        _build_where 的 id 分支）；导出等场景传 favorites=False 绕过，
-        保证收藏夹只是视图筛选、不影响产出内容。
+        favorites=True 时并入收藏夹模式的项目 id 集合（key="id" 走 _build_where
+        的 id 分支）；导出等场景传 favorites=False 绕过，保证收藏夹只是视图
+        筛选、不影响产出内容。
+
+        :param favorites: 是否并入收藏夹过滤
+        :type favorites: bool
+        :return: 查询参数字典（键：filters/keywords/search_fields）
+        :rtype: dict
         """
         filters = {c: s for c, s in self.col_filters.items()
                    if s is not None}
@@ -998,7 +1218,11 @@ class MainApp(tk.Tk):
                 "search_fields": sf}
 
     def _page_rows(self):
-        """当前页（SQL 化：筛选/搜索/排序/分页全在 SQLite）。"""
+        """当前页（SQL 化：筛选/搜索/排序/分页全在 SQLite；周报模式为内存窗口后切片）。
+
+        :return: 二元组（当前页行列表, 全量匹配数）
+        :rtype: tuple
+        """
         if self.mode == "weekly":
             rows = self._filtered_rows()          # 周报：原有 SQL 窗口
             total = len(rows)
@@ -1013,7 +1237,11 @@ class MainApp(tk.Tk):
             limit=CFG.render_limit)
 
     def _all_rows(self):
-        """全量匹配行（导出用）：同一 SQL 管线，不带 LIMIT。"""
+        """全量匹配行（导出用）：同一 SQL 管线，不带 LIMIT；导出不受收藏夹影响。
+
+        :return: 行 dict 列表
+        :rtype: list
+        """
         if self.mode == "weekly":
             return self._filtered_rows()
         rows, _ = self.db.query_projects(
@@ -1023,7 +1251,11 @@ class MainApp(tk.Tk):
         return rows
 
     def _render_rows(self):
-        """把当前页渲染进树。截断与排序全在 SQL 侧完成。"""
+        """把当前页渲染进树：列宽自适应、清空重建、行号->id 映射、红点显示、翻页提示。
+
+        跟进表行 iid 为 None（键是首列 id），周报行 iid = "project_id-序号"
+        （一项目多条追加需唯一）。
+        """
         rows, total = self._page_rows()
         self._fit_columns(rows)
         self.tree.delete(*self.tree.get_children())
@@ -1042,7 +1274,13 @@ class MainApp(tk.Tk):
         self._update_limit_bar(len(rows), total)
 
     def _update_limit_bar(self, shown, total):
-        """翻页提示 + 上/下一页（v2.1 翻页式：恒定每页渲染量）。"""
+        """翻页提示 + 上/下一页按钮状态（v2.1 翻页式：恒定每页渲染量）。
+
+        :param shown: 本页实际渲染行数
+        :type shown: int
+        :param total: 全量匹配行数
+        :type total: int
+        """
         start = self.render_offset + (1 if shown else 0)
         end = self.render_offset + shown
         if total > shown or self.render_offset > 0:
@@ -1057,16 +1295,24 @@ class MainApp(tk.Tk):
             state="normal" if end < total else "disabled")
 
     def _load_more(self):
+        """下一页：偏移 +render_limit 并重渲染。"""
         self.render_offset += CFG.render_limit
         self._render_rows()
 
     def _load_prev(self):
+        """上一页：偏移 -render_limit（不为负）并重渲染。"""
         self.render_offset = max(0, self.render_offset - CFG.render_limit)
         self._render_rows()
 
     @staticmethod
     def _est_px(text):
-        """估算字符串像素宽：中文 17px，ASCII 9px。"""
+        """估算字符串像素宽：中文 17px，ASCII 9px，再加 24px 边距余量。
+
+        :param text: 任意文本（先转 str）
+        :type text: object
+        :return: 估算像素宽
+        :rtype: int
+        """
         return sum(17 if ord(ch) > 127 else 9 for ch in str(text)) + 24
 
     def _fit_columns(self, rows):
@@ -1102,6 +1348,18 @@ class SearchPopup(tk.Toplevel):
     """
 
     def __init__(self, master, anchor_btn, var):
+        """构造搜索弹框：锚定在搜索按钮左侧展开（先 withdraw 定位再显示，避免闪位置）。
+
+        输入即过滤（共用主窗口 search_var 的 trace）；Esc/关闭按钮退出，
+        条件保留。
+
+        :param master: 主窗口
+        :type master: tkinter.Misc
+        :param anchor_btn: 定位锚点按钮（弹框右边缘对齐其左边缘）
+        :type anchor_btn: tkinter.Button
+        :param var: 搜索词共享变量
+        :type var: tkinter.StringVar
+        """
         super().__init__(master)
         self.var = var
         self.withdraw()                     # 先定位再显示，避免闪位置
@@ -1134,6 +1392,7 @@ class SearchPopup(tk.Toplevel):
         self.bind("<Escape>", lambda e_: self.destroy())
 
     def _clear(self):
+        """清空搜索词并关闭弹框。"""
         self.var.set("")
         self.destroy()
 
@@ -1146,6 +1405,16 @@ class WeeklyReportDialog(tk.Toplevel):
     """
 
     def __init__(self, master, on_ok):
+        """周报导出弹窗：两行日期区间（本周跟进 / 下周计划）。
+
+        默认：本周 = 本周一~本周日；下周 = 下周一~下周日。on_ok(d1, d2, p1, p2)
+        由调用方执行导出。
+
+        :param master: 主窗口
+        :type master: tkinter.Misc
+        :param on_ok: 确认回调，接收四个 YYYY-MM-DD 日期串
+        :type on_ok: callable
+        """
         super().__init__(master)
         self.on_ok = on_ok
         self.title("导出周报")
@@ -1188,6 +1457,7 @@ class WeeklyReportDialog(tk.Toplevel):
         self.lift()
 
     def _ok(self):
+        """确认：校验四个日期均为 YYYY-MM-DD 后回调 on_ok 并关闭，格式不符弹警告停留。"""
         for v in (self.d1, self.d2, self.p1, self.p2):
             s = v.get().strip()
             if len(s) != 10 or s[4] != "-" or s[7] != "-":
@@ -1205,6 +1475,17 @@ class TemplatePicker(tk.Toplevel):
     result 为选中的模板或 None。"""
 
     def __init__(self, master, title, templates):
+        """模板选择弹窗（导入/导出共用）：大按钮直选，点哪个用哪个。
+
+        result 为选中的模板或 None；wait_window 阻塞调用方直至选择或取消。
+
+        :param master: 主窗口
+        :type master: tkinter.Misc
+        :param title: 弹窗标题
+        :type title: str
+        :param templates: 候选模板列表（周报模板已由调用方滤除）
+        :type templates: list
+        """
         super().__init__(master)
         self.title(title)
         self.result = None
@@ -1230,6 +1511,11 @@ class TemplatePicker(tk.Toplevel):
         self.wait_window()
 
     def _pick(self, template):
+        """选中模板：记录 result 并关闭弹窗（wait_window 随之返回）。
+
+        :param template: 被选中的模板 dict
+        :type template: dict
+        """
         self.result = template
         self.destroy()
 
@@ -1241,6 +1527,19 @@ class RangeFilterPopup(tk.Toplevel):
     """
 
     def __init__(self, master, col_name, current, on_apply):
+        """日期区间筛选弹窗：从 ~ 到 两个日期框（留空=不限，可只填一端）。
+
+        on_apply((d1, d2) 或 None)。d1/d2 为 YYYY-MM-DD；都空 = 清除筛选。
+
+        :param master: 主窗口
+        :type master: tkinter.Misc
+        :param col_name: 列显示名（标题栏用）
+        :type col_name: str
+        :param current: 当前区间 (d1, d2) 或 None
+        :type current: tuple 或 None
+        :param on_apply: 应用回调，接收 (d1, d2) 或 None
+        :type on_apply: callable
+        """
         super().__init__(master)
         self.on_apply = on_apply
         self.title(f"筛选 - {col_name}")
@@ -1277,10 +1576,13 @@ class RangeFilterPopup(tk.Toplevel):
         self.lift()
 
     def _clear(self):
+        """清除筛选：on_apply(None) 并关闭。"""
         self.on_apply(None)
         self.destroy()
 
     def _ok(self):
+        """确认：normalize_date 规范化两端；无效日期弹红字停留不生效，
+        有效则 on_apply((d1, d2))（至少一端非空，否则视为清除）并关闭。"""
         from db import normalize_date
         a = self.v1.get().strip()
         b = self.v2.get().strip()
@@ -1304,6 +1606,19 @@ class FilterPopup(tk.Toplevel):
     """Excel 式筛选弹窗：勾选该列要显示的值。"""
 
     def __init__(self, master, col_name, values, selected, on_apply):
+        """Excel 式筛选弹窗：勾选该列要显示的值。
+
+        :param master: 主窗口
+        :type master: tkinter.Misc
+        :param col_name: 列显示名
+        :type col_name: str
+        :param values: 该列全部候选值（已按当前视野收缩）
+        :type values: list
+        :param selected: 当前勾选集合；None = 未筛选（默认全选）
+        :type selected: set 或 None
+        :param on_apply: 应用回调，接收勾选值集合（空集 = 该列全不显示）
+        :type on_apply: callable
+        """
         super().__init__(master)
         self.title(f"筛选 - {col_name}")
         self.on_apply = on_apply
@@ -1347,10 +1662,16 @@ class FilterPopup(tk.Toplevel):
         self.grab_set()
 
     def _set_all(self, b):
+        """全选/全不选：批量设置所有勾选框。
+
+        :param b: True=全选，False=全不选
+        :type b: bool
+        """
         for v in self.vars.values():
             v.set(b)
 
     def _ok(self):
+        """确认：把勾选值集合交给 on_apply 并关闭。"""
         checked = {v for v, var in self.vars.items() if var.get()}
         self.on_apply(checked)
         self.destroy()
@@ -1374,6 +1695,21 @@ class FavoritesDialog(tk.Toplevel):
     """
 
     def __init__(self, app, db, on_enter, on_changed):
+        """收藏夹面板（v2.7.0）：左列表 + 操作按钮 + 提示行，弹出定位在收藏夹按钮正下方。
+
+        非模态、不 grab、不设 transient——可最小化，开着不影响主程序；点主
+        窗口任意处面板自动抬回主窗口之上（v2.7.2）。打开期间主表格临时改
+        多选（Ctrl/Shift，批量加入用），关闭即恢复。
+
+        :param app: 主窗口实例（取其表格选中态/模式等）
+        :type app: MainApp
+        :param db: 数据库连接
+        :type db: db.Database
+        :param on_enter: 进入收藏夹模式回调 (cid, name)
+        :type on_enter: callable
+        :param on_changed: 收藏夹内容变动回调（主窗口同步模式状态）
+        :type on_changed: callable
+        """
         super().__init__(app)
         self.app = app
         self.db = db
@@ -1430,7 +1766,11 @@ class FavoritesDialog(tk.Toplevel):
 
     # ---- 列表维护 ----
     def _reload(self, keep_cid=None):
-        """刷新收藏夹列表；keep_cid 指定时保持该夹选中。"""
+        """刷新收藏夹列表；keep_cid 指定时保持该夹选中（增删改名后用）。
+
+        :param keep_cid: 要保持选中的收藏夹 id；None 时沿用当前选中
+        :type keep_cid: int 或 None
+        """
         if keep_cid is None:
             sel = self.listbox.curselection()
             if sel:
@@ -1446,6 +1786,13 @@ class FavoritesDialog(tk.Toplevel):
                     break
 
     def _pick(self, silent=False):
+        """取当前选中的收藏夹行（cid, name, 项目数）。
+
+        :param silent: True 时不弹"请先选"提示（内部探测用）
+        :type silent: bool
+        :return: 三元组 (cid, name, 项目数)；无选中时 None
+        :rtype: tuple 或 None
+        """
         sel = self.listbox.curselection()
         if not sel:
             if not silent:
@@ -1455,11 +1802,17 @@ class FavoritesDialog(tk.Toplevel):
         return self._rows[sel[0]]
 
     def _selected_cid(self):
+        """当前选中收藏夹 id（无选中 None）。
+
+        :return: 收藏夹 id 或 None
+        :rtype: int 或 None
+        """
         row = self._pick(silent=True)
         return row[0] if row else None
 
     # ---- 操作 ----
     def _enter(self):
+        """进入所选收藏夹的筛选模式：不关闭本面板，空夹由主窗口弹框拒绝。"""
         row = self._pick()
         if row is None:
             return
@@ -1469,6 +1822,7 @@ class FavoritesDialog(tk.Toplevel):
         self.on_enter(cid, name)
 
     def _new(self):
+        """新建收藏夹：输入名，建库后刷新列表并保持新夹选中。"""
         name = simpledialog.askstring(
             CFG.favorites_label, "新收藏夹名称：", parent=self)
         if name and name.strip():
@@ -1477,6 +1831,7 @@ class FavoritesDialog(tk.Toplevel):
             self.on_changed()
 
     def _rename(self):
+        """重命名所选收藏夹：名称变化时更新并刷新（当前模式夹的标题栏随之同步）。"""
         row = self._pick()
         if row is None:
             return
@@ -1490,6 +1845,7 @@ class FavoritesDialog(tk.Toplevel):
             self.on_changed()      # 若重命名的是当前模式夹，主窗口标题同步
 
     def _delete(self):
+        """删除所选收藏夹：确认后只删索引（项目数据不动），删的是当前模式夹时主窗口自动退出模式。"""
         row = self._pick()
         if row is None:
             return
@@ -1504,6 +1860,7 @@ class FavoritesDialog(tk.Toplevel):
         self.on_changed()      # 删的若是当前模式夹，主窗口会退出模式
 
     def _add_selected(self):
+        """把主表格当前选中项目加入所选收藏夹（只写索引，不动项目数据）。"""
         cid = self._selected_cid()
         if cid is None:
             messagebox.showinfo(CFG.favorites_label, "请先选一个收藏夹",
@@ -1521,12 +1878,12 @@ class FavoritesDialog(tk.Toplevel):
         self.on_changed()
 
     def _lift_me(self, event=None):
-        """主窗口任意点击 → 面板抬到主窗口之上（不抢焦点）。"""
+        """主窗口任意点击 -> 面板抬到主窗口之上（不抢焦点）。"""
         if self.winfo_exists():
             self.lift()
 
     def _hotkey(self, ev):
-        """面板内的快捷键：输入框不抢，其余转给主窗口同一处理。"""
+        """面板内的快捷键：输入框不抢，其余转给主窗口同一处理（Ctrl+数字直达夹）。"""
         w = self.focus_get()
         if w is not None and w.winfo_class() in (
                 "Entry", "TEntry", "Text", "Spinbox", "TSpinbox"):
@@ -1535,18 +1892,26 @@ class FavoritesDialog(tk.Toplevel):
 
     def _on_close(self):
         # 恢复主表格单选（多选只是本面板打开期间的服务）
+        """关闭面板：恢复主表格单选、解绑抬升回调、销毁窗口。"""
         self.app.tree.configure(selectmode=self._prev_selectmode)
         self.app.unbind("<Button-1>", self._lift_id)
         self.destroy()
 
 
 def _kind_labels():
-    """日历类别显示名：calendar_dates 配置驱动（v2.5.0）。"""
+    """日历类别显示名：calendar_dates 配置驱动（v2.5.0）。
+
+    :return: 类别键 -> 显示名 的 dict
+    :rtype: dict
+    """
     return {k: l for k, _f, l, _c in CFG.calendar_dates}
 
-
 def _kind_colors():
-    """日历类别颜色：calendar_dates 配置驱动。"""
+    """日历类别颜色：calendar_dates 配置驱动。
+
+    :return: 类别键 -> 颜色 的 dict
+    :rtype: dict
+    """
     return {k: c for k, _f, _l, c in CFG.calendar_dates}
 
 
@@ -1558,6 +1923,21 @@ class DayWindow(tk.Toplevel):
     移到别的日期，旧列表不能继续显示（v2.1.7 修复）。"""
 
     def __init__(self, master, date_str, items_provider, on_open):
+        """某天的所有项目时间节点列表，点击打开项目详情。
+
+        items_provider: 无参回调，返回该天条目（跟随当前筛选/模式）。从项目
+        详情返回时重新调用 provider 刷新——刚完成的跟进会把项目移到别的日
+        期，旧列表不能继续显示（v2.1.7 修复）。
+
+        :param master: 主窗口
+        :type master: tkinter.Misc
+        :param date_str: 日期（YYYY-MM-DD，标题与标签显示）
+        :type date_str: str
+        :param items_provider: 条目供给回调，无参返回条目列表
+        :type items_provider: callable
+        :param on_open: 条目点击回调，接收条目 payload，返回阅读器实例或 None
+        :type on_open: callable
+        """
         super().__init__(master)
         self.title(f"{date_str} 的时间节点")
         self.transient(master)      # 依附主窗口
@@ -1574,7 +1954,7 @@ class DayWindow(tk.Toplevel):
         self.lift()
 
     def _load(self):
-        """按 provider 最新数据重建条目列表。"""
+        """按 provider 最新数据重建条目列表；空则显示占位文案。"""
         for w in self.items_frame.winfo_children():
             w.destroy()
         items = self.provider()
@@ -1589,7 +1969,11 @@ class DayWindow(tk.Toplevel):
                       ).pack(fill="x", padx=12, pady=2)
 
     def _open(self, payload):
-        """点开项目：当天列表先藏到后台，项目详情关闭后回来并刷新。"""
+        """点开项目：当天列表先藏到后台，项目详情关闭后回来并刷新。
+
+        :param payload: 条目 dict（含 project_id）
+        :type payload: dict
+        """
         self.withdraw()
         reader = self.on_open(payload)
         if reader is None:
@@ -1600,13 +1984,20 @@ class DayWindow(tk.Toplevel):
                     if e.widget is reader else None, add="+")
 
     def _refresh_back(self):
+        """从项目详情返回：数据可能已变（跟进完成/项目移动），重新取数并显示。"""
         self._load()                # 数据可能已变（跟进完成/项目移动）
         self.deiconify()
 
 
 # ---------- 命令行入口（v3.2.0） ----------
 def _resolve_view(cli_view):
-    """启动视图优先级：命令行 --view > fields.json 缺省 > 内置 aggregate。"""
+    """启动视图优先级：命令行 --view > fields.json 缺省 > 内置 aggregate。
+
+    :param cli_view: 命令行 --view 的值；未传时 None
+    :type cli_view: str 或 None
+    :return: 生效视图名（aggregate / calendar / table）
+    :rtype: str
+    """
     if cli_view:
         return cli_view
     if CFG is not None:
@@ -1615,7 +2006,11 @@ def _resolve_view(cli_view):
 
 
 def _print_cfg_summary(out):
-    """--check-config 校验通过时的生效配置摘要（排查"我以为生效了"）。"""
+    """--check-config 校验通过时的生效配置摘要（排查"我以为生效了"）。
+
+    :param out: 输出流（默认 sys.stdout）
+    :type out: file-like
+    """
     print("生效配置摘要：", file=out)
     print(f"  产品名: {CFG.product_name}", file=out)
     print(f"  数据库: {CFG.db_name}（fields.json 同目录）", file=out)
@@ -1630,10 +2025,18 @@ def _print_cfg_summary(out):
 
 
 def _run_check_config(path=None, out=None):
-    """--check-config 内核：只校验 fields.json，不建库、不创建任何
-    Tk 窗口（无显示环境可跑）。退出码 0 = 无错误，1 = 有错误。
-    校验与启动完全同源（config.validate_config_data）。path 可传，
-    供测试与将来的 db_config 复用。"""
+    """--check-config 内核：只校验 fields.json，不建库、不创建任何 Tk 窗口
+    （无显示环境可跑）。退出码 0 = 无错误，1 = 有错误。校验与启动完全同源
+    （config.validate_config_data）。
+
+    :param path: fields.json 路径；None 时按 config 相同规则锚定
+        （frozen 取 exe 目录，否则取本文件目录）
+    :type path: str 或 None
+    :param out: 输出流；None 时 sys.stdout
+    :type out: file-like 或 None
+    :return: 退出码（0=通过，1=有错误）
+    :rtype: int
+    """
     import json as _json
     out = out or sys.stdout
     if path is None:
@@ -1672,15 +2075,25 @@ def _run_check_config(path=None, out=None):
 
 
 def _show_icon_splash(ms=3000):
-    """v3.7.1 起转发到 show_icon.gui_splash（本函数保留仅为兼容
-    既有调用与测试入口）。"""
+    """v3.7.1 起转发到 show_icon.gui_splash（本函数保留仅为兼容既有调用与测试入口）。
+
+    :param ms: 闪屏停留毫秒数
+    :type ms: int
+    """
     from show_icon import gui_splash
     gui_splash(ms=ms)
 
 
 def main(argv=None):
-    """argv=None 时取 sys.argv[1:]（GUI 直接启动）；
-    workbench_ui gui 透传时也走这里。"""
+    """命令行入口：解析 --view/--show-icon/--no-show-icon/--check-config。
+
+    argv=None 时取 sys.argv[1:]（GUI 直接启动）；workbench_ui gui 透传时也
+    走这里。--check-config 只校验配置并以退出码结束；配置损坏时打印同源
+    错误清单退出；否则按图标开关播闪屏后进入主循环。
+
+    :param argv: 参数列表；None 时取 sys.argv[1:]
+    :type argv: list 或 None
+    """
     import argparse
     parser = argparse.ArgumentParser(
         prog="main.py",

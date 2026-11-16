@@ -2,6 +2,13 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.1** main.py 全函数 reST 文档化（用户定，2026-11-16，
+  文档批第二批）：100 个 def 全覆盖——重写/新增 reST 中文
+  docstring（摘要 + 详细说明 + param/type/return/rtype 字段），
+  含 _header_menu/_filtered_rows 内 5 个嵌套闭包；既有合格
+  docstring 保留原样并补齐 return/rtype 字段。AST 递归剥离
+  docstring 比对确认零逻辑改动；docstring 覆盖率 100%。
+
 - **v3.14.0** db.py 全函数 reST 文档化（用户定，2026-11-16，
   文档批标杆批）：44 个函数 + Database 类 + 模块头全部改写为
   Sphinx 原生 reST 风格 docstring——一行中文摘要 + 中文详细说明 +
