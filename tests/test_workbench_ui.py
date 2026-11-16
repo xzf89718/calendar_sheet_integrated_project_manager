@@ -20,17 +20,22 @@ from workbench_ui import bench_core as bc
 
 
 def copy_pkg(dst):
-    """把源码树（除掉版本控制/缓存/库文件）拷到 dst。"""
+    """把源码树（除掉版本控制/缓存/库文件/构建产物/分析输出）拷到 dst。
+    v3.13.1：排除对齐 .gitignore（bin/exports/build/dist），copytree
+    忽略 db_analysis 的 pie/ timeline/ 输出子目录——本地真实分析
+    输出不得被拷进测试沙箱污染断言。"""
     for name in os.listdir(PROJECT_ROOT):
         if name in (".fslckout", "_FOSSIL_", "__pycache__",
-                    ".pytest_cache", "backups") \
+                    ".pytest_cache", "backups", "bin", "exports",
+                    "build", "dist") \
                 or name.endswith(".db"):
             continue
         src = os.path.join(PROJECT_ROOT, name)
         tgt = os.path.join(str(dst), name)
         if os.path.isdir(src):
             shutil.copytree(src, tgt,
-                            ignore=shutil.ignore_patterns("__pycache__"))
+                            ignore=shutil.ignore_patterns(
+                                "__pycache__", "pie", "timeline"))
         else:
             shutil.copy2(src, tgt)
 
