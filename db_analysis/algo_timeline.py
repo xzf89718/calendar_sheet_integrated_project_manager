@@ -42,9 +42,15 @@ _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 def load_tl():
-    """读并校验 CFG.timeline（config.py 已合并 JSON 配置与
-    calendar 法定三类兜底）。返回 dict(start, next, close, last,
-    plot, colors)。配置错误抛 AnalysisError。"""
+    """读并校验 CFG.timeline（config.py 已合并 JSON 配置与法定兜底）。
+
+    校验 start/next/close 均为 date 类型字段、plot 为 line/spot、
+    colors 为 4 个 #RRGGBB。
+
+    :return: timeline 配置 dict（start/next/close/last/plot/colors）。
+    :rtype: dict
+    :raises AnalysisError: 任一项配置非法时。
+    """
     from config import CFG
     tl = dict(CFG.timeline)
     ftypes = {f["name"]: f["type"] for f in CFG.fields}
@@ -64,10 +70,18 @@ def load_tl():
 
 
 def window_months(mode, today=None):
-    """12 个月窗口 → [(year, month, 'YY-MM'), ...]。
+    """12 个月窗口 -> [(year, month, 'YY-MM'), ...]。
 
-    year    = 当年 1–12 月；
-    rolling = [当月-6, 当月+5]（含当月共 12 列，用户定）。"""
+    year = 当年 1-12 月；rolling = [当月-6, 当月+5]（含当月共 12 列）。
+
+    :param mode: "year" 或 "rolling"。
+    :type mode: str
+    :param today: 基准日期，None = 今天（可注入保证测试确定性）。
+    :type today: datetime.date 或 None
+    :return: 12 个 (年, 月, 短标签) 元组。
+    :rtype: list
+    :raises AnalysisError: mode 非法时。
+    """
     t = today or date.today()
     if mode == "year":
         y, m0 = t.year, 1
@@ -90,8 +104,15 @@ def window_months(mode, today=None):
 
 
 def _where_sql(where):
-    """--where → (wheres, args)（与 analysis_core.collect_rows 同语义：
-    单值集合 IN + 空值兜底；日期区间 date() 比较）。"""
+    """--where -> (wheres, args)（与 analysis_core.collect_rows 同语义）。
+
+    单值集合 IN + 空值兜底；日期区间 date() 比较。
+
+    :param where: --where 原始参数列表。
+    :type where: list 或 None
+    :return: (WHERE 条件片段列表, 参数列表)。
+    :rtype: tuple
+    """
     filters, ranges = _parse_where(where)
     wheres, args = [], []
     for name, vals in filters.items():
@@ -111,11 +132,21 @@ def _where_sql(where):
 
 def collect(db, adds=(), where=None):
     """当前行口径取数：open + closed 全取（--split 时归「已关闭」章）。
-    基准字段取自 CFG.timeline；vals = [开始, 最近跟进(最新快照,
-    派生), 下一个跟进, 关闭]；「最近跟进」列名 = timeline.last
-    （默认 last_snapshot，不属于 fields 的 name）。
-    adds = --add-col 的额外字段名列表（必须是 date 字段）。
-    返回 [dict(id,title,status_val,archived,vals,adds,sortmap)]。"""
+
+    基准字段取自 CFG.timeline；vals = [开始, 最近跟进(最新快照,派生),
+    下一个跟进, 关闭]；「最近跟进」列名 = timeline.last（默认
+    last_snapshot，不属于 fields 的 name）。adds 必须是 date 字段。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :param adds: --add-col 的额外字段名列表。
+    :type adds: tuple 或 list
+    :param where: --where 筛选列表。
+    :type where: list 或 None
+    :return: [dict(id,title,status_val,archived,vals,adds,sortmap,diff)]。
+    :rtype: list
+    :raises AnalysisError: 额外列不是 date 字段时。
+    """
     from config import CFG
     tl = load_tl()
     for a in adds:
@@ -155,8 +186,18 @@ def collect(db, adds=(), where=None):
 
 
 def enrich(rows, today=None):
-    """计算日差（timeline.next − 今天，天）并补项目显示名。
-    归档项目的 diff 恒为 None。today 可注入（测试确定性）。"""
+    """计算日差（timeline.next - 今天，天）并补项目显示名。
+
+    归档项目的 diff 恒为 None；显示名 = name_fields 各列拼接（空段剥
+    "-"），全空回退 title。
+
+    :param rows: collect 返回的行 dict 列表（原地补 diff/name 并返回）。
+    :type rows: list
+    :param today: 基准日期，None = 今天（可注入保证测试确定性）。
+    :type today: datetime.date 或 None
+    :return: 同一列表（便于链式调用）。
+    :rtype: list
+    """
     from config import CFG
     t = today or date.today()
     name_cols = [c for c in CFG.name_fields if c in CFG.names]
@@ -171,9 +212,14 @@ def enrich(rows, today=None):
 
 
 def split_groups(rows):
-    """四章划分（用户定，顺序固定）：逾期未跟进（diff<0）→
-    待跟进（diff>=0）→ 未排跟进（无下个跟进）→ 已关闭（归档）。
-    返回 [(章名, [row...])]，空章不出现。"""
+    """四章划分（用户定，顺序固定）：逾期未跟进(diff<0) -> 待跟进
+    (diff>=0) -> 未排跟进(无下个跟进) -> 已关闭(归档)。空章不出现。
+
+    :param rows: enrich 之后的行 dict 列表。
+    :type rows: list
+    :return: [(章名, [row...]), ...]。
+    :rtype: list
+    """
     overdue, due, unscheduled, archived = [], [], [], []
     for r in rows:
         if r["archived"]:
@@ -193,19 +239,56 @@ def split_groups(rows):
 
 
 def sort_rows(rows, key=None, desc=False):
-    """章内排序：key=None/diff 按日差；库字段按原始值。None/空值
-    恒排最后（与升降序无关）。"""
+    """章内排序：key=None/diff 按日差；库字段按原始值。
+
+    None/空值恒排最后（与升降序无关）。原地重排并返回。
+
+    :param rows: 行 dict 列表。
+    :type rows: list
+    :param key: 排序字段名或 "diff"，None = 按日差。
+    :type key: str 或 None
+    :param desc: 是否降序。
+    :type desc: bool
+    :return: 排序后的同一列表。
+    :rtype: list
+    """
     if key is None or key == "diff":
         def bad(r):
+            """排序键缺失（diff 为 None / 字段值为空）判定，缺失者恒排最后。
+
+            :param r: 行 dict。
+            :type r: dict
+            :return: 是否缺失排序键。
+            :rtype: bool
+            """
             return r["diff"] is None
 
         def keyv(r):
+            """排序键取值。
+
+            :param r: 行 dict。
+            :type r: dict
+            :return: diff 值（按日差排序时）或字段值字符串（按字段排序时）。
+            """
             return r["diff"]
     else:
         def bad(r):
+            """排序键缺失（diff 为 None / 字段值为空）判定，缺失者恒排最后。
+
+            :param r: 行 dict。
+            :type r: dict
+            :return: 是否缺失排序键。
+            :rtype: bool
+            """
             return r["sortmap"].get(key) in (None, "")
 
         def keyv(r):
+            """排序键取值。
+
+            :param r: 行 dict。
+            :type r: dict
+            :return: diff 值（按日差排序时）或字段值字符串（按字段排序时）。
+            """
             return str(r["sortmap"].get(key) or "")
     head = [r for r in rows if not bad(r)]
     head.sort(key=keyv, reverse=desc)
@@ -214,12 +297,26 @@ def sort_rows(rows, key=None, desc=False):
 
 
 def _ym_week(dstr):
-    """'YYYY-MM-DD' → ((year, month), week0-3)；week = (day-1)//7。"""
+    """'YYYY-MM-DD' -> ((year, month), week0-3)；week = (day-1)//7。
+
+    :param dstr: 日期字符串。
+    :type dstr: str
+    :return: ((年, 月), 周内序号)。
+    :rtype: tuple
+    """
     return (int(dstr[:4]), int(dstr[5:7])), (int(dstr[8:10]) - 1) // 7
 
 
 def _cell_index(dstr, months):
-    """日期 → 月网格绝对周列 idx；窗外日期夹到 0 / 最后一列。"""
+    """日期 -> 月网格绝对周列 idx；窗外日期夹到 0 / 最后一列。
+
+    :param dstr: 日期字符串。
+    :type dstr: str
+    :param months: window_months 的 12 个月列表。
+    :type months: list
+    :return: 绝对周列下标（0 起）。
+    :rtype: int
+    """
     ym, wk = _ym_week(dstr)
     hit = [i for i, (y, m, _l) in enumerate(months) if (y, m) == ym]
     if not hit:
@@ -229,8 +326,21 @@ def _cell_index(dstr, months):
 
 
 def _seg_cells(start, end, months):
-    """line 模式：start→end 的绝对周列集合；任一端缺失 → 空（行保留
-    不画线，用户定）；窗外夹边界；start 在 end 之后 → 空。"""
+    """line 模式：start->end 的绝对周列集合。
+
+    任一端缺失 -> 空（行保留不画线，用户定）；窗外夹边界；延伸出窗口
+    的月份边缘格一律填满（v3.8.8 用户定，避免看起来像中间断开）；
+    start 在 end 之后 -> 空。
+
+    :param start: 起点日期，空 = 不画线。
+    :type start: str 或 None
+    :param end: 终点日期。
+    :type end: str 或 None
+    :param months: 12 个月窗口列表。
+    :type months: list
+    :return: 绝对周列下标集合。
+    :rtype: set
+    """
     if not start or not end:
         return set()
     si = _cell_index(start, months)
@@ -251,25 +361,54 @@ def _seg_cells(start, end, months):
 
 
 def _spot_cells(end, months):
-    """spot 模式：只在 end 日期所在周格画一个点（单 #）；
-    日期缺失 → 空。"""
+    """spot 模式：只在 end 日期所在周格画一个点（单格）；日期缺失 -> 空。
+
+    :param end: 点日期。
+    :type end: str 或 None
+    :param months: 12 个月窗口列表。
+    :type months: list
+    :return: 绝对周列下标集合。
+    :rtype: set
+    """
     if not end:
         return set()
     return {_cell_index(end, months)}
 
 
 def _plot_cells(mode, start, end, months):
+    """按画法分发：spot -> _spot_cells，其余（line）-> _seg_cells。
+
+    :param mode: "spot" 或 "line"。
+    :type mode: str
+    :param start: 起点日期（spot 模式忽略）。
+    :type start: str 或 None
+    :param end: 终点日期。
+    :type end: str 或 None
+    :param months: 12 个月窗口列表。
+    :type months: list
+    :return: 绝对周列下标集合。
+    :rtype: set
+    """
     if mode == "spot":
         return _spot_cells(end, months)
     return _seg_cells(start, end, months)
 
 
 def _month_cells(cells, ch="#", pad="-"):
-    """绝对周列集合 → 12 个月格文本，每格 4 字符（对应每月 4 周；
-    用户定：月格而不是 48 个编号列）。v3.8.9：被线段触到的月格内，
-    范围外一律 pad 填充（保证格长一致、线看起来连续；pad 默认
-    "-"），未被触到的月格仍为空格；ch = 标记字符（spot 模式传
-    "$"）。"""
+    """绝对周列集合 -> 12 个月格文本，每格 4 字符（对应每月 4 周）。
+
+    被线段触到的月格内，范围外一律 pad 填充（保证格长一致、线看起来
+    连续）；未被触到的月格仍为空格。ch = 标记字符（spot 模式传 "$"）。
+
+    :param cells: 绝对周列下标集合。
+    :type cells: set
+    :param ch: 范围内标记字符。
+    :type ch: str
+    :param pad: 月格内范围外填充字符。
+    :type pad: str
+    :return: 12 个月格文本列表。
+    :rtype: list
+    """
     if not cells:
         return [" " * WEEKS_PER_MONTH] * 12
     si, ei = min(cells), max(cells)
@@ -286,9 +425,19 @@ def _month_cells(cells, ch="#", pad="-"):
 
 
 def _outside_marks(dates, months, ch="#"):
-    """日期列表 → (头标记, 尾标记)：延伸出窗口的，对应列直接画满
-    4 个标记字符（用户定 v3.8.10：头/尾列填 #，不再填文字标注；
-    spot 模式传 "$"），没有窗外延伸则空。"""
+    """日期列表 -> (头标记, 尾标记)：延伸出窗口的，对应列直接画满 4 个
+    标记字符（v3.8.10 用户定：头/尾列填 #，spot 模式传 "$"），没有
+    窗外延伸则为空串。
+
+    :param dates: 日期字符串列表（可含 None）。
+    :type dates: list
+    :param months: 12 个月窗口列表。
+    :type months: list
+    :param ch: 标记字符。
+    :type ch: str
+    :return: (头标记, 尾标记)。
+    :rtype: tuple
+    """
     lo = (months[0][0], months[0][1])
     hi = (months[-1][0], months[-1][1])
     head = tail = False
@@ -306,8 +455,17 @@ def _outside_marks(dates, months, ch="#"):
 
 def _base_segments(row, today):
     """基准 4 行线段（顺序 v3.8.11 用户定）：(标签, 终点日期)。
+
     起点恒 = vals[0]（开始）；终点依次为 最近跟进(派生) / 今日 /
-    下一个跟进 / 关闭。"""
+    下一个跟进 / 关闭。
+
+    :param row: 行 dict（取 vals）。
+    :type row: dict
+    :param today: 基准日期（"今日"段的终点）。
+    :type today: datetime.date
+    :return: [(标签, 终点日期), ...] 4 项。
+    :rtype: list
+    """
     return [("最近跟进", row["vals"][1]),
             ("今日", today.isoformat()),
             ("下一个跟进", row["vals"][2]),
@@ -316,22 +474,45 @@ def _base_segments(row, today):
 
 def _lead(adds, add_labels, months):
     """表头：前导列名固定（用户定：开始/下一个跟进/关闭），额外列用
-    JSON label；然后 日差 / 更早 + 12 个月列 + 更晚 / 状态 / 备注
-    （v3.8.11：头/尾 更名 更早/更晚）。"""
+    JSON label；然后 日差 / 更早 + 12 个月列 + 更晚 / 状态 / 备注。
+
+    :param adds: 额外字段名列表。
+    :type adds: list
+    :param add_labels: 额外字段中文 label 列表。
+    :type add_labels: list
+    :param months: 12 个月窗口列表。
+    :type months: list
+    :return: 表头字符串列表。
+    :rtype: list
+    """
     return (["开始", "下一个跟进", "关闭"] + add_labels
             + ["日差", "更早"] + [lab for _y, _m, lab in months]
             + ["更晚", "状态", "备注"])
 
 
 def _anchor(gname, n):
-    """章标题 → GitHub 风格 md 锚点（小写、空格转 -、去掉括号）。"""
+    """章标题 -> GitHub 风格 md 锚点（小写、空格转 -、去掉括号）。
+
+    :param gname: 章名。
+    :type gname: str
+    :param n: 项目数。
+    :type n: int
+    :return: "#..." 锚点串。
+    :rtype: str
+    """
     h = f"{gname}（{n} 个项目）"
     h = re.sub(r"[（）()]", "", h)
     return "#" + re.sub(r"\s+", "-", h.strip().lower())
 
 
 def _diff_text(r):
-    """日差文本；< 0 标红（用户定 v3.8.4）。"""
+    """日差文本；< 0 标红（用户定 v3.8.4）。
+
+    :param r: 行 dict（取 diff）。
+    :type r: dict
+    :return: 日差文本，负值包红色 font 标签；diff 为 None 时为空串。
+    :rtype: str
+    """
     if r["diff"] is None:
         return ""
     txt = str(r["diff"])
@@ -342,9 +523,30 @@ def _diff_text(r):
 
 def _render_rows(r, tl, adds, add_labels, add_plot, add_colors,
                  months, t):
-    """一个项目的全部表体行（3 日期值/额外列值/日差/状态在第一行
-    线段行上；项目名已移出表格，由 render_html 单独作标题），已按列
-    展开。返回 [[str...]]（不含表头/分隔）。"""
+    """一个项目的全部 HTML 表体行（已按列展开）。
+
+    3 日期值 / 额外列值 / 日差 / 状态在第一行线段行上；项目名已移出表
+    格，由 render_html 单独作标题。
+
+    :param r: 行 dict。
+    :type r: dict
+    :param tl: load_tl() 的 timeline 配置。
+    :type tl: dict
+    :param adds: 额外字段名列表。
+    :type adds: list
+    :param add_labels: 额外字段中文 label 列表。
+    :type add_labels: list
+    :param add_plot: 额外列画法（line/spot）。
+    :type add_plot: str
+    :param add_colors: 额外列配色列表。
+    :type add_colors: list
+    :param months: 12 个月窗口列表。
+    :type months: list
+    :param t: 基准日期（"今日"段终点）。
+    :type t: datetime.date
+    :return: [[单元格, ...], ...] 表体行（不含表头/分隔）。
+    :rtype: list
+    """
     from config import CFG
     n_lead = 3 + len(adds)
     # 数据值放第一行线段行的前导列：开始/下一个跟进/关闭 + 额外列
@@ -416,9 +618,34 @@ window.addEventListener('load',fit);
 
 def render_html(rows_groups, tl, adds, add_labels, add_plot, add_colors,
                 months, mode_label, today=None, split=False):
-    """HTML 整页（v3.8.12 用户定；v3.8.13 起为唯一输出）——打开后
-    整页按窗口宽度自动适配（fit），右上角 +/-/fit 按钮可再放大
-    缩小。"""
+    """HTML 整页渲染（v3.8.12 用户定；v3.8.13 起为唯一输出）。
+
+    打开后整页按窗口宽度自动适配（fit），右上角 +/-/fit 按钮可再放大
+    缩小；含图例、分章锚点导航、每项目一张表（项目名作表格外标题）。
+
+    :param rows_groups: [(章名, [行 dict, ...]), ...]。
+    :type rows_groups: list
+    :param tl: load_tl() 的 timeline 配置。
+    :type tl: dict
+    :param adds: 额外字段名列表。
+    :type adds: list
+    :param add_labels: 额外字段中文 label 列表。
+    :type add_labels: list
+    :param add_plot: 额外列画法（line/spot）。
+    :type add_plot: str
+    :param add_colors: 额外列配色列表。
+    :type add_colors: list
+    :param months: 12 个月窗口列表。
+    :type months: list
+    :param mode_label: 口径说明文字（如"滚动 12 个月"）。
+    :type mode_label: str
+    :param today: 基准日期，None = 今天。
+    :type today: datetime.date 或 None
+    :param split: 是否分章（影响章标题与导航）。
+    :type split: bool
+    :return: 完整 HTML 文本。
+    :rtype: str
+    """
     t = today or date.today()
     lead = _lead(adds, add_labels, months)
     out = [_HTML_HEAD, f"<h1>项目时间线图（{mode_label}）</h1>"]
@@ -452,7 +679,27 @@ def render_html(rows_groups, tl, adds, add_labels, add_plot, add_colors,
 
 def dump_csv_text(rows_groups, tl, adds, add_labels, add_plot, add_colors,
                   months, today=None):
-    """csv 文本（--dump 终端打印用）：与 md 同网格，纯 # 不着色。"""
+    """csv 文本（--dump 终端打印用）：与 HTML 同网格，纯 # 不着色。
+
+    :param rows_groups: [(章名, [行 dict, ...]), ...]。
+    :type rows_groups: list
+    :param tl: load_tl() 的 timeline 配置。
+    :type tl: dict
+    :param adds: 额外字段名列表。
+    :type adds: list
+    :param add_labels: 额外字段中文 label 列表。
+    :type add_labels: list
+    :param add_plot: 额外列画法（line/spot）。
+    :type add_plot: str
+    :param add_colors: 额外列配色列表（本函数不使用，为签名一致保留）。
+    :type add_colors: list
+    :param months: 12 个月窗口列表。
+    :type months: list
+    :param today: 基准日期，None = 今天。
+    :type today: datetime.date 或 None
+    :return: csv 多行文本。
+    :rtype: str
+    """
     t = today or date.today()
     lead = _lead(adds, add_labels, months)
     out = [",".join(lead)]
@@ -466,7 +713,30 @@ def dump_csv_text(rows_groups, tl, adds, add_labels, add_plot, add_colors,
 
 
 def _csv_rows(r, tl, adds, add_labels, add_plot, add_colors, months, t):
-    """一个项目的 csv 表体行（与 _render_rows 同结构，纯 # 无颜色）。"""
+    """一个项目的 csv 表体行（与 _render_rows 同结构，纯 # 无颜色）。
+
+    首行是项目名行（名字占首列，其余留空），其后各线段行同 HTML 版
+    网格。
+
+    :param r: 行 dict。
+    :type r: dict
+    :param tl: load_tl() 的 timeline 配置。
+    :type tl: dict
+    :param adds: 额外字段名列表。
+    :type adds: list
+    :param add_labels: 额外字段中文 label 列表。
+    :type add_labels: list
+    :param add_plot: 额外列画法（line/spot）。
+    :type add_plot: str
+    :param add_colors: 额外列配色列表（本函数不使用，为签名一致保留）。
+    :type add_colors: list
+    :param months: 12 个月窗口列表。
+    :type months: list
+    :param t: 基准日期。
+    :type t: datetime.date
+    :return: [[单元格, ...], ...] 表体行。
+    :rtype: list
+    """
     n_lead = 3 + len(adds)
     out = [[r["name"]] + [""] * (n_lead + 1 + 1 + 12 + 3 - 1)]  # 项目名行
     first_vals = ([r["vals"][0] or "", r["vals"][2] or "",

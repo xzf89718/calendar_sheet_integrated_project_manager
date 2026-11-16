@@ -2,6 +2,9 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.14.7**
+  - db_analysis 包全部模块（analysis_core 6、algo_pie 4、algo_timeline 24、__main__ 9 共 43 个函数 + 2 个排序闭包）补齐 Sphinx reST 中文 docstring，纯文档改动零逻辑变更；check_docs.py 解除 db_analysis 跳过
+  - docs 新增 db_analysis.rst，index.rst 收录 db_analysis 包
 - **v3.14.3** 文档工具链修复（用户定，2026-11-16，小补丁）：
   ① venv 依赖安装走 tuna 镜像并改为每次幂等执行——已存在的
   .docs-venv 也能补装新增依赖（openpyxl，autodoc 导入

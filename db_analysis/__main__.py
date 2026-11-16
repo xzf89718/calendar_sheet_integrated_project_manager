@@ -51,6 +51,16 @@ _LASTS = {"1m": 30, "6m": 183, "1y": 365}
 
 
 def _norm_date(s, opt):
+    """normalize_date 的严格版：无效日期抛 AnalysisError。
+
+    :param s: 原始日期字符串。
+    :type s: str
+    :param opt: 出错消息里标注的选项名（如 "--from/--last"）。
+    :type opt: str
+    :return: 规范化后的 YYYY-MM-DD。
+    :rtype: str
+    :raises AnalysisError: 日期无效时。
+    """
     v = normalize_date(s)
     if not v:
         raise AnalysisError(f"{opt} 不是有效日期：{s!r}")
@@ -58,6 +68,16 @@ def _norm_date(s, opt):
 
 
 def _build_parser():
+    """构建 db_analysis 的 argparse 解析器：pie / timeline 两子命令。
+
+    pie：--field（必填，可多次）/ --closed / --top / --where / --date-field
+    / 日期区间（--from|--last 互斥 + --to）/ --png / --dump；timeline：
+    --mode / --add-col / --add-plot / --add-colors / --sort / --desc /
+    --split / --where / --path|--dump。每个子命令注入图标双开关。
+
+    :return: 组装完成的 ArgumentParser。
+    :rtype: argparse.ArgumentParser
+    """
     p = argparse.ArgumentParser(
         prog="db_analysis",
         description="只读数据分析（绝不写库；库锚定 fields.json 同目录）")
@@ -148,7 +168,16 @@ def _build_parser():
 
 
 def _window(a):
-    """把 --from/--to/--last 归一成 (d1, d2)；都缺省 = None（当前行口径）。"""
+    """把 --from/--to/--last 归一成 (d1, d2) 日期区间。
+
+    都缺省返回 None（= 当前行口径）。d2 缺省 = 今天；--last 快捷档按
+    _LASTS 天数回推。
+
+    :param a: 已解析的 argparse 命名空间（含 date_from / date_to / last）。
+    :type a: argparse.Namespace
+    :return: (起点, 终点) 或 None。
+    :rtype: tuple 或 None
+    """
     d2 = a.date_to or date.today().isoformat()
     if a.last:
         d1 = (date.today() - timedelta(days=_LASTS[a.last])).isoformat()
@@ -160,6 +189,15 @@ def _window(a):
 
 
 def _print_table(field, segments, closed):
+    """终端打印一个字段的饼图计数表（段/计数/占比 + 口径说明）。
+
+    :param field: 字段英文 name。
+    :type field: str
+    :param segments: [(段名, 计数), ...]。
+    :type segments: list
+    :param closed: 是否含已归档项目（口径文案用）。
+    :type closed: bool
+    """
     label = dict(zip(CFG.names, CFG.labels)).get(field, field)
     total = sum(n for _k, n in segments)
     print(f"字段：{label}（{field}）  共 {total} 个项目")
@@ -173,14 +211,33 @@ def _print_table(field, segments, closed):
 
 
 def _safe(s):
-    """文件名安全化（与 main.py / bench_core 同一规则）。"""
+    """文件名安全化（与 main.py / bench_core 同一规则）。
+
+    :param s: 原始名字段。
+    :type s: str
+    :return: 安全化后的名字段，空结果回退 "x"。
+    :rtype: str
+    """
     for ch in '<>:"/\\|?*':
         s = s.replace(ch, "_")
     return s.strip(" .") or "x"
 
 
 def _cond_summary(a, d1, d2):
-    """筛选条件 → 文件名摘要段（v3.5.1 用户定：输出文件名嵌筛选条件）。"""
+    """筛选条件 -> 文件名摘要段（v3.5.1 用户定：文件名嵌筛选条件）。
+
+    where 原样拼接，日期区间拼 ``date_field=起~止``（缺省字段名"跟进"），
+    含归档加"含归档"；无条件时返回 "全量"。整段过 _safe 安全化。
+
+    :param a: 已解析的 argparse 命名空间（含 where / date_field / closed）。
+    :type a: argparse.Namespace
+    :param d1: 区间起点，None = 无日期条件。
+    :type d1: str 或 None
+    :param d2: 区间终点。
+    :type d2: str 或 None
+    :return: 文件名条件摘要段。
+    :rtype: str
+    """
     parts = list(a.where or [])
     if d1:
         parts.append(f"{a.date_field or '跟进'}={d1}~{d2}")
@@ -190,13 +247,29 @@ def _cond_summary(a, d1, d2):
 
 
 def _resolve_out(base, stem, ext, conds, default_dir, prefix="pie"):
-    """输出路径裁定（v3.5.2 用户定：只接受目录，产出可能是多个
-    文件，指定单文件名无法理解。v3.8.2 起显式目录不存在则自动
-    创建，带扩展名的路径按"想指定文件名"拒绝）。裸参数
-    (__AUTO__) → 默认目录（pie = db_analysis/pie/，timeline =
-    db_analysis/timeline/，均相对 fields.json 同目录）内自动命名
-    <prefix>_<字段>_<筛选摘要>_<时间戳>.<ext>；显式目录 → 该目录内
-    自动命名。prefix（v3.8.0）：timeline 复用本规则时区分模块名。"""
+    """输出路径裁定（v3.5.2 用户定：只接受目录，文件名自动命名）。
+
+    裸参数(__AUTO__) -> default_dir 内自动命名
+    ``<prefix>_<字段>_<筛选摘要>_<时间戳>.<ext>``；显式目录不存在则自动
+    创建，带扩展名的路径按"想指定文件名"拒绝。prefix 供 timeline 复用
+    本规则时区分模块名。
+
+    :param base: 用户给的输出位置，"__AUTO__" = 缺省目录。
+    :type base: str
+    :param stem: 文件名字段段。
+    :type stem: str
+    :param ext: 扩展名（含点）。
+    :type ext: str
+    :param conds: 条件摘要段。
+    :type conds: str
+    :param default_dir: 裸参数时的缺省目录。
+    :type default_dir: str
+    :param prefix: 文件名前缀（pie / timeline）。
+    :type prefix: str
+    :return: 完整输出路径。
+    :rtype: str
+    :raises AnalysisError: base 是文件语义的路径时。
+    """
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     auto = f"{prefix}_{_safe(stem)}_{conds}_{ts}{ext}"
     if base == "__AUTO__":
@@ -210,13 +283,30 @@ def _resolve_out(base, stem, ext, conds, default_dir, prefix="pie"):
 
 
 def _ensure_parent(path):
-    """自动命名的输出目录可能不存在，显式创建（v3.5.2）。"""
+    """自动命名的输出目录可能不存在，显式创建（v3.5.2）。
+
+    :param path: 输出文件完整路径。
+    :type path: str
+    """
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
 
 
 def main(argv=None):
+    """db_analysis CLI 总入口（python -m db_analysis）。
+
+    parse_args（参数错误退出码 2）后播图标，按 algo 分发：pie 逐字段
+    取数打印计数表，可选 PNG / csv 导出（个别字段无匹配跳过，全部无匹
+    配才报业务错误）；timeline 取数、分章、排序、渲染 HTML 整页或
+    --dump 终端打印 csv。AnalysisError 打印 stderr 返回 1；库在 finally
+    中关闭。
+
+    :param argv: 参数列表，None = sys.argv[1:]。
+    :type argv: list 或 None
+    :return: 进程退出码（0 成功 / 1 业务错误）。
+    :rtype: int
+    """
     a = _build_parser().parse_args(argv)
     from show_icon import tty_if_wanted
     tty_if_wanted(a.show_icon, a.no_show_icon)

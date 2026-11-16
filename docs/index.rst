@@ -13,6 +13,7 @@ pm_workbench API 参考
 
    db
    main
+   db_analysis
 
 索引
 ====
