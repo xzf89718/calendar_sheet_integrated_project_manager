@@ -2,6 +2,21 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.12.4** example 配置全面体检修正（用户定，2026-11-13，小补丁）：
+  按最新根模板逐段核对 example 两个 JSON：① qiuzhi/shiyan 的
+  ui.calendar 补 max_per_day_view=4（对齐 v3.12.3）；② qiuzhi 的
+  display_mainsheet 补 application、milestone 两列（v3.12.2 从根
+  模板复制时根模板恰好无这两字段，两列此前只能靠自动补末尾）；
+  ③ backup/split 的 _说明 文本对齐根模板最新措辞（identifier
+  「求职备份/实验备份」等示例个性取值保留）；④ 段间一致性全量
+  体检零错误零提示：字段引用（name_fields/search/weekly_sheet/
+  date_check/calendar_dates/timeline 基准列/display_mainsheet/
+  模板列与 defaults）、法定四类齐全、status_closed 与 choices
+  对齐、ui.io 键值合法。三个 JSON Config 校验全过。281 passed。
+
+- **v3.12.3** 根 fields.json ui.calendar.max_per_day_view 5→4
+  （用户自提交，2026-11-13）。
+
 - **v3.12.2** example 配置补齐新功能 + 根模板 io 修正（用户定，
   2026-11-13，小补丁）：① example/qiuzhi_fields.json、
   example/shiyan_fields.json 补齐 v3.7.1 以来的新配置段——timeline
