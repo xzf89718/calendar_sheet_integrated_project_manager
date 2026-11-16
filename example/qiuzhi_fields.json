@@ -345,9 +345,58 @@
    "margin_y": 120
   },
   "font": {
-   "default": 12,
-   "tree_rowheight": 38,
-   "heading_size": 13
+   "default": 13,
+   "tree_rowheight": 40,
+   "heading_size": 14
+  },
+  "_工具字体说明": "ui.<程序名>.font：各工具包 GUI 独立字体配置（v3.15.2），键 default/heading_size/tree_rowheight/weight 均可缺省；段缺失不报错。",
+  "db_append": {
+   "font": {
+    "default": 14,
+    "heading_size": 15,
+    "tree_rowheight": 44,
+    "weight": "bold"
+   }
+  },
+  "db_assign": {
+   "font": {
+    "default": 14,
+    "heading_size": 15,
+    "tree_rowheight": 44,
+    "weight": "bold"
+   }
+  },
+  "db_copy": {
+   "font": {
+    "default": 14,
+    "heading_size": 15,
+    "tree_rowheight": 44,
+    "weight": "bold"
+   }
+  },
+  "db_recycled": {
+   "font": {
+    "default": 14,
+    "heading_size": 15,
+    "tree_rowheight": 44,
+    "weight": "bold"
+   }
+  },
+  "db_split": {
+   "font": {
+    "default": 14,
+    "heading_size": 15,
+    "tree_rowheight": 44,
+    "weight": "bold"
+   }
+  },
+  "weekreport_clean": {
+   "font": {
+    "default": 14,
+    "heading_size": 15,
+    "tree_rowheight": 44,
+    "weight": "bold"
+   }
   },
   "columns": {
    "min_width": 70,
