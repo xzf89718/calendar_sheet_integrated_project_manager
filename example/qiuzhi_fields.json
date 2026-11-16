@@ -119,7 +119,7 @@
  ],
  "_status_closed说明": "哪些状态算'结案'：已Offer/已拒/已放弃 都会归档。逻辑固定，取值可自由改。",
  "backup": {
-  "_说明": "数据库备份。path=备份目录（相对路径相对程序目录，也支持绝对路径和~）；identifier=备份文件名里的识别符。文件名格式：时间(精确到秒)-识别符-数据库文件名。",
+  "_说明": "数据库备份。path=备份目录（相对路径相对程序目录，也支持绝对路径和~）；identifier=备份文件名里的识别符。",
   "path": "backups",
   "identifier": "求职备份"
  },
@@ -178,7 +178,17 @@
    "on": true
   },
   {
+   "name": "application",
+   "alias": "",
+   "on": true
+  },
+  {
    "name": "brief",
+   "alias": "",
+   "on": true
+  },
+  {
+   "name": "milestone",
    "alias": "",
    "on": true
   },
@@ -344,7 +354,8 @@
    "max_width": 360
   },
   "calendar": {
-   "max_per_day": 1
+   "max_per_day": 1,
+   "max_per_day_view": 4
   },
   "calendar_labels": {
    "start": "投递",

@@ -118,7 +118,7 @@
  },
  "_default_sort说明": "跟进表打开时的默认排序。column=字段名（或id），desc=true倒序。读取不到或列名有误时自动退路为 id 倒序，不报错。",
  "backup": {
-  "_说明": "数据库备份。path=备份目录（相对程序目录）；identifier=文件名识别符。",
+  "_说明": "数据库备份。path=备份目录（相对路径相对程序目录，也支持绝对路径和~）；identifier=备份文件名里的识别符。",
   "path": "backups",
   "identifier": "实验备份"
  },
@@ -316,7 +316,7 @@
  "calendar_mode": "filtered",
  "_calendar_mode说明": "日历渲染模式：all=当月全部；filtered=跟随表格筛选（默认，日历与表格聚合联动的核心体验）。",
  "split": {
-  "_说明": "db_split 输出文件名配方。",
+  "_说明": "db_split 分拆器的输出文件名配方。components=组成部分及顺序（field=键列名/key=键值/time=时间/prefix=前缀文本，空段自动跳过）；prefix=前缀文本。",
   "components": [
    "field",
    "key",
@@ -341,7 +341,8 @@
    "max_width": 360
   },
   "calendar": {
-   "max_per_day": 1
+   "max_per_day": 1,
+   "max_per_day_view": 4
   },
   "calendar_labels": {
    "start": "实验",
