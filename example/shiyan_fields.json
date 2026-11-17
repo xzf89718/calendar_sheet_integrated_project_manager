@@ -336,13 +336,17 @@
    "tree_rowheight": 40,
    "heading_size": 14
   },
-  "_工具字体说明": "ui.<程序名>.font：各工具包 GUI 独立字体配置（v3.15.2），键 default/heading_size/tree_rowheight/weight 均可缺省；段缺失不报错。",
+  "_工具UI说明": "ui.<程序名>：各工具包 GUI 独立 UI 配置。font 子段键 default/heading_size/tree_rowheight/weight，window 子段键 width/height（db_recycled 另有 min_width/min_height），全部可缺省；段缺失不报错，回落代码默认值（v3.15.3）。",
   "db_append": {
    "font": {
     "default": 14,
     "heading_size": 15,
     "tree_rowheight": 44,
     "weight": "bold"
+   },
+   "window": {
+    "width": 1020,
+    "height": 740
    }
   },
   "db_assign": {
@@ -351,6 +355,10 @@
     "heading_size": 15,
     "tree_rowheight": 44,
     "weight": "bold"
+   },
+   "window": {
+    "width": 900,
+    "height": 780
    }
   },
   "db_copy": {
@@ -359,6 +367,10 @@
     "heading_size": 15,
     "tree_rowheight": 44,
     "weight": "bold"
+   },
+   "window": {
+    "width": 1520,
+    "height": 780
    }
   },
   "db_recycled": {
@@ -367,6 +379,12 @@
     "heading_size": 15,
     "tree_rowheight": 44,
     "weight": "bold"
+   },
+   "window": {
+    "width": 960,
+    "height": 600,
+    "min_width": 800,
+    "min_height": 500
    }
   },
   "db_split": {
@@ -375,6 +393,10 @@
     "heading_size": 15,
     "tree_rowheight": 44,
     "weight": "bold"
+   },
+   "window": {
+    "width": 780,
+    "height": 560
    }
   },
   "weekreport_clean": {
@@ -383,6 +405,10 @@
     "heading_size": 15,
     "tree_rowheight": 44,
     "weight": "bold"
+   },
+   "window": {
+    "width": 1340,
+    "height": 840
    }
   },
   "columns": {

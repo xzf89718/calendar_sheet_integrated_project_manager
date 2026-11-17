@@ -12,6 +12,13 @@
     扩充 scripts/README 入口；版本头更新至 v3.16.0
   - 新增 scripts/README.md：check_docs / build_docs / runmyanalysis /
     myanalysis / show_icon 全家桶说明（面向开发者）
+- **v3.15.3**（2026-11-16，GUI 高清化第三批·窗口尺寸配置化）
+  - gui_fonts.py 新增 apply_window()：按 ui.<程序名>.window 段设置
+    初始/最小窗口尺寸（width/height，db_recycled 另有
+    min_width/min_height），缺省回落各程序出厂默认，零硬编码尺寸
+  - 六个工具包 geometry()/minsize() 硬编码行全部删除，改由配置驱动；
+    三份 JSON 的六个 ui.<程序名> 段各加 window 子段（初值 = 出厂
+    尺寸），_工具字体说明 更名 _工具UI说明 并补 window 键说明
 - **v3.15.2**（2026-11-16，GUI 高清化第二批·初值落地）
   - gui_fonts.py 的 font 段新增 weight 键（normal/bold，缺省 normal）
   - fields.json 与 example 双模板同步：主窗口 ui.font 调到 13/40/14；
