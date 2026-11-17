@@ -1,44 +1,22 @@
-# 日历表格聚合项目跟进工作台 v3.12.4
+# 日历表格聚合项目跟进工作台 v3.16.0
 
-<img src="icon/pm_workbench_icon.png" width="300" alt="日历表格聚合项目跟进工作台图标：日历·表格·分析">
+<img src="icon/pm_workbench_icon.png" width="300" alt="日历·表格·分析">
 
-**面向大量并行项目的轻量级跟进工作台**——替代用 Excel、记事本
-做项目管理的困境。所有项目数据存在**一个 SQLite 的数据库 .db
-文件**里，复制即备份，任何 SQLite 工具可打开，不注册、不联网、
-不上传。
+**面向大量并行项目的轻量级跟进工作台。** 所有项目数据存在**一个
+SQLite 数据库 .db 文件**里——复制即备份，任何 SQLite 工具可打开，
+不注册、不联网、不上传。
 
-日历与表格聚合为主要视图：上半日历掌握时间安排与跟进节奏，下半
-表格做查看、搜索、筛选、汇总——两者数据同源、筛选互通。日常
-工作是**碎片化记录**（工作发生时顺手一记），历史记录作为**必要**
-**兜底**（异常、复盘、解释状态变化时随时可查），全部能力由
-`fields.json` 配置，同一框架适配销售、求职、实验记录等不同场景。
+让记录融入工作：每次跟进存一条完整快照——谁改的、改了什么、
+什么时候、为什么，永久可查，任意两版红字对比。
 
-**让记录融入工作，让软件承担信息汇总，让你把精力更多地放在
-项目本身。**
-
-本框架为这句话而生：每次跟进存一条完整快照——谁改的、改了什么、
-什么时候、为什么，永久可查，任意两版红字对比。数据存在你自己硬盘
-的**一个 SQLite 文件**里，不注册、不联网、不上传。
-
-- 数据 = 单个 `.db` 文件，复制即备份，任何 SQLite 工具可读
-- 30 万条实测启动约 5 秒（数据层 SQL 化，翻页式渲染）
-- 一个项目可挂多个日期（开始/跟进/关闭/自定义），每个日期都能在日历上点击找到项目
-- 表格内容全部由 `fields.json` 配置，**改配置不改代码**，
-  加一个产品形态 = 换一份 JSON
+- 数据 = 单个 `.db` 文件；30 万条实测启动约 5 秒
+- 一个项目可挂多个日期（开始/跟进/关闭/自定义），日历上点击直达
+- 表格内容全部由 `fields.json` 配置，**改配置不改代码**
 - 七件套工具：复制 / 追加 / 分拆 / 赋值 / 周报清洗 / 分析 / 回收站
-  + 三个现成形态（见 example/）
-- 软件免费开源（MIT），基于 git 做版本控制开发；
-  定制配置与模板服务另计
+- 软件免费开源（MIT），基于 git 版本控制开发
 
-**联系作者：zifeng.xu@foxmail.com**
-- BUG报告。确认的BUG会竭力修复
-- 讨论添加新功能
-- 捐赠和购买咨询和模板定制服务
-
-**更新和维护计划**
-
-- 业余时间开发，更多功能，暂时没精力更新
-- BUG会被认真对待，尽快修复
+**联系作者：zifeng.xu@foxmail.com**（BUG 报告 / 功能讨论 / 捐赠与
+模板定制咨询；业余时间开发，BUG 会尽快修复）
 
 ---
 
@@ -49,8 +27,7 @@
 **依赖，暂不建议使用**。
 
 ```bash
-# 1. 解压后进入文件夹。部分旧环境需先升级打包工具链，
-#    否则 requirements.txt 里的包可能编译/安装失败：
+# 1. 解压后进入文件夹。部分旧环境需先升级打包工具链：
 pip install --upgrade pip setuptools wheel
 
 # 2. 安装依赖（Excel 导入导出 + Windows 通知）
@@ -60,189 +37,142 @@ pip install -r requirements.txt
 python main.py
 ```
 
-数据文件 `sales_pm.db` 首次启动自动创建，与程序同目录。
+数据文件首次启动自动创建，与程序同目录。
 
-排障：装依赖报 `Failed building wheel for winrt-runtime`——这是
-通知库 `windows-toasts` 的 C++ 依赖在太新的 Python（如 3.15）上
-没有预编译 wheel、源码编译失败所致。改用 Python 3.8~3.14，或按
-requirements.txt 注释换用备选通知库 `win10toast`。主程序与数据
-不受影响。
+排障：装依赖报 `Failed building wheel for winrt-runtime` = Python 太新
+（如 3.15）没有预编译 wheel，改用 3.8~3.14 或按 requirements.txt
+注释换备选通知库 `win10toast`。打包成 exe（可选）：装好 PyInstaller
+后运行 `build_exe.ps1`（PowerShell），dist 目录整个拷走即用。
 
-启动选项（全部可选，双击即用不变）：
-
-```bash
-python main.py                  # 聚合视图（日历+表格，默认）
-python main.py --view calendar  # 仅日历：日历吃满窗口，底部保留"新建项目"
-python main.py --view table     # 仅表格：隐藏日历，其余原样
-python main.py --check-config   # 只校验 fields.json，不建库不启动
-                                # 退出码 0=通过 1=有错误（可接脚本/CI）
-```
-**品牌图标开关（v3.7.2）**：所有命令行入口（main.py、
-workbench_ui、全部 db_* 模块）的任何命令统一接受
-`--show-icon` / `--no-show-icon`，覆盖 fields.json 的
-`ui.show_icon`（缺省 false）。CLI 下先播终端字符画（`#$&`
-ASCII：绿 `#`、蓝 `&`、红 `$`，行流输出、**不停顿**）再执行原命令；
-GUI 下为屏幕中央 3 秒闪屏。渲染由根目录 `scripts/` 下的薄脚本
-完成（ps1 走 [Console] 颜色 / sh 走 ANSI）；脚本加载失败静默放弃，
-**无 ANSI 兜底渲染**（经典控制台兜不住，v3.7.2 起移除）。
-
-**图标脚本手动重采样**：运行时的默认行为是**只执行**
-`scripts/` 里已有的薄脚本——零 PNG 解码，重复运行无卡顿。
-只有两种情况下 Python 才碰 PNG：脚本缺失时兜底生成一次；
-更换 `icon/pm_workbench_icon.png` 后手动重采样：
-
-```bash
-python show_icon.py              # 重新采样，写回 ps1 + sh 两个脚本
-python show_icon.py --cols 40    # 可选：改字符列数（默认 48）
-```
-
-脚本头部含图标文件 mtime/size 溯源标记，可人工核对是否过期。
-
-视图优先级：`--view` 命令行 > fields.json 的 `ui.default_view` >
-聚合。视图启动时选定，运行中不切换。
-
-打包成 exe（可选）：装好 PyInstaller 后运行 `build_exe.ps1`
-（PowerShell），dist 目录得到全部 exe；`fields.json` 自动复制到
-主程序 exe 旁边，整个 dist 文件夹拷到任何机器都能跑。
-
-## 二、基本使用
+## 二、基本使用（零基础从这里开始）
 
 ### 主窗口：三块
 
-- **上半：日历**——跟进表模式显示开始、跟进、关闭等日期类别
-  （默认绿/蓝/红），周报模式显示追加记录（紫）
-- **中间：按钮行**——新建、导入导出、查看、备份、模式切换、
-  收藏夹、搜索
-- **下半：项目列表**——列由 `display_mainsheet` 配置，每列可
-  排序可筛选，超页自动翻页
+<img src="figure/main_window.png" alt="主窗口：上日历、中按钮行、下项目列表">
 
-### 日历操作
+- **上半：日历**——跟进表模式显示开始/跟进/关闭等日期（默认绿/蓝/红），
+  周报模式显示追加记录（紫）
+- **中间：按钮行**——新建、导入导出、查看、备份、模式切换、收藏夹、搜索
+- **下半：项目列表**——列由配置决定，每列可排序可筛选，超页自动翻页
 
-| 操作 | 效果 |
-|------|------|
-| 点条目色块 | 直接打开项目详情 |
-| 点"还有N条 ▸" | 弹出当天全部事项列表（跟随当前筛选） |
-| 点日期数字 | 同上；弹窗返回时自动重新取数刷新 |
-| `<` `>` / 今天 / 跳转 | 翻月、回今天、跳任意年月日 |
+日历/列表的全部手势（表头左键排序、右键筛选、多选、翻页……）见
+[workbench_ui/README.md](workbench_ui/README.md) 的「界面总览」。
 
-### 列表操作
+### 三个现成形态：换 JSON 即换软件
 
-- **左键点表头**：排序，再点反向（▲/▼）；数字列按数值
-- **右键点表头**：筛选——日期列为"从~到"区间框，其余列为勾选
-  清单；多列叠加
-- **搜索**：子串匹配、不区分大小写，空格分隔多关键词取 AND，
-  命中字段前标红点 🔴
-- **双击行**：打开项目详情
-- **翻页**：列表下方"上一页/下一页"，提示"第 X~Y 条 / 共 N 条"
-- **默认排序**：打开按开始日期倒序（最新置顶），配置见
-  `default_sort`
+表单字段、列、状态全部由 `fields.json` 决定。同一份代码，换一份
+JSON 就是另一个软件——三个现成形态的新建表单：
+
+**销售项目管理（默认）**
+
+<img src="figure/editor_xiaoshou.png" alt="销售形态新建表单" width="380">
+
+**求职投递**
+
+<img src="figure/editor_qiuzhi.png" alt="求职形态新建表单" width="380">
+
+**实验记录本**
+
+<img src="figure/editor_shiyan.png" alt="实验形态新建表单" width="380">
+
+切换方法三分钟搞定（复制 example 里的文件改名为 fields.json），
+见 [example/README.md](example/README.md)；想定义自己的形态见
+[FIELDS-CONFIG.md](FIELDS-CONFIG.md)。
 
 ### 新建与跟进
 
-「新建项目」填表保存（项目名自动生成 = `name_fields` 配置的字段
-按序拼接，如 厂家-客户-产品）。之后每次联系客户：打开项目 →
-「编辑/添加跟进」→ 改字段、写跟进记录 → 保存 = 生成一条**完整
-快照**。改动说明留空会自动生成（如"里程碑: Lead → Quotation;
-金额: 50 → 48"）。
+「新建项目」填表保存（项目名自动生成 = 配置字段按序拼接）。之后
+每次有新进展：打开项目 →「编辑/添加跟进」→ 改字段、写跟进记录 →
+保存 = 生成一条**完整快照**。改动说明留空会自动生成
+（如"阶段: 制备 → 表征"）。
 
-里程碑建议值：Lead / Qualified Lead / Quotation / Under negotiation /
-Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关闭**——
-后两种归档到「显示已关闭」，历史全保留。
+### 追溯（本软件的核心）
 
-### 追溯（本框架的核心）
+<img src="figure/project_detail.png" alt="项目详情：当前状态 + 跟进历史 + 版本对比">
 
-打开项目详情：
+打开项目详情：**当前状态**显示所有字段最新值；跟进历史里选中一条
+可查看旧版本整版快照；选中两条逐字段红色高亮对比，跟进记录全文
+对照。**删除项目**进回收站可恢复（见 db_recycled/README.md）。
 
-- **当前状态**：所有字段最新值（长文本限高滚动显示）
-- **查看选中版本**：历史列表选中一条，左侧整版切到该版本快照
-  （横幅提示，一键回到最新）
-- **对比选中两条**：逐字段差异红色高亮，跟进记录全文对照
-- **删除项目**：弹窗二次确认，进入回收站可恢复（见
-  db_recycled/README.md）
+### 周报模式与导入导出
 
-### 周报模式
+点「周报模式」：日历与表格改显每天的追加记录（紫），「导出周报」
+按两行日期区间合并导出一个 xlsx 的两个工作表（本周跟进 + 下周
+计划）。「导入」选模板选文件（xlsx/csv，一行 = 一个项目）；「导出」
+只导出列表筛出的，按后缀生成 xlsx 或 csv（utf-8-sig，Excel 双击
+中文不乱码）。细节见
+[workbench_ui/README.md](workbench_ui/README.md)。
 
-点「周报模式」切换：日历与表格改显每天的追加记录
-（`[追加] 项目名称`，紫）；「导出周报」弹窗两行日期区间（本周
-跟进 + 下周计划），合并导出为一个 xlsx 的两个工作表。周报是
-只读视图——数据唯一入口是跟进表。
-
-### 导入与导出
-
-「导入」→ 选模板 → 选文件（xlsx/csv）：一行 = 一个项目，日期
-格式不拘，模板外列自动忽略并提示。「导出」→ 只导出列表筛出的，
-按文件名后缀生成 xlsx 或 csv（csv 为 utf-8-sig，Excel 双击中文
-不乱码）。模板措辞和界面显示名可以不一样，只要 `field` 指向同一
-字段名。
-
-## 三、进阶：命令行与更多文档
-
-喜欢终端的用户可以用命令行完成同样的事（进阶内容，零基础可
-跳过）：
+## 三、分析：饼图与时间线
 
 ```bash
-python -m workbench_ui list                 # 项目列表
-python -m workbench_ui new --set 客户=XX --set 金额=50
-python -m workbench_ui follow 3 --set 概率=80 --note 已报价
-python -m workbench_ui export               # 导出筛出项到 exports/（自动命名）
-                                            # --csv 出 CSV；import/weekly 同理
-python -m workbench_ui backup               # 一键备份
+python -m db_analysis pie --field 阶段        # 分布饼图（PNG + 数据 CSV）
+python -m db_analysis timeline --split        # 项目时间线（HTML，可缩放）
 ```
 
-完整命令集与规则见 [workbench_ui/README.md](workbench_ui/README.md)。
+<img src="figure/pie.png" alt="分布饼图" width="420">
+<img src="figure/timeline.png" alt="项目时间线图" width="700">
 
-**本地一键分析（v3.12.0）**：`python scripts/runmyanalysis.py`——
-四张任务清单（导出/周报/饼图/时间线），每行一个任务，参数（模板、
-筛选、排序、日期窗）全在行上，支持 @today/@today-1m 日期令牌。
-改 `scripts/runmyanalysis.py` 的参数区即可，用法见其文件头注释。
+筛选、日期窗、多变量同图等完整用法见
+[db_analysis/README.md](db_analysis/README.md)。本地一键跑批：
+`python scripts/runmyanalysis.py`（用法见
+[scripts/README.md](scripts/README.md)）。
 
-**快捷命令（可选）**：跑一次 `setup.ps1`（Windows PowerShell：
-`powershell -ExecutionPolicy Bypass -File setup.ps`）或
-`bash setup.sh`（Linux/macOS），生成 `db_split xxx.db ...` 式的
-单字命令（本质是 `python -m db_split xxx.db ...` 的封装），并把
-shim 目录加进 PATH。脚本幂等，可重复执行。
+## 四、让 AI 帮你部署和安装
+
+不会装环境也没关系——把下面这段提示词发给任意 AI Agent
+（Kimi、ChatGPT、Claude、Cursor 等），它会帮你完成下载、装依赖、
+启动和排障：
+
+```text
+请帮我部署 pm_workbench（日历表格聚合项目跟进工作台）：
+1. 从仓库获取源码（Gitee: https://gitee.com/xu-zifeng/cal-sheet-combine-management-framework
+   或 GitHub: https://github.com/xzf89718/calendar_sheet_integrated_project_manager.git）；
+2. 按仓库 README.md 的「安装与启动」一节安装依赖并启动（需要 Python 3.8~3.14）；
+3. 启动失败时阅读报错并修复，可参考 README 的排障段落与 FIELDS-CONFIG.md；
+4. 部署完成后告诉我：如何启动、数据文件在哪、如何备份。
+```
+
+仓库地址（手动下载用）：
+
+- Gitee：https://gitee.com/xu-zifeng/cal-sheet-combine-management-framework
+- GitHub：https://github.com/xzf89718/calendar_sheet_integrated_project_manager
+
+> **免责声明**：AI 会在你的机器上执行命令，关键操作（删除、覆盖、
+> 修改系统配置）请自行核对后再放行；作者不为 AI 执行结果导致的
+> 问题负责。发给 AI 的上下文可能包含你的业务信息——**敏感信息
+> （客户隐私、个人身份信息、薪资、未公开业务数据）不要发给 AI**；
+> 软件本身不联网、不上传任何数据，但发给第三方 AI 服务的内容
+> 离开本机后不受本软件控制。
+
+## 五、更多文档
 
 | 想看什么 | 去哪看 |
 |----------|--------|
 | 三个产品形态（销售/求职/实验，换形态教程） | [example/README.md](example/README.md) |
 | fields.json 逐条配置详解 + SQL 速查 | [FIELDS-CONFIG.md](FIELDS-CONFIG.md) |
-| 全部版本更新历史 | [CHANGELOG.md](CHANGELOG.md) |
-| 命令行工作台（全部 GUI 功能的 CLI 版） | [workbench_ui/README.md](workbench_ui/README.md) |
+| 命令行工作台（全部 GUI 功能的 CLI 版）+ 界面/日历/列表操作详解 + 启动选项/品牌图标 | [workbench_ui/README.md](workbench_ui/README.md) |
 | 复制 / 追加 / 分拆 / 赋值 / 周报清洗 / 分析 / 回收站 | 各模块目录内 README.md |
-| 设计细节、边界与诚实声明 | 本文档末节「设计哲学」 |
+| 开发者脚本（文档体检/文档构建/一键分析/图标重采样） | [scripts/README.md](scripts/README.md) |
+| 全部版本更新历史 | [CHANGELOG.md](CHANGELOG.md) |
 
-改配置的方法：把 fields.json 和需求发给 AI（如"加一列'竞争对手'，
-字符串，放简述后面"）→ 贴回 → 重启生效；启动报错就把报错发回
-给 AI。FIELDS-CONFIG.md 就是写给 AI 看的说明书。
+## 六、设计哲学（简写）
+
+**起点是对 Excel 项目管理的反思**：消耗精力的不只是项目本身，
+还有记录、查找、更新、回顾这些信息管理工作。三个主张：
+
+1. **让记录融入工作**——在工作发生的时刻就记录，让记录足够快、
+   足够顺，而不是事后重建。
+2. **让软件承担信息汇总**——导入、日常记录、历史、日历/表格视图、
+   周报导出构成闭环，周报是日常记录的自然产物。
+3. **历史追溯是低频但重要的兜底**——历史不为翻旧账，而是异常、
+   复盘时保留查清"为什么变了"的可能。
+
+日历管时间安排与跟进节奏，表格管查看、搜索、筛选、汇总——时间
+维度和集合维度两种理解工作的方式。本工作台服务"异步共享"的扁平
+团队：不做实时协作与并发写入，价值由真实用户的长期使用检验。
 
 ---
 
-LICENSE: MIT（Copyright (c) 2026 Ken）
-
-开发历史由 git 管理，Gitee/GitHub 双远程仓库同步。
-
-## 四、设计哲学
-
-**起点是对 Excel 项目管理方式的反思。** 长期使用 Excel 跟进项目
-后逐渐发现：消耗精力的不只是项目本身，还有记录、查找、更新、
-回顾、整理这些信息管理工作。这个软件是逐个解决这些摩擦的产物
-——先复盘摩擦，再形成设计，不是先列功能清单。
-
-**三个设计主张：**
-
-1. **让记录融入工作**：在工作发生的时刻就记录，而不是事后重建
-   记录。重点不是记录更多，而是让记录动作足够快、足够顺。
-2. **让软件承担信息汇总**：Excel 导入、日常记录、历史、日历/
-   表格视图、周报导出构成一个闭环——周报是日常记录的自然产物，
-   不是每周重启的整理任务。
-3. **历史追溯是低频但重要的兜底**：历史的目的不是经常翻旧账，
-   而是在异常、复盘、需要解释"为什么变了"时保留查清事实的可能。
-
-**日历与表格服务于不同的认知任务**：日历帮你看时间安排和跟进
-节奏，表格帮你做查看、搜索、筛选、汇总——二者不是重复呈现，
-而是时间维度和集合维度两种理解工作的方式。
-
-**边界与诚实**：本工作台服务"异步共享"的扁平团队——每人一份库、
-同一格式、定期追加汇总；不做实时协作、并发写入与冲突消解。
-它是一项有清晰问题意识的个人软件实践，价值由真实用户的长期
-使用来检验。
+LICENSE: MIT（Copyright (c) 2026 Ken）。开发历史由 git 管理，
+Gitee/GitHub 双远程仓库同步。

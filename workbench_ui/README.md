@@ -218,3 +218,37 @@ Ordered（不强制，任意字符串）。状态：**跟进中 / 成单 / 关�
 - 任何 SQLite 工具可直接打开；快照平铺存储，离开本框架依然可读
 - 损坏的 db 启动时报错退出，不误伤数据
 
+
+## 启动选项与品牌图标
+
+启动选项（全部可选，双击即用不变）：
+
+```bash
+python main.py                  # 聚合视图（日历+表格，默认）
+python main.py --view calendar  # 仅日历：日历吃满窗口，底部保留"新建项目"
+python main.py --view table     # 仅表格：隐藏日历，其余原样
+python main.py --check-config   # 只校验 fields.json，不建库不启动
+                                # 退出码 0=通过 1=有错误（可接脚本/CI）
+```
+
+**品牌图标开关（v3.7.2）**：所有命令行入口（main.py、
+workbench_ui、全部 db_* 模块）的任何命令统一接受
+`--show-icon` / `--no-show-icon`，覆盖 fields.json 的
+`ui.show_icon`（缺省 false）。CLI 下先播终端字符画（`#$&`
+ASCII：绿 `#`、蓝 `&`、红 `$`，行流输出、**不停顿**）再执行原命令；
+GUI 下为屏幕中央 3 秒闪屏。渲染由根目录 `scripts/` 下的薄脚本
+完成（ps1 走 [Console] 颜色 / sh 走 ANSI）；脚本加载失败静默放弃，
+**无 ANSI 兜底渲染**（经典控制台兜不住，v3.7.2 起移除）。
+
+**图标脚本手动重采样**：运行时的默认行为是**只执行**
+`scripts/` 里已有的薄脚本——零 PNG 解码，重复运行无卡顿。
+只有两种情况下 Python 才碰 PNG：脚本缺失时兜底生成一次；
+更换 `icon/pm_workbench_icon.png` 后手动重采样：
+
+```bash
+python show_icon.py              # 重新采样，写回 ps1 + sh 两个脚本
+python show_icon.py --cols 40    # 可选：改字符列数（默认 48）
+```
+
+脚本头部含图标文件 mtime/size 溯源标记，可人工核对是否过期。
+（v3.16.0 起本段从根 README 移至此处。）

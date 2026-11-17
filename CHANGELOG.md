@@ -2,6 +2,16 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.16.0**（2026-11-16，README 重做 + scripts/README）
+  - 根 README 重做：只保留零基础向基本使用；新增 figure/ 文件夹
+    （main_window / project_detail / pie / timeline 四张真实运行
+    截图，实验形态演示数据，不含真实人名与厂家名）；品牌图标与
+    命令行启动选项移入 workbench_ui/README.md；新增"让 AI 帮你部
+    署和安装"段落（Agent 部署提示词 + Gitee/GitHub 仓库地址 +
+    免责声明 + 敏感信息勿上传警告）；设计哲学简写；文档索引表
+    扩充 scripts/README 入口；版本头更新至 v3.16.0
+  - 新增 scripts/README.md：check_docs / build_docs / runmyanalysis /
+    myanalysis / show_icon 全家桶说明（面向开发者）
 - **v3.15.3**（2026-11-16，GUI 高清化第三批·窗口尺寸配置化）
   - gui_fonts.py 新增 apply_window()：按 ui.<程序名>.window 段设置
     初始/最小窗口尺寸（width/height，db_recycled 另有
