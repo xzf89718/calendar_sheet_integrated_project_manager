@@ -24,7 +24,7 @@ class AppendApp(tk.Tk):
         super().__init__()
         gui_fonts.apply(self, "db_append")
         self.title("多库追加器 v1.0.0")
-        self.geometry("1020x740")
+        gui_fonts.apply_window(self, "db_append", 1020, 740)
         self._build()
 
     def _build(self):

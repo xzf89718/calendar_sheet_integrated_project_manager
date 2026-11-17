@@ -408,7 +408,7 @@ class CopierApp(tk.Tk):
         super().__init__()
         gui_fonts.apply(self, "db_copy")
         self.title("项目库复制器 v1.1.0")
-        self.geometry("1520x780")
+        gui_fonts.apply_window(self, "db_copy", 1520, 780)
         self.db_a = None
         self.db_b = None
         self._build()

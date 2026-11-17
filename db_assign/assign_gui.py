@@ -30,7 +30,7 @@ class AssignApp(tk.Tk):
         super().__init__()
         gui_fonts.apply(self, "db_assign")
         self.title("批量赋值器 v1.2.0")
-        self.geometry("900x780")
+        gui_fonts.apply_window(self, "db_assign", 900, 780)
         self.db = None
         self.rows = []          # [(pid, 项目名, 当前值)]
         self._build()
