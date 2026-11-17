@@ -25,7 +25,7 @@ class SplitApp(tk.Tk):
         super().__init__()
         gui_fonts.apply(self, "db_split")
         self.title("按键分拆器 v1.0.0")
-        self.geometry("620x420")
+        self.geometry("780x560")
         self.db = None
         self._build()
 

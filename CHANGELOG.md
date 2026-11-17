@@ -2,6 +2,14 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.15.2**（2026-11-16，GUI 高清化第二批·初值落地）
+  - gui_fonts.py 的 font 段新增 weight 键（normal/bold，缺省 normal）
+  - fields.json 与 example 双模板同步：主窗口 ui.font 调到 13/40/14；
+    新增 ui.<程序名>.font 六个段（default 14 / heading_size 15 /
+    tree_rowheight 44 / weight bold）+ _工具字体说明 键
+  - 六个工具包初始窗口放大约 20%：追加器 1020x740、赋值器 900x780、
+    复制器 1520x780、回收站 960x600(min 800x500)、分拆器 780x560、
+    清洗器 1340x840
 - **v3.15.1**（2026-11-16，GUI 高清化第一批·独立配置版）
   - 新增根级 gui_fonts.py：各工具包读 fields.json 各自独立的
     ui.<程序名>.font 段（ui.db_append / ui.db_assign / ui.db_copy /

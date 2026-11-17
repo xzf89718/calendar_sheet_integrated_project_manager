@@ -26,7 +26,7 @@ class CleanApp(tk.Tk):
         super().__init__()
         gui_fonts.apply(self, "weekreport_clean")
         self.title("周报清洗器 v1.0.0")
-        self.geometry("1100x680")
+        self.geometry("1340x840")
         self.headers = []
         self.rows = []
         self.kept = []

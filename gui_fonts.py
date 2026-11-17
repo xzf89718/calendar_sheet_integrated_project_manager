@@ -12,10 +12,11 @@ window/font/columns 等键（main.py 的 _setup_fonts 消费，不动）；
   ui.db_split.font     按键分拆器
   ui.weekreport_clean.font  周报清洗器
 
-每个 font 子段三个键均可缺省（缺省 12 / 13 / 38）：
+每个 font 子段四个键均可缺省（缺省 12 / 13 / 38 / normal）：
   default        正文字号 pt
   heading_size   表格表头字号 pt
   tree_rowheight 表格行高 px
+  weight         正文字粗 normal / bold（bold 更适合大屏远观）
 
 配置整体缺省 = 用缺省值，JSON 无需预先加段；段不存在或键缺失都不报错。
 值非法（非正整数）自动回落缺省值，不抛异常。
@@ -63,9 +64,12 @@ def apply(root, name):
     sec = ui.get(name, {})
     f = sec.get("font", {}) if isinstance(sec, dict) else {}
     size = _pos_int(f.get("default"), 12)
+    weight = f.get("weight", "normal")
+    if weight not in ("normal", "bold"):
+        weight = "normal"
     for fname in _FONT_NAMES:
         try:
-            _tkfont.nametofont(fname).configure(size=size)
+            _tkfont.nametofont(fname).configure(size=size, weight=weight)
         except (KeyError, RuntimeError):
             pass                          # 字体未实例化：跳过
     style = _ttk.Style(root)

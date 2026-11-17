@@ -27,8 +27,8 @@ def run_gui(db, db_path=""):
     root = tk.Tk()
     gui_fonts.apply(root, "db_recycled")
     root.title(f"回收站 - {db_path}")
-    root.geometry("760x480")
-    root.minsize(640, 400)
+    root.geometry("960x600")
+    root.minsize(800, 500)
 
     cols = ("id", "title", "at", "cnt")
     tree = ttk.Treeview(root, columns=cols, show="headings", selectmode="browse")
