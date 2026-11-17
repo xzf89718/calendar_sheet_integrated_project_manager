@@ -2,6 +2,27 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.17.0**（2026-11-17，db_analysis 卡方列联表）
+  - 新增 `python -m db_analysis chi2 --row 字段 --col 字段`：两个
+    分类变量的列联表独立性检验——观测频数表 + 期望频数表 +
+    Pearson 卡方统计量 + 自由度 + p 值 + Cramér's V 效应量；
+    2×2 且最小期望频数 <5 时附 Fisher 精确检验（双侧），输出
+    注明本次用了什么检验；期望频数 <5 格子占比告警（异常可见）。
+    给证据不给结论：不输出"相关/无关"判定
+  - 默认输出 HTML 整页（仿 timeline：缩放 fit、标准化残差 |r|≥2
+    格子染色），自动命名 chi2_<行>-<列>_<筛选>_<时间戳>.html，
+    默认目录 db_analysis/chi2/；--dump 导出检验用到的观测数据
+    csv（宽表 + 边际合计，utf-8-sig + 纯 LF）
+  - 默认不合并长尾；--top N 才把行/列取值压到 N、超出并入「其他」
+    （合并改变检验口径，故默认关闭）
+  - 可用字段由 fields.json 的 chi2.fields 配置（可选段），缺省 =
+    全部 choice/status 字段；date 类型与 multiline（跟进简介类
+    长文本）永不纳入；analysis_core 抽出 _where_sql 供
+    collect_rows / 新增 collect_pairs 共用
+  - scipy 升为必需依赖（卡方/Fisher 的 p 值）；requirements.txt
+    同步；退出码约定不变（0 成功 / 1 业务错误 / 2 参数错误）；
+    check_docs 全绿，301 测试通过（新增 9 个 chi2 用例）
+
 - **v3.16.1**（2026-11-17，README 版面微调）
   - 「让 AI 帮你部署和安装」整节移到「安装与启动」之后（新读者
     装不上时立刻看到 AI 部署入口），后续章节序号顺延；内容不变

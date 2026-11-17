@@ -17,6 +17,14 @@ db_analysis.algo_pie 模块
    :undoc-members:
    :show-inheritance:
 
+db_analysis.algo_chi2 模块
+--------------------------
+
+.. automodule:: db_analysis.algo_chi2
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 db_analysis.algo_timeline 模块
 ------------------------------
 

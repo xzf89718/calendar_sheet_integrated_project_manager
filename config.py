@@ -452,6 +452,19 @@ class Config:
                                    if f["type"] == "status")
         self.multiline = {f["name"]: f.get("height", 5)
                           for f in self.fields if f.get("multiline")}
+        # chi2 列联表允许字段：JSON 的 chi2.fields 可配；缺省 = 全部
+        # choice/status 类型字段。date 与 multiline（跟进简介类长文本）
+        # 永不纳入（v3.17.0 用户定）
+        _ftypes = {f["name"]: f["type"] for f in self.fields}
+        _sec = data.get("chi2", {})
+        if isinstance(_sec, dict) and _sec.get("fields"):
+            _cand = [n for n in _sec["fields"] if n in _ftypes]
+        else:
+            _cand = [n for n, t in _ftypes.items()
+                     if t in ("choice", "status")]
+        self.chi2_fields = sorted(n for n in _cand
+                                  if _ftypes[n] != "date"
+                                  and n not in self.multiline)
         # 日历用的时间节点字段：{"start": "start_date", "followup": ..., ...}
         self.calendar = {f["calendar"]: f["name"] for f in self.fields
                          if f.get("calendar")}

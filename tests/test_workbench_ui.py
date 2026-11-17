@@ -35,7 +35,7 @@ def copy_pkg(dst):
         if os.path.isdir(src):
             shutil.copytree(src, tgt,
                             ignore=shutil.ignore_patterns(
-                                "__pycache__", "pie", "timeline"))
+                                "__pycache__", "pie", "timeline", "chi2"))
         else:
             shutil.copy2(src, tgt)
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """db_analysis：只读数据分析统一入口（v3.5.0；v3.5.1 多变量饼图；
-v3.5.2 默认输出目录 + --dump 改名；v3.8.0 timeline 时间线图）。
+v3.5.2 默认输出目录 + --dump 改名；v3.8.0 timeline 时间线图；
+v3.17.0 chi2 卡方列联表）。
 
     python -m db_analysis pie --field 客户 [--field 城市 ...] [--closed]
             [--top N] [--where 字段=值 ...] [--date-field 名]
@@ -11,6 +12,11 @@ v3.5.2 默认输出目录 + --dump 改名；v3.8.0 timeline 时间线图）。
             [--add-col 字段 ...] [--add-plot line|spot]
             [--add-colors #RRGGBB ...] [--sort 字段|diff] [--desc]
             [--split] [--where 字段=值 ...] [--path [目录]] [--dump]
+
+    python -m db_analysis chi2 --row 字段 --col 字段 [--closed]
+            [--top N] [--where 字段=值 ...] [--date-field 名]
+            [--from YYYY-MM-DD --to YYYY-MM-DD | --last 1m|6m|1y]
+            [--dump [目录]] [--path [目录]]
 
     基准四列（开始/下一个跟进/关闭/最近跟进）的字段、画法与配色在
     fields.json 的 timeline 段配置，不走 CLI（v3.8.4）。
@@ -39,12 +45,15 @@ from db import Database, normalize_date     # noqa: E402
 
 from .analysis_core import AnalysisError    # noqa: E402
 from . import algo_pie                      # noqa: E402
+from . import algo_chi2                     # noqa: E402
 
 # 算法表：子命令名 → (内核函数, 一句话说明)。GUI 预留数据源。
 ALGOS = {
     "pie": (algo_pie.cmd_pies, "选定字段取值分布饼图 + 计数（可多字段）"),
     "timeline": (None, "项目分类时间点可视化（HTML 整页，非甘特图；"
                  "v3.8.13 起只出 HTML）"),
+    "chi2": (algo_chi2.cmd_chi2, "两分类变量卡方列联表独立性检验"
+             "（HTML 整页；v3.17.0）"),
 }
 
 _LASTS = {"1m": 30, "6m": 183, "1y": 365}
@@ -68,7 +77,7 @@ def _norm_date(s, opt):
 
 
 def _build_parser():
-    """构建 db_analysis 的 argparse 解析器：pie / timeline 两子命令。
+    """构建 db_analysis 的 argparse 解析器：pie / timeline / chi2 子命令。
 
     pie：--field（必填，可多次）/ --closed / --top / --where / --date-field
     / 日期区间（--from|--last 互斥 + --to）/ --png / --dump；timeline：
@@ -164,6 +173,43 @@ def _build_parser():
                                 "终端（纯 # 不着色，便于复制再分析）")
         from show_icon import add_icon_flags
         add_icon_flags(sp)                      # 各算法子命令接受双开关
+        if name == "chi2":
+            sp.add_argument("--row", required=True, metavar="字段",
+                            help="行字段英文 name（分类变量；可用字段由 "
+                                 "fields.json 的 chi2.fields 配置，缺省 "
+                                 "choice/status 字段）")
+            sp.add_argument("--col", required=True, metavar="字段",
+                            help="列字段英文 name（同 --row）")
+            sp.add_argument("--closed", action="store_true",
+                            help="把已归档（closed）项目也纳入分析")
+            sp.add_argument("--top", type=int, default=0,
+                            help="每轴取值数上限，超出合并「其他」；"
+                                 "0 = 不合并（默认；合并会改变检验口径）")
+            sp.add_argument("--where", action="append", default=None,
+                            metavar="字段=值",
+                            help="筛选，可多次；同字段并集、异字段交集")
+            sp.add_argument("--date-field", default=None,
+                            metavar="字段名",
+                            help="日期区间作用的列：缺省 = 跟进日"
+                                 "（snapshot_at）；也可填快照里的 date 字段名")
+            g = sp.add_mutually_exclusive_group()
+            g.add_argument("--from", dest="date_from", default=None,
+                           metavar="YYYY-MM-DD")
+            g.add_argument("--last", default=None, choices=sorted(_LASTS),
+                           help="快捷档：近一个月/半年/一年")
+            sp.add_argument("--to", dest="date_to", default=None,
+                            metavar="YYYY-MM-DD")
+            sp.add_argument("--dump", nargs="?", const="__AUTO__",
+                            default=None, metavar="目录",
+                            help="导出检验用到的观测数据 csv（宽表 + 边际"
+                                 "合计，utf-8-sig）；只接受目录：不带值 = "
+                                 "db_analysis/chi2/，带值 = 该目录内自动"
+                                 "命名（不存在则自动创建；文件名嵌筛选摘要）")
+            sp.add_argument("--path", nargs="?", const="__AUTO__",
+                            default="__AUTO__", metavar="目录",
+                            help="HTML 写出目录（默认 db_analysis/chi2/）；"
+                                 "只接受目录，自动命名 chi2_<行>-<列>_<筛选>"
+                                 "_<时间戳>.html")
     return p
 
 
@@ -437,6 +483,47 @@ def main(argv=None):
                 f.write(text)
             print(f"筛选：{conds}")
             print(f"口径：{mode_label}；共 {n_proj} 个项目：{chap}")
+            print(f"文件已写出：{path}")
+        if a.algo == "chi2":
+            if a.top < 0:
+                raise AnalysisError("--top 必须是 >=0 的整数"
+                                "（0 = 不合并长尾）")
+            win = _window(a)
+            date_field = "__snap__" if (win and not a.date_field) \
+                else a.date_field
+            if a.date_field:
+                ftypes = {f["name"]: f["type"] for f in CFG.fields}
+                if a.date_field not in ftypes:
+                    raise AnalysisError(
+                        f"--date-field 不存在的字段：{a.date_field}")
+                if ftypes[a.date_field] != "date":
+                    raise AnalysisError(
+                        f"--date-field 必须是 date 类型字段：{a.date_field}")
+            d1 = d2 = None
+            if win:
+                d1 = _norm_date(win[0], "--from/--last")
+                d2 = _norm_date(win[1], "--to")
+            res = fn(db, a.row, a.col, closed=a.closed, top=a.top,
+                     where=a.where, date_field=date_field,
+                     d1=d1, d2=d2)
+            conds = _cond_summary(a, d1, d2)
+            scope = ("open 项目" + ("，含已归档" if a.closed else "")
+                     + (f"，日期窗 {a.date_field or '跟进'}"
+                        f"={d1}~{d2}" if d1 else ""))
+            stem = f"{res['row_label']}-{res['col_label']}"
+            print(algo_chi2.format_text(res, conds, scope))
+            out_dir = os.path.join(BASE_DIR, "db_analysis", "chi2")
+            if a.dump:
+                path = _resolve_out(a.dump, stem, ".csv", conds,
+                                    out_dir, prefix="chi2")
+                _ensure_parent(path)
+                algo_chi2.dump_csv(res, path)
+                print(f"数据已导出：{path}")
+            path = _resolve_out(a.path, stem, ".html", conds,
+                                out_dir, prefix="chi2")
+            _ensure_parent(path)
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(algo_chi2.render_html(res, conds, scope))
             print(f"文件已写出：{path}")
         return 0
     except AnalysisError as e:

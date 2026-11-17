@@ -4,6 +4,9 @@
 # 必需：Excel 导入/导出（.xlsx 读写）
 openpyxl>=3.1
 
+# 必需：db_analysis 卡方列联表 p 值 / Fisher 精确检验（v3.17.0）
+scipy>=1.10
+
 # 通知推送（Windows 原生通知，Win10/Win11）
 windows-toasts>=1.1
 
