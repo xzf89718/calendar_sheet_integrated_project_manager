@@ -106,18 +106,57 @@ def _validate_field(field):
     """
     ftypes = {f["name"]: f["type"] for f in CFG.fields}
     if field not in ftypes:
-        raise AnalysisError(f"--field 不存在的字段：{field}"
+        raise AnalysisError(f"不存在的字段：{field}"
                             f"（可用：{'、'.join(CFG.names)}）")
     return ftypes[field]
+
+
+def _where_sql(closed, where, date_field, d1, d2):
+    """拼口径 + 筛选的 where 片段（collect_* 共用，v3.17.0 抽出）。
+
+    默认只取 open 项目（closed=True 含归档）。单值筛选带空值兜底
+    （NULL 视为 '' 参与 IN），日期区间用 date() 比较。
+
+    :param closed: 是否含已归档项目。
+    :type closed: bool
+    :param where: --where 原始参数列表。
+    :type where: list 或 None
+    :param date_field: 日期区间作用的列（"__snap__" = 快照时间）。
+    :type date_field: str 或 None
+    :param d1: 区间起点（date_field 非 None 时必填）。
+    :type d1: str 或 None
+    :param d2: 区间终点。
+    :type d2: str 或 None
+    :return: (where 条件列表, 参数列表)。
+    :rtype: tuple
+    """
+    filters, ranges = _parse_where(where)
+    pick_sql, pick_args = _pick_snapshot_sql(date_field, d1, d2)
+    wheres = [pick_sql]
+    args = list(pick_args)
+    if not closed:
+        wheres.append("p.status = 'open'")
+    for name, vals in filters.items():
+        marks = ",".join("?" * len(vals))
+        wheres.append(f"(s.{name} IN ({marks})"
+                      f" OR (s.{name} IS NULL AND '' IN ({marks})))")
+        args.extend(list(vals) + list(vals))
+    for name, r1, r2 in ranges:
+        if r1:
+            wheres.append(f"date(s.{name}) >= date(?)")
+            args.append(r1)
+        if r2:
+            wheres.append(f"date(s.{name}) <= date(?)")
+            args.append(r2)
+    return wheres, args
 
 
 def collect_rows(db, field, closed=False, where=None,
                  date_field=None, d1=None, d2=None):
     """按口径取数：返回该字段的原始取值列表（含 None/空串，未归段）。
 
-    口径链：_validate_field -> _parse_where -> _pick_snapshot_sql；默认
-    只取 open 项目（closed=True 含归档）。单值筛选带空值兜底
-    （NULL 视为 '' 参与 IN），日期区间用 date() 比较。
+    口径链：_validate_field -> _where_sql；默认只取 open 项目
+    （closed=True 含归档）。
 
     :param db: 已打开的库。
     :type db: db.Database
@@ -137,28 +176,47 @@ def collect_rows(db, field, closed=False, where=None,
     :rtype: list
     """
     _validate_field(field)
-    filters, ranges = _parse_where(where)
-    pick_sql, pick_args = _pick_snapshot_sql(date_field, d1, d2)
-    wheres = [pick_sql]
-    args = list(pick_args)
-    if not closed:
-        wheres.append("p.status = 'open'")
-    for name, vals in filters.items():
-        marks = ",".join("?" * len(vals))
-        wheres.append(f"(s.{name} IN ({marks})"
-                      f" OR (s.{name} IS NULL AND '' IN ({marks})))")
-        args.extend(list(vals) + list(vals))
-    for name, r1, r2 in ranges:
-        if r1:
-            wheres.append(f"date(s.{name}) >= date(?)")
-            args.append(r1)
-        if r2:
-            wheres.append(f"date(s.{name}) <= date(?)")
-            args.append(r2)
+    wheres, args = _where_sql(closed, where, date_field, d1, d2)
     sql = (f"SELECT s.{field} FROM snapshots s "
            f"JOIN projects p ON p.id = s.project_id "
            f"WHERE {' AND '.join(wheres)}")
     return [r[0] for r in db.conn.execute(sql, args).fetchall()]
+
+
+def collect_pairs(db, row, col, closed=False, where=None,
+                  date_field=None, d1=None, d2=None):
+    """按口径取数：返回 (行字段值, 列字段值) 原始配对列表（v3.17.0）。
+
+    与 collect_rows 完全同一口径（_where_sql 共用），供列联表等
+    双变量算法用；同一项目的两条字段值来自同一条快照行。
+
+    :param db: 已打开的库。
+    :type db: db.Database
+    :param row: 行字段英文 name。
+    :type row: str
+    :param col: 列字段英文 name。
+    :type col: str
+    :param closed: 是否含已归档项目。
+    :type closed: bool
+    :param where: --where 原始参数列表。
+    :type where: list 或 None
+    :param date_field: 日期区间作用的列（"__snap__" = 快照时间）。
+    :type date_field: str 或 None
+    :param d1: 区间起点。
+    :type d1: str 或 None
+    :param d2: 区间终点。
+    :type d2: str 或 None
+    :return: [(行值, 列值), ...]，值含 None/空串（未归段）。
+    :rtype: list
+    """
+    _validate_field(row)
+    _validate_field(col)
+    wheres, args = _where_sql(closed, where, date_field, d1, d2)
+    sql = (f"SELECT s.{row}, s.{col} FROM snapshots s "
+           f"JOIN projects p ON p.id = s.project_id "
+           f"WHERE {' AND '.join(wheres)}")
+    return [(r[0], r[1])
+            for r in db.conn.execute(sql, args).fetchall()]
 
 
 def aggregate(values, top=9):

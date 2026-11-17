@@ -2,7 +2,7 @@
 
 只读数据分析统一入口，**绝不写库**（专项测试：跑完库文件哈希
 不变）。当前算法：多变量饼图共享筛选；项目分类时间点可视化
-（timeline，v3.8.0；v3.8.1 布局重排）。
+（timeline，v3.8.0；v3.8.1 布局重排）；卡方列联表（chi2，v3.17.0）。
 
 - 口径：默认统计 open 项目当前行；`--closed` 把已归档也纳入
   （timeline 例外：全量取数，`--split` 时归「已关闭」章）
@@ -21,7 +21,32 @@ python -m db_analysis pie --field 字段 [--field 字段2 ...] [--closed] [--top
 python -m db_analysis timeline [--mode year|rolling] [--cols 3个字段]
         [--colors 4个#RRGGBB] [--sort 字段|diff] [--desc] [--split]
         [--where 字段=值 ...] [--path [目录]] [--dump]
+
+python -m db_analysis chi2 --row 字段 --col 字段 [--closed] [--top N]
+        [--where 字段=值 ...] [--date-field 名]
+        [--from YYYY-MM-DD --to YYYY-MM-DD | --last 1m|6m|1y]
+        [--dump [目录]] [--path [目录]]
 ```
+
+### chi2：卡方列联表（v3.17.0）
+
+两个分类变量的独立性检验：观测频数表 + 期望频数表 + Pearson
+卡方统计量 + 自由度 + p 值 + Cramér's V 效应量；2×2 且最小期望
+频数 <5 时附 Fisher 精确检验（双侧），输出注明本次用了什么检验。
+
+- **给证据不给结论**：只摆计数与统计量，不判定"相关/无关"；期望
+  频数 <5 的格子占比高时告警"卡方近似可能失效"（异常可见）
+- 可用字段由 fields.json 的 `chi2.fields` 配置（可选段），缺省 =
+  全部 choice/status 字段；date 类型与 multiline（跟进简介类长
+  文本）永不纳入
+- 默认不合并长尾；`--top N` 才把行/列取值压到 N、超出并入「其他」
+  （合并改变检验口径，故默认关闭）
+- 默认输出 HTML 整页（db_analysis/chi2/，自动命名
+  chi2_<行>-<列>_<筛选>_<时间戳>.html；|标准化残差| ≥ 2 的格子
+  染色：红 = 超预期，蓝 = 低于预期）；`--dump` 导出检验用到的
+  观测数据 csv（宽表 + 边际合计，utf-8-sig + 纯 LF）
+- 口径与 pie 一致（open 当前行、`--closed`、日期窗取"当时最新"
+  快照、`--where` 筛选）；p 值依赖 scipy（必需依赖，v3.17.0 起）
 
 ### timeline：项目分类时间点可视化（v3.8.0 首版；v3.8.3 贴图定版；v3.8.4 配置化改版）
 

@@ -693,3 +693,159 @@ def test_timeline_week_of_month_and_cell_index():
     assert _cell_index("2026-11-29", months) == 6 * 4 + 3
     assert _cell_index("2025-01-01", months) == 0       # 窗外夹头
     assert _cell_index("2028-01-01", months) == 47      # 窗外夹尾
+
+
+# ---------- v3.17.0 chi2 卡方列联表 ----------
+
+def _allow_chi2(pkg, *names):
+    """在沙箱 fields.json 写入 chi2.fields 允许清单（测试配置路径）。"""
+    import json
+    p = pkg / "fields.json"
+    d = json.loads(p.read_text(encoding="utf-8"))
+    d["chi2"] = {"fields": list(names)}
+    p.write_text(json.dumps(d, ensure_ascii=False, indent=1),
+                 encoding="utf-8")
+
+
+def test_chi2_basic_and_html(pkg):
+    _allow_chi2(pkg, "customer", "city", "status")
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=北",
+           "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=南",
+           "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=乙", "--set", "city=北",
+           "--note", "立项")
+    r = run_ana(pkg, "chi2", "--row", "customer", "--col", "city")
+    assert r.returncode == 0
+    assert "共 3 个项目" in r.stdout
+    assert "Pearson 卡方独立性检验" in r.stdout
+    assert "Cramér's V" in r.stdout
+    assert "卡方 = " in r.stdout
+    hits = list((pkg / "db_analysis" / "chi2").glob("chi2_*.html"))
+    assert len(hits) == 1
+    html = hits[0].read_text(encoding="utf-8")
+    for k in ("观测频数", "期望频数", "给证据不给结论"):
+        assert k in html
+
+
+def test_chi2_default_fields_choice_status_only(pkg):
+    """默认允许清单 = choice/status 字段；text 字段须配置才可用。"""
+    run_ui(pkg, "new", "--set", "customer=甲", "--note", "立项")
+    r = run_ana(pkg, "chi2", "--row", "customer", "--col", "status")
+    assert r.returncode == 1
+    assert "不支持列联表" in r.stderr
+    r = run_ana(pkg, "chi2", "--row", "status", "--col", "status")
+    # status 允许但行列同字段、只有 1 个取值 -> 退化报错，不是字段拒绝
+    assert r.returncode == 1
+    assert "无法做" in r.stderr or "只剩 1 个取值" in r.stderr
+
+
+def test_chi2_rejects_date_and_multiline(pkg):
+    """date 字段与跟进简介类长文本永不纳入，配置了也拒绝。"""
+    _allow_chi2(pkg, "start_date", "note")
+    run_ui(pkg, "new", "--set", "customer=甲", "--note", "立项")
+    r = run_ana(pkg, "chi2", "--row", "start_date", "--col", "status")
+    assert r.returncode == 1
+    assert "不支持列联表" in r.stderr
+
+
+def test_chi2_fisher_small_sample(pkg):
+    """2×2 且最小期望频数 <5：输出 Fisher 精确检验并注明方法。"""
+    _allow_chi2(pkg, "customer", "city")
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=北",
+           "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=南",
+           "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=乙", "--set", "city=北",
+           "--note", "立项")
+    r = run_ana(pkg, "chi2", "--row", "customer", "--col", "city")
+    assert r.returncode == 0
+    assert "Fisher 精确检验" in r.stdout
+    assert "以 Fisher 精确" in r.stdout.split("检验：")[1].splitlines()[0]
+    assert "期望频数 <5" in r.stdout
+
+
+def test_chi2_no_merge_by_default_and_top(pkg):
+    """默认不合并长尾；--top N 才并入「其他」。"""
+    _allow_chi2(pkg, "customer", "city")
+    for i in range(6):
+        run_ui(pkg, "new", "--set", f"customer=客{i}",
+               "--set", f"city=城{i % 2}", "--note", "立项")
+    r = run_ana(pkg, "chi2", "--row", "customer", "--col", "city")
+    assert r.returncode == 0
+    assert "其他" not in r.stdout.split("检验：")[0]
+    r = run_ana(pkg, "chi2", "--row", "customer", "--col", "city",
+                "--top", "3")
+    assert "其他" in r.stdout
+
+
+def test_chi2_dump_csv(pkg):
+    _allow_chi2(pkg, "customer", "city")
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=北",
+           "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=乙", "--set", "city=南",
+           "--note", "立项")
+    outdir = pkg / "outdir"
+    outdir.mkdir()
+    r = run_ana(pkg, "chi2", "--row", "customer", "--col", "city",
+                "--dump", str(outdir))
+    assert r.returncode == 0
+    hits = list(outdir.glob("chi2_*.csv"))
+    assert len(hits) == 1
+    raw = hits[0].read_bytes()
+    assert raw.startswith(b"\xef\xbb\xbf")
+    assert b"\r\n" not in raw
+    text = raw.decode("utf-8-sig")
+    assert text.splitlines()[0].endswith(",合计")
+    assert text.splitlines()[-1].startswith("合计")
+
+
+def test_chi2_where_and_closed(pkg):
+    _allow_chi2(pkg, "customer", "city", "product")
+    for prod in ("锅", "壶"):
+        for cust, city in (("甲", "北"), ("甲", "南"),
+                           ("乙", "北"), ("乙", "南")):
+            run_ui(pkg, "new", "--set", f"customer={cust}",
+                   "--set", f"city={city}", "--set", f"product={prod}",
+                   "--note", "立项")
+    r = run_ana(pkg, "chi2", "--row", "city", "--col", "customer",
+                "--where", "product=锅")
+    assert r.returncode == 0 and "共 4 个项目" in r.stdout
+    with _db(pkg) as c:
+        c.execute("UPDATE projects SET status='closed' WHERE id=7")
+    r = run_ana(pkg, "chi2", "--row", "city", "--col", "customer")
+    assert "共 7 个项目" in r.stdout
+    r = run_ana(pkg, "chi2", "--row", "city", "--col", "customer",
+                "--closed")
+    assert "含已归档" in r.stdout and "共 8 个项目" in r.stdout
+
+
+def test_chi2_readonly_hash_unchanged(pkg):
+    """只读铁律：跑完 chi2 库文件字节不变。"""
+    _allow_chi2(pkg, "customer", "city")
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=北",
+           "--note", "立项")
+    run_ui(pkg, "new", "--set", "customer=乙", "--set", "city=南",
+           "--note", "立项")
+    dbp = pkg / "sales_pm.db"
+    before = _sha(dbp)
+    r = run_ana(pkg, "chi2", "--row", "customer", "--col", "city")
+    assert r.returncode == 0
+    assert _sha(dbp) == before
+
+
+def test_chi2_errors_exit_1(pkg):
+    _allow_chi2(pkg, "customer", "city")
+    run_ui(pkg, "new", "--set", "customer=甲", "--set", "city=北",
+           "--note", "立项")
+    for argv, msg in (
+        (("chi2", "--row", "ghost", "--col", "city"), "不存在的字段"),
+        (("chi2", "--row", "customer", "--col", "city", "--top", "-1"),
+         "--top"),
+        (("chi2", "--row", "customer", "--col", "city",
+          "--where", "customer=不存在"), "没有匹配的项目"),
+    ):
+        r = run_ana(pkg, *argv)
+        assert r.returncode == 1
+        assert msg in r.stderr
+        assert "Traceback" not in r.stderr
