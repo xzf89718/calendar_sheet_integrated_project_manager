@@ -2,6 +2,13 @@
 
 版本规则：修复动第三位，功能动第二位，结构动第一位。
 
+- **v3.16.1**（2026-11-17，README 版面微调）
+  - 「让 AI 帮你部署和安装」整节移到「安装与启动」之后（新读者
+    装不上时立刻看到 AI 部署入口），后续章节序号顺延；内容不变
+  - figure/ 新增三张真实运行截图（editor_xiaoshou / editor_qiuzhi /
+    editor_shiyan）：销售 / 求职 / 实验三个现成形态的新建表单并排
+    展示在「换 JSON 即换软件」小节
+
 - **v3.16.0**（2026-11-16，README 重做 + scripts/README）
   - 根 README 重做：只保留零基础向基本使用；新增 figure/ 文件夹
     （main_window / project_detail / pie / timeline 四张真实运行

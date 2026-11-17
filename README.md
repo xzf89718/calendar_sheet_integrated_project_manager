@@ -1,4 +1,4 @@
-# 日历表格聚合项目跟进工作台 v3.16.0
+# 日历表格聚合项目跟进工作台 v3.16.1
 
 <img src="icon/pm_workbench_icon.png" width="300" alt="日历·表格·分析">
 
@@ -44,7 +44,34 @@ python main.py
 注释换备选通知库 `win10toast`。打包成 exe（可选）：装好 PyInstaller
 后运行 `build_exe.ps1`（PowerShell），dist 目录整个拷走即用。
 
-## 二、基本使用（零基础从这里开始）
+## 二、让 AI 帮你部署和安装
+
+不会装环境也没关系——把下面这段提示词发给任意 AI Agent
+（Kimi、ChatGPT、Claude、Cursor 等），它会帮你完成下载、装依赖、
+启动和排障：
+
+```text
+请帮我部署 pm_workbench（日历表格聚合项目跟进工作台）：
+1. 从仓库获取源码（Gitee: https://gitee.com/xu-zifeng/cal-sheet-combine-management-framework
+   或 GitHub: https://github.com/xzf89718/calendar_sheet_integrated_project_manager.git）；
+2. 按仓库 README.md 的「安装与启动」一节安装依赖并启动（需要 Python 3.8~3.14）；
+3. 启动失败时阅读报错并修复，可参考 README 的排障段落与 FIELDS-CONFIG.md；
+4. 部署完成后告诉我：如何启动、数据文件在哪、如何备份。
+```
+
+仓库地址（手动下载用）：
+
+- Gitee：https://gitee.com/xu-zifeng/cal-sheet-combine-management-framework
+- GitHub：https://github.com/xzf89718/calendar_sheet_integrated_project_manager
+
+> **免责声明**：AI 会在你的机器上执行命令，关键操作（删除、覆盖、
+> 修改系统配置）请自行核对后再放行；作者不为 AI 执行结果导致的
+> 问题负责。发给 AI 的上下文可能包含你的业务信息——**敏感信息
+> （客户隐私、个人身份信息、薪资、未公开业务数据）不要发给 AI**；
+> 软件本身不联网、不上传任何数据，但发给第三方 AI 服务的内容
+> 离开本机后不受本软件控制。
+
+## 三、基本使用（零基础从这里开始）
 
 ### 主窗口：三块
 
@@ -103,7 +130,7 @@ JSON 就是另一个软件——三个现成形态的新建表单：
 中文不乱码）。细节见
 [workbench_ui/README.md](workbench_ui/README.md)。
 
-## 三、分析：饼图与时间线
+## 四、分析：饼图与时间线
 
 ```bash
 python -m db_analysis pie --field 阶段        # 分布饼图（PNG + 数据 CSV）
@@ -118,32 +145,6 @@ python -m db_analysis timeline --split        # 项目时间线（HTML，可缩�
 `python scripts/runmyanalysis.py`（用法见
 [scripts/README.md](scripts/README.md)）。
 
-## 四、让 AI 帮你部署和安装
-
-不会装环境也没关系——把下面这段提示词发给任意 AI Agent
-（Kimi、ChatGPT、Claude、Cursor 等），它会帮你完成下载、装依赖、
-启动和排障：
-
-```text
-请帮我部署 pm_workbench（日历表格聚合项目跟进工作台）：
-1. 从仓库获取源码（Gitee: https://gitee.com/xu-zifeng/cal-sheet-combine-management-framework
-   或 GitHub: https://github.com/xzf89718/calendar_sheet_integrated_project_manager.git）；
-2. 按仓库 README.md 的「安装与启动」一节安装依赖并启动（需要 Python 3.8~3.14）；
-3. 启动失败时阅读报错并修复，可参考 README 的排障段落与 FIELDS-CONFIG.md；
-4. 部署完成后告诉我：如何启动、数据文件在哪、如何备份。
-```
-
-仓库地址（手动下载用）：
-
-- Gitee：https://gitee.com/xu-zifeng/cal-sheet-combine-management-framework
-- GitHub：https://github.com/xzf89718/calendar_sheet_integrated_project_manager
-
-> **免责声明**：AI 会在你的机器上执行命令，关键操作（删除、覆盖、
-> 修改系统配置）请自行核对后再放行；作者不为 AI 执行结果导致的
-> 问题负责。发给 AI 的上下文可能包含你的业务信息——**敏感信息
-> （客户隐私、个人身份信息、薪资、未公开业务数据）不要发给 AI**；
-> 软件本身不联网、不上传任何数据，但发给第三方 AI 服务的内容
-> 离开本机后不受本软件控制。
 
 ## 五、更多文档
 
